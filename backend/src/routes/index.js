@@ -13,8 +13,9 @@
  * - app.js (mounted under /api)
  *
  * Routes exposed:
- * - /api/posts  → handled by posts.routes.js
- * - /api/delete → handled by delete.routes.js
+ * - /api/posts  -> handled by posts.routes.js
+ * - /api/delete -> handled by delete.routes.js
+ * - /api/display -> handled by display.routes.js
  *
  * Notes:
  * - Keeps route registration centralized and readable
@@ -25,11 +26,13 @@
 import express from 'express';
 import postsRoutes from './posts.routes.js';
 import deleteRoutes from './delete.routes.js';
+import displayRoutes from './display.routes.js';
 
 const router = express.Router();
 
 router.use("/posts", postsRoutes);
 router.use("/delete", deleteRoutes);
+router.use("/display", displayRoutes);
 
 export default router;
 
