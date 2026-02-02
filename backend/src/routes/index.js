@@ -17,6 +17,7 @@
  * - /api/delete/:id -> handled by delete.routes.js
  * - /api/display -> handled by display.routes.js
  * - /api/displayPost/:id -> handled by displayPost.routes.js
+ * - /api/register -> handled by register.routes.js
  *
  * Notes:
  * - Keeps route registration centralized and readable
@@ -29,6 +30,7 @@ import postsRoutes from './posts.routes.js';
 import deleteRoutes from './delete.routes.js';
 import displayRoutes from './display.routes.js';
 import displayPostRoutes from './displayPost.routes.js';
+import registerRoutes from './register.routes.js';
 
 const router = express.Router();
 
@@ -36,6 +38,7 @@ router.use("/posts", postsRoutes);
 router.use("/delete", deleteRoutes);
 router.use("/display", displayRoutes);
 router.use("/displayPost", displayPostRoutes);
+router.use("/register", registerRoutes);
 
 export default router;
 

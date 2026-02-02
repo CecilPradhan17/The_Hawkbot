@@ -1,6 +1,9 @@
+DROP TABLE IF EXISTS users CASCADE;
+
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
     username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE,
+    password_hash TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
