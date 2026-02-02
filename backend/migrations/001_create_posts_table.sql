@@ -1,5 +1,12 @@
+DROP TABLE IF EXISTS posts;
+
 CREATE TABLE posts (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    author_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_author
+      FOREIGN KEY (author_id)
+      REFERENCES users(id)
+      ON DELETE CASCADE
 );

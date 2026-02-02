@@ -13,7 +13,7 @@
  * - posts.controllers.js
  *
  * Function:
- * - createPostInDB(content)
+ * - createPostInDB({content, author_id})
  *   - Inserts a new post into the `posts` table
  *   - Returns the newly created post using `RETURNING *`
  *
@@ -25,7 +25,7 @@
 
 import pool from "../db.js";
 
-export const createPostInDB = async (content) => {
-        const res = await pool.query(`INSERT INTO posts (content) VALUES ($1) RETURNING *;`,[content]);
+export const createPostInDB = async ({content, author_id}) => {
+        const res = await pool.query(`INSERT INTO posts (content, author_id) VALUES ($1, $2) RETURNING *;`,[content, author_id]);
         return res.rows[0];    
 }
