@@ -29,13 +29,14 @@ import { createPostInDB } from "../services/posts.services.js";
 
 export const createPost = async (req, res) => {
     const { content } = req.body;
+    const authorId = req.user.id;
 
     if (!content){
         return res.status(400).json({message: "Content is required"});
     }
 
     try{
-        const post = await createPostInDB({content, author_id:1});
+        const post = await createPostInDB({content, author_id: authorId});
         res.status(201).json({
             message: "Post created",
             post: post,
