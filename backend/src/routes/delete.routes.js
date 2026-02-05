@@ -7,6 +7,7 @@
  * Responsibilities:
  * - Maps incoming DELETE requests to the appropriate controller
  * - Does not contain business logic or database queries
+ * - requireAuth to check if the client token is authorized
  *
  * Routes:
  * - DELETE /
@@ -20,12 +21,12 @@
  * - Makes it easy to extend delete-related endpoints in the future
  */
 
-
 import express from 'express';
 import { deletePost } from '../controllers/delete.controllers.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-router.delete("/:id", deletePost);
+router.delete("/:id", requireAuth, deletePost);
 
 export default router;
