@@ -2,19 +2,21 @@
  * vote.services.js
  *
  * Purpose:
- * - Contains database logic for handling post voting
- * - Ensures vote consistency, idempotency, and accurate vote counts
+ * - Contains database logic for handling post voting and post status transitions
+ * - Ensures vote consistency, idempotency, and controlled post approval workflow
  *
  * Responsibilities:
  * - Records user votes on posts
  * - Handles first-time votes, vote toggling, and vote switching
- * - Keeps `post_votes` and `posts.vote_count` in sync
+ * - Prevents voting on posts that are no longer pending
+ * - Updates post status based on vote thresholds
+ * - Keeps `post_votes`, `posts.vote_count`, and `posts.status` in sync
  * - Uses database transactions to maintain data integrity
  *
  * Used by:
  * - vote.controllers.js
  *
- * Function:
+ * Functions:
  * - voteOnPost({ userId, postId, vote })
  *   - Parameters:
  *       - userId: ID of the authenticated user casting the vote
@@ -22,6 +24,7 @@
  *       - vote: Integer value representing the vote (+1 or -1)
  *   - Behavior:
  *       - Begins a database transaction
+ *       - Checks the current post status and blocks voting if status is not `pending`
  *       - Checks for an existing vote by the user on the post
  *       - If no existing vote:
  *           - Inserts a new vote record
@@ -32,36 +35,60 @@
  *       - If the opposite vote exists:
  *           - Updates the vote value
  *           - Adjusts the post’s vote count accordingly
- *       - Commits the transaction if all operations succeed
- *       - Returns the updated vote count
+ *       - Commits the transaction
+ *       - Determines the new post status based on updated vote count
+ *       - Updates post status if it has changed
+ *       - Returns the updated vote count and post status
+ *
+ * - determinePostStatus(voteCount)
+ *   - Parameters:
+ *       - voteCount: Integer representing total votes on a post
+ *   - Behavior:
+ *       - Returns `"approved"` if vote count ≥ 1
+ *       - Returns `"disapproved"` if vote count ≤ -1
+ *       - Returns `"pending"` otherwise
  *
  * Security notes:
- * - Does not trust client-side vote counts
+ * - Does not trust client-side vote or status values
  * - User identity is derived from JWT middleware at the controller level
- * - Prevents multiple votes per user per post through database checks
+ * - Prevents vote manipulation by enforcing one vote per user per post
+ * - Prevents state changes once a post is no longer pending
  *
  * Error handling:
- * - Rolls back the transaction if any step fails
+ * - Rolls back the entire transaction if any step fails
+ * - Throws an error if voting is attempted on a non-pending post
  * - Rethrows errors to be handled by the controller
  *
  * Extra notes:
- * - Transaction usage ensures atomic updates across multiple tables
- * - Vote switching adjusts the count by `vote * 2` to account for reversal
- * - Designed to be idempotent for repeated identical vote requests
+ * - Status transitions are derived purely from vote count thresholds
+ * - Post status updates are conditional to avoid unnecessary writes
+ * - Vote logic and moderation logic are intentionally coupled here to keep consistency
  *
  * Additional info for Frontend/Modification:
- * - Frontend should rely on the returned `vote_count` instead of calculating locally
- * - UI can optimistically update votes but should reconcile on response
- * - Can be extended to support reactions, weighted votes, or rate-limiting
- * - Consider adding database constraints or indexes on `(user_id, post_id)` for performance
+ * - Frontend should rely on returned `{ voteCount, status }` instead of inferring state
+ * - UI can disable voting controls when status is not `pending`
+ * - Thresholds for approval/disapproval can be easily adjusted in `determinePostStatus`
+ * - Can be extended to support moderator overrides, quorum rules, or delayed approvals
  */
 
 import pool from "../db.js";
+
+const determinePostStatus = (voteCount) => {
+  if (voteCount >= 1) return "approved";
+  if (voteCount <= -1) return "disapproved";
+  return "pending";
+};
 
 export const voteOnPost = async ({ userId, postId, vote }) => {
 
   try {
     await pool.query("BEGIN");
+
+    const postRes = await pool.query('SELECT status FROM posts WHERE id = $1;',[postId]);
+
+    if (postRes.rows[0].status != "pending"){
+      throw new Error("Voting is closed for this post");
+    }
 
     const existing = await pool.query(
       `SELECT vote FROM post_votes WHERE user_id = $1 AND post_id = $2`,
@@ -110,7 +137,21 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
       `SELECT vote_count FROM posts WHERE id = $1`,
       [postId]
     );
-    return result.rows[0].vote_count;
+
+    const { vote_count } = result.rows[0];
+
+    const newStatus = determinePostStatus(vote_count);
+
+    await pool.query(
+      `
+      UPDATE posts
+      SET status = $1
+      WHERE id = $2 AND status <> $1
+      `,
+      [newStatus, postId]
+    );
+
+    return { voteCount: vote_count, status: newStatus };
 
   } catch (err) {
     await pool.query("ROLLBACK");

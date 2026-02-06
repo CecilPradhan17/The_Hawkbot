@@ -6,7 +6,7 @@
  * - Isolates raw SQL queries from controllers
  *
  * Responsibilities:
- * - Executes a SELECT query to fetch all posts from the `posts` table
+ * - Executes a SELECT query to fetch all posts from the `posts` table that have status pending
  * - Returns the results to the controller for HTTP response
  *
  * Used by:
@@ -26,6 +26,6 @@
 import pool from "../db.js";
 
 export const displayAllPostsFromDB = async () => {
-        const res = await pool.query(`SELECT * FROM posts;`);
+        const res = await pool.query(`SELECT * FROM posts WHERE status = 'pending';`);
         return res.rows;    
 }

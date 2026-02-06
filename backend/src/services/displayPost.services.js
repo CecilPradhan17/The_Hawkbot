@@ -6,7 +6,7 @@
  * - Encapsulates raw SQL queries related to fetching individual posts
  *
  * Responsibilities:
- * - Executes a SELECT query to retrieve a post matching the provided ID
+ * - Executes a SELECT query to retrieve a post matching the provided ID and status is pending
  * - Returns the matching post object to the controller
  *
  * Used by:
@@ -27,6 +27,6 @@
 import pool from "../db.js";
 
 export const displayOnePostFromDB = async (id) => {
-        const res = await pool.query(`SELECT * FROM posts WHERE id = $1;`, [id]);
+        const res = await pool.query(`SELECT * FROM posts WHERE id = $1 and status = 'pending';`, [id]);
         return res.rows[0];    
 }
