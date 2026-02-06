@@ -13,7 +13,7 @@
  * - app.js (mounted under /api)
  *
  * Routes exposed:
- * - /api/posts  -> handled by posts.routes.js
+ * - /api/posts  -> handled by posts.routes.js 
  * - /api/delete/:id -> handled by delete.routes.js
  * - /api/display -> handled by display.routes.js
  * - /api/displayPost/:id -> handled by displayPost.routes.js

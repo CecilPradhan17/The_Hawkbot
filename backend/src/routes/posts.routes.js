@@ -15,6 +15,7 @@
  *
  * Calls:
  * - createPost controller to handle post creation logic
+ * - handleVote controller to handle post vote logic
  * - requireAuth to check if the client token is authorized
  *
  * Notes:
@@ -26,9 +27,11 @@
 import express from 'express';
 import { createPost } from '../controllers/posts.controllers.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
+import { handleVote } from '../controllers/vote.controllers.js';
 
 const router = express.Router();
 
 router.post("/", requireAuth, createPost);
+router.post("/:id/vote", requireAuth, handleVote);
 
 export default router;
