@@ -40,7 +40,7 @@ export const loginUser = async (req, res) => {
 
     try{
         const user = await loginUserInDB({email, password});
-        res.status(201).json({
+        res.status(200).json({
             message: "User logged in",
             user,
         });

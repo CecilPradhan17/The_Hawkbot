@@ -8,7 +8,6 @@
  * Responsibilities:
  * - Hashes the user's password using bcrypt before storage
  * - Inserts a new user record into the `users` table
- * - Returns non-sensitive user information after creation
  *
  * Used by:
  * - register.controllers.js
@@ -18,11 +17,9 @@
  *   - Accepts user registration data
  *   - Hashes the plaintext password
  *   - Stores the hashed password in the database
- *   - Returns the created user's public fields (email, username)
- *
+ * 
  * Security notes:
  * - Passwords are never stored in plaintext
- * - Only non-sensitive fields are returned to the controller
  *
  * Notes:
  * - Database errors (e.g., duplicate users) should be handled by the controller
@@ -34,8 +31,7 @@ import bcrypt from "bcrypt";
 
 export const createUserInDB = async ({email, username, password}) => {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const res = await pool.query(`INSERT INTO users (username, email, password_hash) 
-            VALUES ($1, $2, $3) RETURNING email, username ;`,
+        await pool.query(`INSERT INTO users (username, email, password_hash) 
+            VALUES ($1, $2, $3);`,
             [username, email, hashedPassword]);
-        return res.rows[0];    
 }

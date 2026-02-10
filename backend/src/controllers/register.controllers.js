@@ -40,10 +40,9 @@ export const registerUser = async (req, res) => {
     }
 
     try{
-        const user = await createUserInDB({email, username, password});
+        await createUserInDB({email, username, password});
         res.status(201).json({
             message: "User created",
-            user,
         });
     }
     catch(error){

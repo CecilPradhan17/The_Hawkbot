@@ -6,6 +6,7 @@
  *
  * Responsibilities:
  * - Creates the Express app instance
+ * - Allows 'http://localhost:5173' (The Hawkbot frontend) to bypass CORS
  * - Registers global middleware (JSON body parsing)
  * - Mounts all application routes under the `/api` prefix
  *
@@ -20,8 +21,16 @@
 
 import express from 'express';
 import routes from './routes/index.js';
+import cors from 'cors';
 
  const app = express();
+
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  })
+);
 
  app.use(express.json());
 
