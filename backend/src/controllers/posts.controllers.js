@@ -37,10 +37,7 @@ export const createPost = async (req, res) => {
 
     try{
         const post = await createPostInDB({content, author_id: authorId});
-        res.status(201).json({
-            message: "Post created",
-            post: post,
-        });
+        res.status(201).json(post);
     }
     catch(error){
         console.log(error);

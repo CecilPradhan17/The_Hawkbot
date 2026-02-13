@@ -31,10 +31,7 @@ export const displayAllPosts = async (req, res) => {
 
     try{
         const posts = await displayAllPostsFromDB();
-        res.status(200).json({
-            message: "Posts fetched successfully",
-            posts: posts,
-        });
+        res.status(200).json(posts);
     }
     catch(error){
         console.log(error);

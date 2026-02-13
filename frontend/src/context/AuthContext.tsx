@@ -1,3 +1,58 @@
+/**
+ * Purpose:
+ * - Manages global authentication state for the frontend application
+ * - Provides login/logout logic and authentication status
+ *
+ * Responsibilities:
+ * - Stores and synchronizes JWT token in React state
+ * - Persists token in localStorage
+ * - Exposes authentication utilities via React Context
+ *
+ * Used by:
+ * - App root (wraps entire application)
+ * - ProtectedRoute component
+ * - Login page
+ * - Any component requiring auth state
+ *
+ * Context Interface:
+ * - token
+ *   - Current JWT token (null if unauthenticated)
+ *
+ * - isAuthenticated
+ *   - Boolean flag derived from token presence
+ *
+ * - login(data)
+ *   - Sends login request to backend
+ *   - Stores returned JWT in localStorage
+ *   - Updates authentication state
+ *
+ * - logout()
+ *   - Clears token from localStorage
+ *   - Resets authentication state
+ *
+ * Lifecycle Behavior:
+ * - On mount:
+ *     - Checks localStorage for an existing token
+ *     - Restores authentication state if token exists
+ *
+ * Hook:
+ * - useAuth()
+ *   - Custom hook to access auth context
+ *   - Throws error if used outside AuthProvider
+ *
+ * Extra notes:
+ * - Centralizes authentication logic in one place
+ * - Prevents token duplication logic across components
+ *
+ * Additional info for Future Modification / Integration:
+ * - Can be extended to:
+ *     - Decode JWT and store user info
+ *     - Implement token refresh logic
+ *     - Validate token expiration on load
+ *     - Integrate with backend logout endpoint
+ * - Could migrate token storage from localStorage to HTTP-only cookies for improved security
+ */
+
 import React, { createContext, useContext, useEffect, useState } from "react"
 import { login as loginRequest } from "@/api/auth.api"
 import type { LoginRequest } from "@/api/auth.api"
