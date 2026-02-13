@@ -69,3 +69,11 @@ export function createPost(data: CreatePostRequest): Promise<PostResponse> {
 export function getAllPosts():Promise<PostResponse[]> {
     return api.get<PostResponse[]>('/display')
 }
+
+export function getOnePost(data: number):Promise<PostResponse> {
+    return api.get<PostResponse>(`/displayPost/${data}`)
+}
+
+export function deletePost(id: number): Promise<void> {
+    return api.delete(`/delete/${id}`)
+}

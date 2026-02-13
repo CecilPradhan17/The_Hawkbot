@@ -44,10 +44,7 @@ export const displayOnePost = async (req, res) => {
                 message: "Post has been hidded"
         });
         }
-        res.status(200).json({
-            message: "Post fetched successfully",
-            post: post,
-        });
+        res.status(200).json(post);
     }
     catch(error){
         console.log(error);

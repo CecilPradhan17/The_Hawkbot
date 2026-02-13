@@ -66,7 +66,10 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  user: AuthUser
+  token: string
+  id: number
+  email: string
+  username: string
 }
 
 export interface RegisterRequest {
