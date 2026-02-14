@@ -34,11 +34,13 @@ import ProtectedRoute from "@/routes/ProtectedRoute"
 import Login from "@/pages/Login"
 import Register from "@/pages/Register"
 import Posts from "@/pages/Posts"
+import PostTest from "@/pages/PostTest"
 
 export default function App() { 
   return (
     <Routes>
       {/* Public */}
+      <Route path="/PostTest" element={<PostTest />} /> 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       {/* Protected */}

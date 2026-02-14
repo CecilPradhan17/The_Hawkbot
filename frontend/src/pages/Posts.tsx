@@ -1,24 +1,18 @@
+// pages/PostsPage.tsx
 import { useEffect, useState } from 'react'
-import {
-  createPost,
-  getAllPosts,
-  getOnePost,
-  deletePost,
-  votePost
-} from '@/api/posts.api'
-import type { PostResponse } from '@/api/posts.api'
 import { useAuth } from '@/context/AuthContext'
+import { getAllPosts, deletePost, votePost } from '@/api/posts.api'
+import type { PostResponse } from '@/api/posts.api'
+import CreatePostModal from '@/components/posts/CreatePostModal'
+import PostList from '@/components/posts/PostList'
 
 export default function PostsPage() {
-  const [content, setContent] = useState('')
+  const { userId } = useAuth()
   const [posts, setPosts] = useState<PostResponse[]>([])
+  const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const { userId } = useAuth()
-
-  const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
-  const [modalLoading, setModalLoading] = useState(false)
 
   // Fetch all posts on mount
   useEffect(() => {
@@ -26,262 +20,154 @@ export default function PostsPage() {
       try {
         const data = await getAllPosts()
         setPosts(data)
-      } catch {
+      } catch (err) {
         setError('Failed to load posts')
       } finally {
         setLoading(false)
       }
     }
-
     fetchPosts()
   }, [])
 
-  // Fetch single post when clicked
-  const handlePostClick = async (id: number) => {
-    try {
-      setModalLoading(true)
-      setError(null)
-
-      const data = await getOnePost(id)
-      setSelectedPost(data)
-    } catch {
-      setError('Failed to load post')
-    } finally {
-      setModalLoading(false)
-    }
+  // Handle new post created
+  const handlePostCreated = (newPost: PostResponse) => {
+    setPosts([newPost, ...posts])
   }
 
-  const handleDelete = async (id: number) => {
+  // Handle delete
+  const handleDelete = async (postId: number) => {
     try {
-      await deletePost(id)
-      // remove from UI state
-      setPosts(prev => prev.filter(p => p.id !== id))
-      // Close modal if deleted post was open
-      if (selectedPost?.id === id) {
+      await deletePost(postId)
+      setPosts(prev => prev.filter(p => p.id !== postId))
+      if (selectedPost?.id === postId) {
         setSelectedPost(null)
       }
     } catch (err) {
-      console.error(err)
+      console.error('Delete failed:', err)
     }
   }
 
-  // Handle voting with optimistic updates
+  // Handle vote with optimistic updates
   const handleVote = async (postId: number, voteValue: 1 | -1) => {
-    // Stop event propagation to prevent opening modal
-    
-    // 1. OPTIMISTIC UPDATE - immediately update UI
-    setPosts(prev => prev.map(post => 
-      post.id === postId 
+    // Optimistic update
+    setPosts(prev => prev.map(post =>
+      post.id === postId
         ? { ...post, vote_count: post.vote_count + voteValue }
         : post
     ))
 
-    // Also update modal if it's open
     if (selectedPost?.id === postId) {
-      setSelectedPost(prev => 
+      setSelectedPost(prev =>
         prev ? { ...prev, vote_count: prev.vote_count + voteValue } : null
       )
     }
 
     try {
-      // 2. SEND TO BACKEND
       const response = await votePost(postId, { vote: voteValue })
       
-      // 3. SYNC WITH BACKEND (in case of mismatch)
-      setPosts(prev => prev.map(post => 
-        post.id === postId 
+      // Sync with backend
+      setPosts(prev => prev.map(post =>
+        post.id === postId
           ? { ...post, vote_count: response.voteCount }
           : post
       ))
 
-      // Update modal with actual count
       if (selectedPost?.id === postId) {
-        setSelectedPost(prev => 
+        setSelectedPost(prev =>
           prev ? { ...prev, vote_count: response.voteCount } : null
         )
       }
     } catch (error) {
-      // 4. ROLLBACK ON FAILURE
-      setPosts(prev => prev.map(post => 
-        post.id === postId 
+      // Rollback on failure
+      setPosts(prev => prev.map(post =>
+        post.id === postId
           ? { ...post, vote_count: post.vote_count - voteValue }
           : post
       ))
 
-      // Rollback modal
       if (selectedPost?.id === postId) {
-        setSelectedPost(prev => 
+        setSelectedPost(prev =>
           prev ? { ...prev, vote_count: prev.vote_count - voteValue } : null
         )
       }
-
-      setError('Failed to vote. Please try again.')
-      console.error('Vote failed:', error)
     }
   }
-
-  // Create new post
-  const handleCreatePost = async () => {
-    if (!content.trim()) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      const newPost = await createPost({ content })
-
-      // Add new post to top of list
-      setPosts(prev => [newPost, ...prev])
-      setContent('')
-    } catch {
-      setError('Failed to create post')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const modalStyle: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  }
-
-  const modalContentStyle: React.CSSProperties = {
-    background: 'white',
-    padding: '2rem',
-    borderRadius: '8px',
-    minWidth: '300px',
-  }
-
-  if (loading) return <p style={{ padding: '2rem' }}>Loading posts...</p>
 
   return (
-    <>
-      <div style={{ padding: '2rem' }}>
-        <h1>Posts</h1>
-
-        {/* Create Post Section */}
-        <div style={{ marginBottom: '1rem' }}>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Write something..."
-            rows={4}
-            style={{ width: '100%', marginBottom: '0.5rem' }}
-          />
-
-          <button onClick={handleCreatePost}>
-            Create Post
-          </button>
-
-          {error && <p style={{ color: 'red' }}>{error}</p>}
-        </div>
-
-        {/* Posts List */}
-        <div>
-          {posts.map(post => (
-            <div
-              key={post.id}
-              onClick={() => handlePostClick(post.id)}
-              style={{
-                border: '1px solid #ccc',
-                padding: '1rem',
-                marginBottom: '1rem',
-                cursor: 'pointer',
-              }}
+    <div className="min-h-screen bg-[#FAF3E1]">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-[#8A244B]">Hawkbot</h1>
+          
+          <div className="flex gap-3">
+            <button className="px-4 py-2 text-slate-700 hover:text-[#8A244B] transition-colors">
+              Chatbot
+            </button>
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-[#8A244B] text-white rounded-lg hover:scale-105 transition-all"
             >
-              {post.author_id === userId && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation() // Prevent modal from opening
-                    handleDelete(post.id)
-                  }}
-                >
-                  Delete
-                </button>
-              )}
-              <p>{post.content}</p>
-              
-              {/* Voting buttons */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation() // Prevent modal from opening
-                    handleVote(post.id, 1)
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  ⬆️ Upvote
-                </button>
-                
-                <small>Votes: {post.vote_count}</small>
-                
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation() // Prevent modal from opening
-                    handleVote(post.id, -1)
-                  }}
-                  style={{ cursor: 'pointer' }}
-                >
-                  ⬇️ Downvote
-                </button>
-              </div>
-            </div>
-          ))}
+              Create Post
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Modal */}
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        {loading && (
+          <div className="text-center py-12">
+            <p className="text-slate-600">Loading posts...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <PostList
+            posts={posts}
+            onPostClick={(id: number) => {
+              const post = posts.find(p => p.id === id) || null
+              setSelectedPost(post)
+            }}
+            onVote={handleVote}
+            onDelete={handleDelete}
+            currentUserId={userId}
+          />
+        )}
+      </main>
+
+      {/* Create Post Modal */}
+      {showCreateModal && (
+        <CreatePostModal
+          onClose={() => setShowCreateModal(false)}
+          onPostCreated={handlePostCreated}
+        />
+      )}
+
+      {/* Post Detail Modal (placeholder for now) */}
       {selectedPost && (
-        <div
-          style={modalStyle}
-          onClick={() => setSelectedPost(null)}
-        >
-          <div
-            style={modalContentStyle}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {modalLoading ? (
-              <p>Loading...</p>
-            ) : (
-              <>
-                <h2>Post Details</h2>
-                <p>{selectedPost.content}</p>
-                
-                {/* Voting buttons in modal */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
-                  <button 
-                    onClick={() => handleVote(selectedPost.id, 1)}
-                  >
-                    ⬆️ Upvote
-                  </button>
-                  
-                  <small>Votes: {selectedPost.vote_count}</small>
-                  
-                  <button 
-                    onClick={() => handleVote(selectedPost.id, -1)}
-                  >
-                    ⬇️ Downvote
-                  </button>
-                </div>
-
-                <div style={{ marginTop: '1rem' }}>
-                  <button onClick={() => setSelectedPost(null)}>
-                    Close
-                  </button>
-                </div>
-              </>
-            )}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+             onClick={() => setSelectedPost(null)}>
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full"
+               onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-4">Post Details</h2>
+            <p>{selectedPost.content}</p>
+            <p className="mt-4 text-sm text-slate-500">Votes: {selectedPost.vote_count}</p>
+            <button 
+              onClick={() => setSelectedPost(null)}
+              className="mt-4 px-4 py-2 bg-slate-200 rounded-lg"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
