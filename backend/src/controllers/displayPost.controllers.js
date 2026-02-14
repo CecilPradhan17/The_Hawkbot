@@ -40,7 +40,7 @@ export const displayOnePost = async (req, res) => {
     try{
         const post = await displayOnePostFromDB(id);
         if (!post){
-            res.status(200).json({
+            return res.status(200).json({
                 message: "Post has been hidded"
         });
         }
