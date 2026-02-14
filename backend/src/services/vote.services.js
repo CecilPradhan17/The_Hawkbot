@@ -74,8 +74,8 @@
 import pool from "../db.js";
 
 const determinePostStatus = (voteCount) => {
-  if (voteCount >= 1) return "approved";
-  if (voteCount <= -1) return "disapproved";
+  if (voteCount >= 5) return "approved";
+  if (voteCount <= -5) return "disapproved";
   return "pending";
 };
 
@@ -146,12 +146,12 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
       `
       UPDATE posts
       SET status = $1
-      WHERE id = $2 AND status <> $1
+      WHERE id = $2 AND status <>$1
       `,
       [newStatus, postId]
     );
 
-    return { voteCount: vote_count, status: newStatus };
+    return { voteCount: vote_count};
 
   } catch (err) {
     await pool.query("ROLLBACK");

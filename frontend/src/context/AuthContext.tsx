@@ -5,7 +5,7 @@
  *
  * Responsibilities:
  * - Stores and synchronizes JWT token in React state
- * - Persists token in localStorage
+ * - Persists token and userId in localStorage
  * - Exposes authentication utilities via React Context
  *
  * Used by:
@@ -23,16 +23,16 @@
  *
  * - login(data)
  *   - Sends login request to backend
- *   - Stores returned JWT in localStorage
+ *   - Stores returned JWT and userIdin localStorage
  *   - Updates authentication state
  *
  * - logout()
- *   - Clears token from localStorage
+ *   - Clears token and userId from localStorage
  *   - Resets authentication state
  *
  * Lifecycle Behavior:
  * - On mount:
- *     - Checks localStorage for an existing token
+ *     - Checks localStorage for an existing token and userId 
  *     - Restores authentication state if token exists
  *
  * Hook:
@@ -46,8 +46,6 @@
  *
  * Additional info for Future Modification / Integration:
  * - Can be extended to:
- *     - Decode JWT and store user info
- *     - Implement token refresh logic
  *     - Validate token expiration on load
  *     - Integrate with backend logout endpoint
  * - Could migrate token storage from localStorage to HTTP-only cookies for improved security

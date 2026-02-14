@@ -62,6 +62,14 @@ export interface CreatePostRequest {
   content: string
 }
 
+export interface VoteRequest {
+  vote: 1 | -1
+}
+
+export interface VoteResponse {
+  voteCount: number
+}
+
 export function createPost(data: CreatePostRequest): Promise<PostResponse> {
     return api.post<PostResponse>('/posts', data)
 }
@@ -76,4 +84,8 @@ export function getOnePost(data: number):Promise<PostResponse> {
 
 export function deletePost(id: number): Promise<void> {
     return api.delete(`/delete/${id}`)
+}
+
+export function votePost(id: number, data: VoteRequest): Promise<VoteResponse> {
+  return api.post<VoteResponse>(`/posts/${id}/vote`, data)
 }

@@ -3,7 +3,8 @@ import {
   createPost,
   getAllPosts,
   getOnePost,
-  deletePost
+  deletePost,
+  votePost
 } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 import { useAuth } from '@/context/AuthContext'
@@ -55,11 +56,69 @@ export default function PostsPage() {
       await deletePost(id)
       // remove from UI state
       setPosts(prev => prev.filter(p => p.id !== id))
+      // Close modal if deleted post was open
+      if (selectedPost?.id === id) {
+        setSelectedPost(null)
+      }
     } catch (err) {
       console.error(err)
     }
   }
 
+  // Handle voting with optimistic updates
+  const handleVote = async (postId: number, voteValue: 1 | -1) => {
+    // Stop event propagation to prevent opening modal
+    
+    // 1. OPTIMISTIC UPDATE - immediately update UI
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, vote_count: post.vote_count + voteValue }
+        : post
+    ))
+
+    // Also update modal if it's open
+    if (selectedPost?.id === postId) {
+      setSelectedPost(prev => 
+        prev ? { ...prev, vote_count: prev.vote_count + voteValue } : null
+      )
+    }
+
+    try {
+      // 2. SEND TO BACKEND
+      const response = await votePost(postId, { vote: voteValue })
+      
+      // 3. SYNC WITH BACKEND (in case of mismatch)
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, vote_count: response.voteCount }
+          : post
+      ))
+
+      // Update modal with actual count
+      if (selectedPost?.id === postId) {
+        setSelectedPost(prev => 
+          prev ? { ...prev, vote_count: response.voteCount } : null
+        )
+      }
+    } catch (error) {
+      // 4. ROLLBACK ON FAILURE
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, vote_count: post.vote_count - voteValue }
+          : post
+      ))
+
+      // Rollback modal
+      if (selectedPost?.id === postId) {
+        setSelectedPost(prev => 
+          prev ? { ...prev, vote_count: prev.vote_count - voteValue } : null
+        )
+      }
+
+      setError('Failed to vote. Please try again.')
+      console.error('Vote failed:', error)
+    }
+  }
 
   // Create new post
   const handleCreatePost = async () => {
@@ -139,12 +198,41 @@ export default function PostsPage() {
               }}
             >
               {post.author_id === userId && (
-              <button onClick={() => handleDelete(post.id)}>
-              Delete
-              </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation() // Prevent modal from opening
+                    handleDelete(post.id)
+                  }}
+                >
+                  Delete
+                </button>
               )}
               <p>{post.content}</p>
-              <small>Votes: {post.vote_count}</small>
+              
+              {/* Voting buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation() // Prevent modal from opening
+                    handleVote(post.id, 1)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  ⬆️ Upvote
+                </button>
+                
+                <small>Votes: {post.vote_count}</small>
+                
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation() // Prevent modal from opening
+                    handleVote(post.id, -1)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  ⬇️ Downvote
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -166,7 +254,23 @@ export default function PostsPage() {
               <>
                 <h2>Post Details</h2>
                 <p>{selectedPost.content}</p>
-                <small>Votes: {selectedPost.vote_count}</small>
+                
+                {/* Voting buttons in modal */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+                  <button 
+                    onClick={() => handleVote(selectedPost.id, 1)}
+                  >
+                    ⬆️ Upvote
+                  </button>
+                  
+                  <small>Votes: {selectedPost.vote_count}</small>
+                  
+                  <button 
+                    onClick={() => handleVote(selectedPost.id, -1)}
+                  >
+                    ⬇️ Downvote
+                  </button>
+                </div>
 
                 <div style={{ marginTop: '1rem' }}>
                   <button onClick={() => setSelectedPost(null)}>

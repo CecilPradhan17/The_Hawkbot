@@ -60,7 +60,7 @@ export const handleVote = async (req, res) => {
     }
 
     const newVoteCount = await voteOnPost({ userId, postId, vote });
-    res.status(200).json({ voteCount: newVoteCount });
+    res.status(200).json(newVoteCount);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

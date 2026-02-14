@@ -18,6 +18,7 @@
  *   - Renders nested routes when authentication passes
  *
  * Extra notes:
+ * - Relies on isLoading state from useAuth to wait for useEffect to load up the token in state
  * - Relies on token presence rather than token validity
  * - Token validation occurs on the backend via JWT middleware
  *
