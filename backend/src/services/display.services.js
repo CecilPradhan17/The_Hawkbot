@@ -26,6 +26,6 @@
 import pool from "../db.js";
 
 export const displayAllPostsFromDB = async () => {
-        const res = await pool.query(`SELECT * FROM posts WHERE status = 'pending';`);
+        const res = await pool.query(`SELECT * FROM posts WHERE status = 'pending' ORDER BY created_at DESC;`);
         return res.rows;    
 }
