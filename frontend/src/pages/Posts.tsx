@@ -5,8 +5,9 @@ import { getAllPosts, deletePost, votePost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 import CreatePostModal from '@/components/posts/CreatePostModal'
 import PostList from '@/components/posts/PostList'
+import PostDetailModal from '@/components/posts/PostDetailModal'
 
-export default function PostsPage() {
+export default function Posts() {
   const { userId } = useAuth()
   const [posts, setPosts] = useState<PostResponse[]>([])
   const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
@@ -96,21 +97,20 @@ export default function PostsPage() {
   return (
     <div className="min-h-screen bg-[#FAF3E1]">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-[#8A244B]">Hawkbot</h1>
+      <header className="bg-[#8A244B] border-b border-slate-200 px-6 py-4 z-40">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <button className="px-4 py-2 text-slate-200 hover:text-white transition-colors">
+            Chatbot
+          </button>
           
-          <div className="flex gap-3">
-            <button className="px-4 py-2 text-slate-700 hover:text-[#8A244B] transition-colors">
-              Chatbot
-            </button>
-            <button 
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-[#8A244B] text-white rounded-lg hover:scale-105 transition-all"
-            >
-              Create Post
-            </button>
-          </div>
+          <h1 className="text-2xl font-bold text-white">Hawkbot</h1>
+          
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-white text-[#8A244B] rounded-lg hover:scale-105 transition-all"
+          >
+            Create Post
+          </button>
         </div>
       </header>
 
@@ -150,23 +150,15 @@ export default function PostsPage() {
         />
       )}
 
-      {/* Post Detail Modal (placeholder for now) */}
+      {/* Post Detail Modal */}
       {selectedPost && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-             onClick={() => setSelectedPost(null)}>
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full"
-               onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4">Post Details</h2>
-            <p>{selectedPost.content}</p>
-            <p className="mt-4 text-sm text-slate-500">Votes: {selectedPost.vote_count}</p>
-            <button 
-              onClick={() => setSelectedPost(null)}
-              className="mt-4 px-4 py-2 bg-slate-200 rounded-lg"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <PostDetailModal
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          onVote={handleVote}
+          onDelete={handleDelete}
+          currentUserId={userId}
+        />
       )}
     </div>
   )
