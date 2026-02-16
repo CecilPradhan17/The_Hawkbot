@@ -49,19 +49,29 @@
 
 import { voteOnPost } from "../services/vote.services.js";
 
-export const handleVote = async (req, res) => {
+export const handleVote = async (req, res, next) => {
   try {
-    const userId = req.user.id;       // from JWT middleware
+    const userId = req.user.id;
     const postId = parseInt(req.params.id);
-    const { vote } = req.body;        // 1 or -1
+    const { vote } = req.body;
+
+    if (isNaN(postId)) {
+      const error = new Error("Invalid post ID");
+      error.status = 400;
+      return next(error);
+    }
 
     if (![1, -1].includes(vote)) {
-      return res.status(400).json({ error: "Invalid vote value" });
+      const error = new Error("Invalid vote value");
+      error.status = 400;
+      return next(error);
     }
 
     const newVoteCount = await voteOnPost({ userId, postId, vote });
+
     res.status(200).json(newVoteCount);
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

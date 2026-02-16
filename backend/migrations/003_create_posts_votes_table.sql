@@ -1,5 +1,3 @@
-DROP TABLE IF EXISTS post_votes CASCADE;
-
 CREATE TABLE post_votes (
   user_id INT REFERENCES users(id) ON DELETE CASCADE,
   post_id INT REFERENCES posts(id) ON DELETE CASCADE,

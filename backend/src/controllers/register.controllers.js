@@ -32,24 +32,27 @@
 
 import { createUserInDB } from "../services/register.services.js";
 
-export const registerUser = async (req, res) => {
+export const registerUser = async (req, res, next) => {
     const { email, username, password } = req.body;
 
-    if (!email || !username || !password){
-        return res.status(400).json({message: "Information is required"});
+    if (!email || !username || !password) {
+        const error = new Error("Email, username and password are required");
+        error.status = 400;
+        return next(error);
     }
 
-    try{
-        await createUserInDB({email, username, password});
+    try {
+        await createUserInDB({ email, username, password });
+
         res.status(201).json({
-            message: "User created",
+            message: "User created"
         });
-    }
-    catch(error){
+
+    } catch (error) {
         if (error.message === "User already exists") {
-            return res.status(409).json({ message: error.message });
+            error.status = 409;
         }
 
-        res.status(500).json({ "error": error.message });
+        next(error);
     }
 };

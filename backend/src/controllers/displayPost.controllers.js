@@ -29,25 +29,27 @@
 
 import { displayOnePostFromDB } from "../services/displayPost.services.js";
 
-export const displayOnePost = async (req, res) => {
-
+export const displayOnePost = async (req, res, next) => {
     const { id } = req.params;
 
-    if (!id){
-        return res.status(400).json({message: "id is required"});
+    if (!id) {
+        const error = new Error("ID is required");
+        error.status = 400;
+        return next(error);
     }
 
-    try{
+    try {
         const post = await displayOnePostFromDB(id);
-        if (!post){
-            return res.status(200).json({
-                message: "Post has been hidded"
-        });
+
+        if (!post) {
+            const error = new Error("Post not found");
+            error.status = 404;
+            return next(error);
         }
+
         res.status(200).json(post);
-    }
-    catch(error){
-        console.log(error);
-        res.status(500).json({ message: "Database error" });
+
+    } catch (error) {
+        next(error);
     }
 };

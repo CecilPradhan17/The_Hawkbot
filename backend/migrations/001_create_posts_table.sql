@@ -1,5 +1,3 @@
-DROP TABLE IF EXISTS posts CASCADE;
-
 CREATE TABLE posts (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL,

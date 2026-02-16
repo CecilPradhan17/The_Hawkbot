@@ -50,18 +50,22 @@
 
 import { deletePostInDB, getAuthorIdByPost } from "../services/delete.services.js";
 
-export const deletePost = async (req, res) => {
+export const deletePost = async (req, res, next) => {
     try {    
         const { id } = req.params;
 
         const post = await getAuthorIdByPost(id);
 
-        if (!post){
-            return res.status(404).json({message:"Post not found"});
+        if (!post) {
+            const error = new Error("Post not found");
+            error.status = 404;
+            return next(error);
         }
 
-        if (post.author_id != req.user.id){
-            return res.status(403).json({message:"Not authorized"});
+        if (post.author_id != req.user.id) {
+            const error = new Error("Not authorized");
+            error.status = 403;
+            return next(error);
         }
 
         const answer = await deletePostInDB(id);
@@ -70,8 +74,8 @@ export const deletePost = async (req, res) => {
             message: "Post deleted",
             answer
         });
-    }
-    catch(error){
-        res.status(500).json({ message: error.message});
+
+    } catch (error) {
+        next(error); 
     }
 };

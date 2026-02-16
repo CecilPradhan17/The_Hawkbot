@@ -22,6 +22,7 @@
 import express from 'express';
 import routes from './routes/index.js';
 import cors from 'cors';
+import errorHandler from './middleware/errorHandler.middleware.js';
 
  const app = express();
 
@@ -35,5 +36,7 @@ app.use(
  app.use(express.json());
 
  app.use("/api", routes);
+
+ app.use(errorHandler);
 
  export default app;

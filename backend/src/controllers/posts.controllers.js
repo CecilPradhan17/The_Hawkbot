@@ -17,7 +17,7 @@
  * - createPostInDB: handles the actual database insertion logic
  *
  * Error handling:
- * - Returns 400 if required input is missing
+ * - Returns 400 if required input is missing or input exceed limit
  * - Returns 500 if a database or server error occurs
  *
  * Notes:
@@ -27,20 +27,31 @@
 
 import { createPostInDB } from "../services/posts.services.js";
 
-export const createPost = async (req, res) => {
+export const createPost = async (req, res, next) => {
     const { content } = req.body;
     const authorId = req.user.id;
 
-    if (!content){
-        return res.status(400).json({message: "Content is required"});
+    if (!content || !content.trim()) {
+        const error = new Error("Content is required");
+        error.status = 400;
+        return next(error);
     }
 
-    try{
-        const post = await createPostInDB({content, author_id: authorId});
-        res.status(201).json(post);
+    if (content.length > 500) {
+        const error = new Error("Content exceeds maximum length of 500 characters");
+        error.status = 400;
+        return next(error);
     }
-    catch(error){
-        console.log(error);
-        res.status(500).json({ message: "Database error" });
+
+    try {
+        const post = await createPostInDB({
+            content,
+            author_id: authorId
+        });
+
+        res.status(201).json(post);
+
+    } catch (error) {
+        next(error); 
     }
 };
