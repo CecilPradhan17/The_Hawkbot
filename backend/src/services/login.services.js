@@ -54,14 +54,18 @@ export const loginUserInDB = async ({email, password}) => {
         
         const user = res.rows[0];
 
-        if (!user){
-            throw new Error ("Invalid credentials");
+        if (!user) {
+        const error = new Error("Invalid email or password");
+        error.status = 401;
+        throw error;
         }
 
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordMatch) {
-            throw new Error("Invalid password");
+        const error = new Error("Invalid email or password");
+        error.status = 401;
+        throw error;
         }
 
         const token = signToken({

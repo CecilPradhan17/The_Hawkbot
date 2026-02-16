@@ -29,9 +29,23 @@
 import pool from "../db.js";
 import bcrypt from "bcrypt";
 
-export const createUserInDB = async ({email, username, password}) => {
+export const createUserInDB = async ({ email, username, password }) => {
+    try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        await pool.query(`INSERT INTO users (username, email, password_hash) 
-            VALUES ($1, $2, $3);`,
-            [username, email, hashedPassword]);
-}
+
+        await pool.query(
+            `INSERT INTO users (username, email, password_hash) 
+             VALUES ($1, $2, $3);`,
+            [username, email, hashedPassword]
+        );
+
+    } catch (error) {
+        if (error.code === "23505") {
+            const err = new Error("Email already registered");
+            err.status = 409;
+            throw err;
+        }
+
+        throw error;
+    }
+};
