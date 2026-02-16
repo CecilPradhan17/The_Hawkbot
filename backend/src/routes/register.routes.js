@@ -25,9 +25,10 @@
 
 import express from 'express';
 import { registerUser } from '../controllers/register.controllers.js';
+import { registerLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
-router.post("/", registerUser);
+router.post("/", registerLimiter, registerUser);
 
 export default router;

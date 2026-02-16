@@ -25,9 +25,10 @@
 
 import express from 'express';
 import { loginUser } from '../controllers/login.controllers.js';
+import { loginLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
-router.post("/", loginUser);
+router.post("/", loginLimiter, loginUser);
 
 export default router;
