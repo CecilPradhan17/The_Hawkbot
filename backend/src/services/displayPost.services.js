@@ -27,6 +27,38 @@
 import pool from "../db.js";
 
 export const displayOnePostFromDB = async (id) => {
-        const res = await pool.query(`SELECT * FROM posts WHERE id = $1 and status = 'pending';`, [id]);
-        return res.rows[0];    
-}
+
+    const postRes = await pool.query(
+        `
+        SELECT * FROM posts 
+        WHERE id = $1 
+        AND status = 'pending';
+        `,
+        [id]
+    );
+
+    if (postRes.rows.length === 0) {
+        return null;
+    }
+
+    const post = postRes.rows[0];
+
+    if (post.type !== "question") {
+        return {post};
+    }
+
+    const answersRes = await pool.query(
+        `
+        SELECT * FROM posts
+        WHERE parent_id = $1
+        AND status = 'pending'
+        ORDER BY created_at ASC;
+        `,
+        [id]
+    );
+
+    return {
+        post,
+        answers: answersRes.rows
+    };
+};
