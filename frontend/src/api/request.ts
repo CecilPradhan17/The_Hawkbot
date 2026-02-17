@@ -61,20 +61,32 @@ export default async function request<T>(
   body?: unknown
 ): Promise<T> {
   const token = getToken()
-
+  
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   }
-
+  
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }
-
+  
   const res = await fetch(`${BASE_URL}${endpoint}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+
+  // Handle token expiration (401 Unauthorized)
+  if (res.status === 401) {
+    // Clear auth state
+    localStorage.removeItem('token')
+    localStorage.removeItem('userId')
+    
+    // Redirect to login
+    window.location.href = '/login'
+    
+    throw new Error('Session expired. Please login again.')
+  }
 
   // Handle non-2xx responses
   if (!res.ok) {

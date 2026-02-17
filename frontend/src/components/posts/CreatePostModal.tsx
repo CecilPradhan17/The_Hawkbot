@@ -6,22 +6,37 @@ interface CreatePostModalProps {
   onPostCreated: (newPost: any) => void
 }
 
+const MAX_POST_LENGTH = 500
+
 export default function CreatePostModal({ onClose, onPostCreated }: CreatePostModalProps) {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const remainingChars = MAX_POST_LENGTH - content.length
+  const isOverLimit = content.length > MAX_POST_LENGTH
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!content.trim()) return
+    
+    // Validation checks
+    if (!content.trim()) {
+      setError('Post cannot be empty')
+      return
+    }
+
+    if (content.length > MAX_POST_LENGTH) {
+      setError(`Post cannot exceed ${MAX_POST_LENGTH} characters`)
+      return
+    }
 
     setLoading(true)
     setError(null)
 
     try {
       const newPost = await createPost({ content })
-      onPostCreated(newPost) // Tell parent about new post
-      onClose() // Close modal
+      onPostCreated(newPost)
+      onClose()
     } catch (err) {
       setError('Failed to create post')
     } finally {
@@ -33,12 +48,12 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
     // Modal backdrop (dark overlay)
     <div 
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={onClose} // Click outside to close
+      onClick={onClose}
     >
       {/* Modal content */}
       <div 
         className="bg-white rounded-2xl p-6 w-full max-w-lg"
-        onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
@@ -58,11 +73,30 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
             onChange={(e) => setContent(e.target.value)}
             placeholder="What's on your mind?"
             rows={6}
-            className="w-full px-4 py-3 rounded-lg border border-slate-200 
-                     focus:outline-none focus:ring-2 focus:ring-[#8A244B] 
-                     resize-none"
+            className={`w-full px-4 py-3 rounded-lg border resize-none
+                     focus:outline-none focus:ring-2 transition-colors
+                     ${isOverLimit 
+                       ? 'border-red-300 focus:ring-red-500' 
+                       : 'border-slate-200 focus:ring-[#8A244B]'
+                     }`}
             required
           />
+
+          {/* Character count */}
+          <div className="flex justify-between items-center mt-2">
+            <span className={`text-sm ${
+              isOverLimit 
+                ? 'text-red-600 font-medium' 
+                : remainingChars < 50 
+                  ? 'text-yellow-600' 
+                  : 'text-slate-500'
+            }`}>
+              {isOverLimit 
+                ? `${Math.abs(remainingChars)} characters over limit` 
+                : `${remainingChars} characters remaining`
+              }
+            </span>
+          </div>
 
           {error && (
             <p className="text-red-600 text-sm mt-2">{error}</p>
@@ -80,10 +114,10 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
             </button>
             <button
               type="submit"
-              disabled={loading || !content.trim()}
+              disabled={loading || !content.trim() || isOverLimit}
               className="flex-1 px-4 py-2 bg-[#8A244B] text-white rounded-lg
                        hover:scale-105 disabled:opacity-50 disabled:hover:scale-100
-                       transition-all"
+                       disabled:cursor-not-allowed transition-all"
             >
               {loading ? 'Posting...' : 'Post'}
             </button>

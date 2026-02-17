@@ -31,6 +31,7 @@
 
 import { Navigate, Outlet } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
+import { jwtDecode } from "jwt-decode"
 
 const ProtectedRoute = () => {
   
@@ -41,6 +42,18 @@ const ProtectedRoute = () => {
   }
 
   if (!token) {
+    return <Navigate to="/login" replace />
+  }
+
+  // Check if token is expired
+  try {
+    const decoded: any = jwtDecode(token)
+    const currentTime = Date.now() / 1000
+    if (decoded.exp < currentTime) {
+      console.log('[ProtectedRoute] Token expired, redirecting to login')
+      return <Navigate to="/login" replace />
+    }
+  } catch (error) {
     return <Navigate to="/login" replace />
   }
 

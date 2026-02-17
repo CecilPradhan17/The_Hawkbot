@@ -1,4 +1,3 @@
-// pages/PostsPage.tsx
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getAllPosts, deletePost, votePost } from '@/api/posts.api'
