@@ -1,34 +1,7 @@
-/**
- * posts.controllers.js
- *
- * Purpose:
- * - Handles HTTP requests related to posts
- * - Acts as the middle layer between routes and database services
- *
- * Responsibilities:
- * - Validates incoming request data
- * - Calls service-layer functions to interact with the database
- * - Sends appropriate HTTP responses back to the client
- *
- * Used by:
- * - posts.routes.js (for POST /api/posts)
- *
- * Dependencies:
- * - createPostInDB: handles the actual database insertion logic
- *
- * Error handling:
- * - Returns 400 if required input is missing or input exceed limit
- * - Returns 500 if a database or server error occurs
- *
- * Notes:
- * - Controllers should stay lightweight and avoid direct DB queries
- * - All business/data logic is delegated to the service layer
- */
-
 import { createPostInDB } from "../services/posts.services.js";
 
 export const createPost = async (req, res, next) => {
-    const { content } = req.body;
+    const { content, type, parent_id } = req.body;
     const authorId = req.user.id;
 
     if (!content || !content.trim()) {
@@ -38,20 +11,40 @@ export const createPost = async (req, res, next) => {
     }
 
     if (content.length > 500) {
-        const error = new Error("Content exceeds maximum length of 500 characters");
+        const error = new Error("Content exceeds 500 characters");
         error.status = 400;
         return next(error);
     }
 
+    if (!["post","question", "answer"].includes(type)) {
+        const error = new Error("Invalid post type");
+        error.status = 400;
+        return next(error);
+    }
+
+    if (type === "answer" && !parent_id) {
+        const error = new Error("Answers must have a parent_id");
+        error.status = 400;
+        return next(error);
+    }
+
+    if (["post", "question"].includes(type) && parent_id) {
+        const error = new Error("Only answers can have a parent_id");
+        error.status = 400;
+        return next(error);
+}
+
     try {
         const post = await createPostInDB({
             content,
-            author_id: authorId
+            author_id: authorId,
+            type,
+            parent_id: type === "answer" ? parent_id : null
         });
 
         res.status(201).json(post);
 
     } catch (error) {
-        next(error); 
+        next(error);
     }
 };
