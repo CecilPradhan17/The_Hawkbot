@@ -1,77 +1,18 @@
-/**
- * vote.services.js
- *
- * Purpose:
- * - Contains database logic for handling post voting and post status transitions
- * - Ensures vote consistency, idempotency, and controlled post approval workflow
- *
- * Responsibilities:
- * - Records user votes on posts
- * - Handles first-time votes, vote toggling, and vote switching
- * - Prevents voting on posts that are no longer pending
- * - Updates post status based on vote thresholds
- * - Keeps `post_votes`, `posts.vote_count`, and `posts.status` in sync
- * - Uses database transactions to maintain data integrity
- *
- * Used by:
- * - vote.controllers.js
- *
- * Functions:
- * - voteOnPost({ userId, postId, vote })
- *   - Parameters:
- *       - userId: ID of the authenticated user casting the vote
- *       - postId: ID of the post being voted on
- *       - vote: Integer value representing the vote (+1 or -1)
- *   - Behavior:
- *       - Begins a database transaction
- *       - Checks the current post status and blocks voting if status is not `pending`
- *       - Checks for an existing vote by the user on the post
- *       - If no existing vote:
- *           - Inserts a new vote record
- *           - Updates the post’s vote count by the vote value
- *       - If the same vote already exists:
- *           - Removes the vote (toggle off)
- *           - Reverses the previous vote from the post’s vote count
- *       - If the opposite vote exists:
- *           - Updates the vote value
- *           - Adjusts the post’s vote count accordingly
- *       - Commits the transaction
- *       - Determines the new post status based on updated vote count
- *       - Updates post status if it has changed
- *       - Returns the updated vote count and post status
- *
- * - determinePostStatus(voteCount)
- *   - Parameters:
- *       - voteCount: Integer representing total votes on a post
- *   - Behavior:
- *       - Returns `"approved"` if vote count ≥ 1
- *       - Returns `"disapproved"` if vote count ≤ -1
- *       - Returns `"pending"` otherwise
- *
- * Security notes:
- * - Does not trust client-side vote or status values
- * - User identity is derived from JWT middleware at the controller level
- * - Prevents vote manipulation by enforcing one vote per user per post
- * - Prevents state changes once a post is no longer pending
- *
- * Error handling:
- * - Rolls back the entire transaction if any step fails
- * - Throws an error if voting is attempted on a non-pending post
- * - Rethrows errors to be handled by the controller
- *
- * Extra notes:
- * - Status transitions are derived purely from vote count thresholds
- * - Post status updates are conditional to avoid unnecessary writes
- * - Vote logic and moderation logic are intentionally coupled here to keep consistency
- *
- * Additional info for Frontend/Modification:
- * - Frontend should rely on returned `{ voteCount, status }` instead of inferring state
- * - UI can disable voting controls when status is not `pending`
- * - Thresholds for approval/disapproval can be easily adjusted in `determinePostStatus`
- * - Can be extended to support moderator overrides, quorum rules, or delayed approvals
- */
-
 import pool from "../db.js";
+
+/**
+ * PURPOSE:
+ * Handles voting for answers.
+ * - Questions cannot be voted on.
+ * - Answers can be voted on.
+ * - If an answer reaches approval threshold:
+ *      → It becomes approved
+ *      → Its parent question becomes approved
+ *      → All sibling answers become disapproved
+ *
+ * USED BY:
+ * vote.controller.js → handleVote
+ */
 
 const determinePostStatus = (voteCount) => {
   if (voteCount >= 5) return "approved";
@@ -80,81 +21,134 @@ const determinePostStatus = (voteCount) => {
 };
 
 export const voteOnPost = async ({ userId, postId, vote }) => {
-
   try {
     await pool.query("BEGIN");
 
-    const postRes = await pool.query('SELECT status FROM posts WHERE id = $1;',[postId]);
+    const postRes = await pool.query(
+      `SELECT id, type, parent_id, status
+       FROM posts
+       WHERE id = $1`,
+      [postId]
+    );
 
-    if (postRes.rows[0].status != "pending"){
+    if (postRes.rows.length === 0) {
+      throw new Error("Post not found");
+    }
+
+    const { type, parent_id, status } = postRes.rows[0];
+
+    if (type === "question") {
+      throw new Error("Questions cannot be voted on");
+    }
+
+    if (status !== "pending") {
       throw new Error("Voting is closed for this post");
     }
 
+    // Check existing vote
     const existing = await pool.query(
-      `SELECT vote FROM post_votes WHERE user_id = $1 AND post_id = $2`,
+      `SELECT vote FROM post_votes
+       WHERE user_id = $1 AND post_id = $2`,
       [userId, postId]
     );
 
     if (existing.rows.length === 0) {
-      // first vote
+      // First vote
       await pool.query(
-        `INSERT INTO post_votes (user_id, post_id, vote) VALUES ($1, $2, $3)`,
+        `INSERT INTO post_votes (user_id, post_id, vote)
+         VALUES ($1, $2, $3)`,
         [userId, postId, vote]
       );
+
       await pool.query(
-        `UPDATE posts SET vote_count = vote_count + $1 WHERE id = $2`,
+        `UPDATE posts
+         SET vote_count = vote_count + $1
+         WHERE id = $2`,
         [vote, postId]
       );
+
     } else {
       const prevVote = existing.rows[0].vote;
+
       if (prevVote === vote) {
-        // toggle off
+        // Toggle off
         await pool.query(
-          `DELETE FROM post_votes WHERE user_id = $1 AND post_id = $2`,
+          `DELETE FROM post_votes
+           WHERE user_id = $1 AND post_id = $2`,
           [userId, postId]
         );
+
         await pool.query(
-          `UPDATE posts SET vote_count = vote_count - $1 WHERE id = $2`,
+          `UPDATE posts
+           SET vote_count = vote_count - $1
+           WHERE id = $2`,
           [vote, postId]
         );
+
       } else {
-        // switch vote
+        // Switch vote
         await pool.query(
-          `UPDATE post_votes SET vote = $1 WHERE user_id = $2 AND post_id = $3`,
+          `UPDATE post_votes
+           SET vote = $1
+           WHERE user_id = $2 AND post_id = $3`,
           [vote, userId, postId]
         );
+
         await pool.query(
-          `UPDATE posts SET vote_count = vote_count + $1 WHERE id = $2`,
+          `UPDATE posts
+           SET vote_count = vote_count + $1
+           WHERE id = $2`,
           [vote * 2, postId]
         );
       }
     }
 
-    await pool.query("COMMIT");
-
-    // Return the new vote count for convenience
-    const result = await pool.query(
+    // Get updated vote count
+    const updated = await pool.query(
       `SELECT vote_count FROM posts WHERE id = $1`,
       [postId]
     );
 
-    const { vote_count } = result.rows[0];
+    const voteCount = updated.rows[0].vote_count;
+    const newStatus = determinePostStatus(voteCount);
 
-    const newStatus = determinePostStatus(vote_count);
-
+    // Update this answer's status
     await pool.query(
-      `
-      UPDATE posts
-      SET status = $1
-      WHERE id = $2 AND status <>$1
-      `,
+      `UPDATE posts
+       SET status = $1
+       WHERE id = $2`,
       [newStatus, postId]
     );
 
-    return { voteCount: vote_count};
+    if (type === "answer" && newStatus === "approved") {
+
+      await pool.query(
+        `UPDATE posts
+         SET status = 'approved'
+         WHERE id = $1 AND type = 'question'`,
+        [parent_id]
+      );
+
+      // Disapprove ALL sibling answers
+      await pool.query(
+        `UPDATE posts
+         SET status = 'disapproved'
+         WHERE parent_id = $1
+         AND id <> $2
+         AND type = 'answer'`,
+        [parent_id, postId]
+      );
+    }
+
+    await pool.query("COMMIT");
+
+    return {
+      voteCount,
+      status: newStatus
+    };
 
   } catch (err) {
     await pool.query("ROLLBACK");
     throw err;
-  } 
+  }
 };
