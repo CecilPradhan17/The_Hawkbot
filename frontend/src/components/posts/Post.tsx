@@ -6,9 +6,8 @@ interface PostProps {
   post: PostResponse
   replies: PostResponse[]
   repliesOpen: boolean
-  onPostClick: (id: number) => void
+  onViewPost: (id: number) => void
   onVote: (postId: number, voteValue: 1 | -1) => void
-  onDelete?: (postId: number) => void
   onAnswerQuestion?: (question: PostResponse) => void
   onToggleReplies: (questionId: number) => void
   currentUserId: number | null
@@ -18,17 +17,13 @@ export default function Post({
   post,
   replies,
   repliesOpen,
-  onPostClick,
+  onViewPost,
   onVote,
-  onDelete,
   onAnswerQuestion,
-  onToggleReplies,
-  currentUserId,
+  onToggleReplies
 }: PostProps) {
-  const isOwner = currentUserId === post.author_id
   const isQuestion = post.type === 'question'
 
-  // Local loading only — just for the button text while fetching
   const [repliesLoading, setRepliesLoading] = useState(false)
 
   const handleToggleReplies = async (e: React.MouseEvent) => {
@@ -38,30 +33,19 @@ export default function Post({
     setRepliesLoading(false)
   }
 
-  // Use reply_count from the post data before replies are fetched,
-  // then switch to replies.length once the replies are loaded
   const replyCountDisplay = repliesOpen ? replies.length : post.reply_count
 
   return (
-    <div
-      onClick={() => onPostClick(post.id)}
-      className="bg-white rounded-xl p-6 shadow-sm border border-slate-200
-                 hover:shadow-md transition-all cursor-pointer"
-    >
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-all">
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
         <p className="text-xs text-slate-500">{getTimeAgo(post.created_at)}</p>
-        {isOwner && onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(post.id)
-            }}
-            className="text-black-500 hover:text-red-700 text-sm"
-          >
-            Delete
-          </button>
-        )}
+        <button
+          onClick={() => onViewPost(post.id)}
+          className="text-[#8A244B] hover:underline text-sm font-medium"
+        >
+          View post
+        </button>
       </div>
 
       {/* Content */}
@@ -71,7 +55,6 @@ export default function Post({
       <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
         {isQuestion ? (
           <>
-            {/* Replies toggle */}
             <button
               onClick={handleToggleReplies}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
@@ -85,13 +68,8 @@ export default function Post({
                   : `${replyCountDisplay} replies`
               }
             </button>
-
-            {/* Give answer */}
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onAnswerQuestion?.(post)
-              }}
+              onClick={() => onAnswerQuestion?.(post)}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-[#8A244B]/10 hover:bg-[#8A244B]/20 text-[#8A244B]
                          transition-colors text-sm"
@@ -101,12 +79,8 @@ export default function Post({
           </>
         ) : (
           <>
-            {/* Vote buttons — posts and answers only */}
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onVote(post.id, 1)
-              }}
+              onClick={() => onVote(post.id, 1)}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-slate-100 hover:bg-green-100 hover:text-green-700
                          transition-colors"
@@ -115,10 +89,7 @@ export default function Post({
             </button>
             <span className="font-medium text-slate-700">{post.vote_count}</span>
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onVote(post.id, -1)
-              }}
+              onClick={() => onVote(post.id, -1)}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-slate-100 hover:bg-red-100 hover:text-red-700
                          transition-colors"
@@ -131,67 +102,44 @@ export default function Post({
 
       {/* Replies list */}
       {repliesOpen && (
-        <div
-          className="mt-4 space-y-3"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="mt-4 space-y-3">
           {replies.length === 0 ? (
             <p className="text-slate-400 text-sm italic">No answers yet. Be the first!</p>
           ) : (
-            replies.map((reply) => {
-              return (
-                <div
-                  key={reply.id}
-                  className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-200"
-                >
-                  {/* Reply header */}
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-slate-400">{getTimeAgo(reply.created_at)}</span>
-                    <div className="flex items-center gap-3">
-                      {isOwner && onDelete && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onDelete(reply.id)
-                          }}
-                          className="text-black-500 hover:text-red-700 text-xs"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Reply content */}
-                  <p className="text-slate-700 text-sm">{reply.content}</p>
-
-                  {/* Answer votes */}
-                  <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onVote(reply.id, 1)
-                      }}
-                      className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
-                                 hover:text-green-700 transition-colors"
-                    >
-                      HawkYeah
-                    </button>
-                    <span className="text-xs font-medium text-slate-600">{reply.vote_count}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onVote(reply.id, -1)
-                      }}
-                      className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
-                                 hover:text-red-700 transition-colors"
-                    >
-                      HawkNah
-                    </button>
-                  </div>
+            replies.map((reply) => (
+              <div
+                key={reply.id}
+                className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-200"
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-slate-400">{getTimeAgo(reply.created_at)}</span>
+                  <button
+                    onClick={() => onViewPost(reply.id)}
+                    className="text-[#8A244B] hover:underline text-xs font-medium"
+                  >
+                    View post
+                  </button>
                 </div>
-              )
-            })
+                <p className="text-slate-700 text-sm">{reply.content}</p>
+                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
+                  <button
+                    onClick={() => onVote(reply.id, 1)}
+                    className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
+                               hover:text-green-700 transition-colors"
+                  >
+                    HawkYeah
+                  </button>
+                  <span className="text-xs font-medium text-slate-600">{reply.vote_count}</span>
+                  <button
+                    onClick={() => onVote(reply.id, -1)}
+                    className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
+                               hover:text-red-700 transition-colors"
+                  >
+                    HawkNah
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       )}

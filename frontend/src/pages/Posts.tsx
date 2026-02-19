@@ -22,7 +22,6 @@ export default function Posts() {
   const [repliesMap, setRepliesMap] = useState<Record<number, PostResponse[]>>({})
   const [repliesOpenMap, setRepliesOpenMap] = useState<Record<number, boolean>>({})
 
-  // Fetch all posts on mount
   useEffect(() => {
     async function fetchPosts() {
       try {
@@ -37,7 +36,6 @@ export default function Posts() {
     fetchPosts()
   }, [])
 
-  // Toggle replies open/closed, fetching if not yet loaded
   const handleToggleReplies = async (questionId: number) => {
     const isOpen = repliesOpenMap[questionId] ?? false
 
@@ -46,13 +44,11 @@ export default function Posts() {
       return
     }
 
-    // If already fetched, just open
     if (repliesMap[questionId]) {
       setRepliesOpenMap(prev => ({ ...prev, [questionId]: true }))
       return
     }
 
-    // Fetch for the first time
     try {
       const data = await getOnePost(questionId)
       setRepliesMap(prev => ({ ...prev, [questionId]: data.answers ?? [] }))
@@ -62,8 +58,6 @@ export default function Posts() {
     }
   }
 
-  // Fetch replies for a question without toggling open state
-  // Used when opening the detail modal so replies are ready immediately
   const ensureRepliesFetched = async (questionId: number) => {
     if (repliesMap[questionId]) return
     try {
@@ -74,35 +68,37 @@ export default function Posts() {
     }
   }
 
-  // Handle post click — if it's a question, preload replies before opening modal
-  const handlePostClick = async (id: number) => {
-    const post = posts.find(p => p.id === id) || null
+  // Handle "View post" — works for posts, questions, and answers
+  // Answers may only be in repliesMap, not in the main posts array
+  const handleViewPost = async (id: number) => {
+    const post =
+      posts.find(p => p.id === id) ??
+      Object.values(repliesMap).flat().find(r => r.id === id) ??
+      null
+
     if (!post) return
+
     if (post.type === 'question') {
       await ensureRepliesFetched(post.id)
     }
+
     setSelectedPost(post)
   }
 
-  // Handle new post or question created
   const handlePostCreated = (newPost: PostResponse) => {
     setPosts(prev => [newPost, ...prev])
   }
 
-  // Handle answer created — append to replies and increment reply_count on parent question
   const handleAnswerCreated = (answer: PostResponse) => {
     const questionId = answer.parent_id!
 
-    // Append to replies list
     setRepliesMap(prev => ({
       ...prev,
       [questionId]: [...(prev[questionId] ?? []), answer],
     }))
 
-    // Ensure replies are shown open
     setRepliesOpenMap(prev => ({ ...prev, [questionId]: true }))
 
-    // Increment reply_count on the parent question in posts list
     setPosts(prev => prev.map(post =>
       post.id === questionId
         ? { ...post, reply_count: post.reply_count + 1 }
@@ -110,11 +106,11 @@ export default function Posts() {
     ))
   }
 
-  // Handle delete — if it's an answer, also decrement reply_count on parent
   const handleDelete = async (postId: number) => {
     try {
-      const postToDelete = posts.find(p => p.id === postId)
-        ?? Object.values(repliesMap).flat().find(r => r.id === postId)
+      const postToDelete =
+        posts.find(p => p.id === postId) ??
+        Object.values(repliesMap).flat().find(r => r.id === postId)
 
       await deletePost(postId)
 
@@ -143,7 +139,6 @@ export default function Posts() {
     }
   }
 
-  // Handle vote with optimistic updates — covers both posts and replies
   const handleVote = async (postId: number, voteValue: 1 | -1) => {
     setPosts(prev => prev.map(post =>
       post.id === postId
@@ -222,7 +217,6 @@ export default function Posts() {
     }
   }
 
-  // Close detail modal and open answer modal
   const handleAnswerFromDetail = (question: PostResponse) => {
     setSelectedPost(null)
     setAnsweringQuestion(question)
@@ -275,9 +269,8 @@ export default function Posts() {
             posts={posts}
             repliesMap={repliesMap}
             repliesOpenMap={repliesOpenMap}
-            onPostClick={handlePostClick}
+            onViewPost={handleViewPost}
             onVote={handleVote}
-            onDelete={handleDelete}
             onAnswerQuestion={setAnsweringQuestion}
             onToggleReplies={handleToggleReplies}
             currentUserId={userId}
@@ -319,6 +312,7 @@ export default function Posts() {
           onVote={handleVote}
           onDelete={handleDelete}
           onAnswerQuestion={handleAnswerFromDetail}
+          onViewPost={handleViewPost}
           currentUserId={userId}
         />
       )}

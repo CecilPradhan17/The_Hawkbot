@@ -5,9 +5,8 @@ interface PostListProps {
   posts: PostResponse[]
   repliesMap: Record<number, PostResponse[]>
   repliesOpenMap: Record<number, boolean>
-  onPostClick: (id: number) => void
+  onViewPost: (id: number) => void
   onVote: (postId: number, voteValue: 1 | -1) => void
-  onDelete: (postId: number) => void
   onAnswerQuestion: (question: PostResponse) => void
   onToggleReplies: (questionId: number) => void
   currentUserId: number | null
@@ -17,9 +16,8 @@ export default function PostList({
   posts,
   repliesMap,
   repliesOpenMap,
-  onPostClick,
+  onViewPost,
   onVote,
-  onDelete,
   onAnswerQuestion,
   onToggleReplies,
   currentUserId,
@@ -40,9 +38,8 @@ export default function PostList({
           post={post}
           replies={repliesMap[post.id] ?? []}
           repliesOpen={repliesOpenMap[post.id] ?? false}
-          onPostClick={onPostClick}
+          onViewPost={onViewPost}
           onVote={onVote}
-          onDelete={onDelete}
           onAnswerQuestion={onAnswerQuestion}
           onToggleReplies={onToggleReplies}
           currentUserId={currentUserId}
