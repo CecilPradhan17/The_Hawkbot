@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getAllPosts, deletePost, votePost } from '@/api/posts.api'
+import { getAllPosts, deletePost, votePost, getOnePost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 import CreatePostModal from '@/components/posts/CreatePostModal'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
+import AnswerQuestionModal from '@/components/posts/AnswerQuestionModal'
 import PostList from '@/components/posts/PostList'
 import PostDetailModal from '@/components/posts/PostDetailModal'
 
@@ -13,8 +14,13 @@ export default function Posts() {
   const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showAskModal, setShowAskModal] = useState(false)
+  const [answeringQuestion, setAnsweringQuestion] = useState<PostResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Lifted replies state: keyed by question post ID
+  const [repliesMap, setRepliesMap] = useState<Record<number, PostResponse[]>>({})
+  const [repliesOpenMap, setRepliesOpenMap] = useState<Record<number, boolean>>({})
 
   // Fetch all posts on mount
   useEffect(() => {
@@ -31,9 +37,44 @@ export default function Posts() {
     fetchPosts()
   }, [])
 
-  // Handle new post created
+  // Toggle replies open/closed, fetching if not yet loaded
+  const handleToggleReplies = async (questionId: number) => {
+    const isOpen = repliesOpenMap[questionId] ?? false
+
+    if (isOpen) {
+      setRepliesOpenMap(prev => ({ ...prev, [questionId]: false }))
+      return
+    }
+
+    // If already fetched, just open
+    if (repliesMap[questionId]) {
+      setRepliesOpenMap(prev => ({ ...prev, [questionId]: true }))
+      return
+    }
+
+    // Fetch for the first time
+    try {
+      const data = await getOnePost(questionId)
+      setRepliesMap(prev => ({ ...prev, [questionId]: data.answers ?? [] }))
+      setRepliesOpenMap(prev => ({ ...prev, [questionId]: true }))
+    } catch (err) {
+      console.error('Failed to load replies:', err)
+    }
+  }
+
+  // Handle new post or question created
   const handlePostCreated = (newPost: PostResponse) => {
-    setPosts([newPost, ...posts])
+    setPosts(prev => [newPost, ...prev])
+  }
+
+  // Handle answer created — append to the question's replies and ensure open
+  const handleAnswerCreated = (answer: PostResponse) => {
+    const questionId = answer.parent_id!
+    setRepliesMap(prev => ({
+      ...prev,
+      [questionId]: [...(prev[questionId] ?? []), answer],
+    }))
+    setRepliesOpenMap(prev => ({ ...prev, [questionId]: true }))
   }
 
   // Handle delete
@@ -49,14 +90,27 @@ export default function Posts() {
     }
   }
 
-  // Handle vote with optimistic updates
+  // Handle vote with optimistic updates — covers both posts and replies
   const handleVote = async (postId: number, voteValue: 1 | -1) => {
-    // Optimistic update
+    // Optimistic update for main posts list
     setPosts(prev => prev.map(post =>
       post.id === postId
         ? { ...post, vote_count: post.vote_count + voteValue }
         : post
     ))
+
+    // Optimistic update for replies
+    setRepliesMap(prev => {
+      const updated = { ...prev }
+      for (const questionId in updated) {
+        updated[questionId] = updated[questionId].map(reply =>
+          reply.id === postId
+            ? { ...reply, vote_count: reply.vote_count + voteValue }
+            : reply
+        )
+      }
+      return updated
+    })
 
     if (selectedPost?.id === postId) {
       setSelectedPost(prev =>
@@ -67,25 +121,51 @@ export default function Posts() {
     try {
       const response = await votePost(postId, { vote: voteValue })
 
-      // Sync with backend
+      // Sync with backend for main posts
       setPosts(prev => prev.map(post =>
         post.id === postId
           ? { ...post, vote_count: response.voteCount }
           : post
       ))
 
+      // Sync with backend for replies
+      setRepliesMap(prev => {
+        const updated = { ...prev }
+        for (const questionId in updated) {
+          updated[questionId] = updated[questionId].map(reply =>
+            reply.id === postId
+              ? { ...reply, vote_count: response.voteCount }
+              : reply
+          )
+        }
+        return updated
+      })
+
       if (selectedPost?.id === postId) {
         setSelectedPost(prev =>
           prev ? { ...prev, vote_count: response.voteCount } : null
         )
       }
-    } catch (error) {
-      // Rollback on failure
+    } catch {
+      // Rollback for main posts
       setPosts(prev => prev.map(post =>
         post.id === postId
           ? { ...post, vote_count: post.vote_count - voteValue }
           : post
       ))
+
+      // Rollback for replies
+      setRepliesMap(prev => {
+        const updated = { ...prev }
+        for (const questionId in updated) {
+          updated[questionId] = updated[questionId].map(reply =>
+            reply.id === postId
+              ? { ...reply, vote_count: reply.vote_count - voteValue }
+              : reply
+          )
+        }
+        return updated
+      })
 
       if (selectedPost?.id === postId) {
         setSelectedPost(prev =>
@@ -140,12 +220,16 @@ export default function Posts() {
         {!loading && !error && (
           <PostList
             posts={posts}
+            repliesMap={repliesMap}
+            repliesOpenMap={repliesOpenMap}
             onPostClick={(id: number) => {
               const post = posts.find(p => p.id === id) || null
               setSelectedPost(post)
             }}
             onVote={handleVote}
             onDelete={handleDelete}
+            onAnswerQuestion={setAnsweringQuestion}
+            onToggleReplies={handleToggleReplies}
             currentUserId={userId}
           />
         )}
@@ -164,6 +248,15 @@ export default function Posts() {
         <AskQuestionModal
           onClose={() => setShowAskModal(false)}
           onPostCreated={handlePostCreated}
+        />
+      )}
+
+      {/* Answer Question Modal */}
+      {answeringQuestion && (
+        <AnswerQuestionModal
+          question={answeringQuestion}
+          onClose={() => setAnsweringQuestion(null)}
+          onAnswerCreated={handleAnswerCreated}
         />
       )}
 

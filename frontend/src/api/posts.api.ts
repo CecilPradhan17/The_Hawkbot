@@ -11,6 +11,7 @@ export interface PostResponse {
   type: 'post' | 'question' | 'answer'
   parent_id: number | null
   approved_child_id: number | null
+  answers?: PostResponse[]
 }
 
 export interface CreatePostRequest {
