@@ -38,6 +38,10 @@ export default function Post({
     setRepliesLoading(false)
   }
 
+  // Use reply_count from the post data before replies are fetched,
+  // then switch to replies.length once the replies are loaded
+  const replyCountDisplay = repliesOpen ? replies.length : post.reply_count
+
   return (
     <div
       onClick={() => onPostClick(post.id)}
@@ -78,7 +82,7 @@ export default function Post({
                 ? 'Loading...'
                 : repliesOpen
                   ? 'Hide replies'
-                  : `${replies.length} replies`
+                  : `${replyCountDisplay} replies`
               }
             </button>
 

@@ -12,6 +12,7 @@ export interface PostResponse {
   parent_id: number | null
   approved_child_id: number | null
   answers?: PostResponse[]
+  reply_count: number
 }
 
 export interface CreatePostRequest {

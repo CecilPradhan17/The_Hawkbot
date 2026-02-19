@@ -67,23 +67,57 @@ export default function Posts() {
     setPosts(prev => [newPost, ...prev])
   }
 
-  // Handle answer created — append to the question's replies and ensure open
+  // Handle answer created — append to replies and increment reply_count on parent question
   const handleAnswerCreated = (answer: PostResponse) => {
     const questionId = answer.parent_id!
+
+    // Append to replies list
     setRepliesMap(prev => ({
       ...prev,
       [questionId]: [...(prev[questionId] ?? []), answer],
     }))
+
+    // Ensure replies are shown open
     setRepliesOpenMap(prev => ({ ...prev, [questionId]: true }))
+
+    // Increment reply_count on the parent question in posts list
+    setPosts(prev => prev.map(post =>
+      post.id === questionId
+        ? { ...post, reply_count: post.reply_count + 1 }
+        : post
+    ))
   }
 
-  // Handle delete
+  // Handle delete — if it's an answer, also decrement reply_count on parent
   const handleDelete = async (postId: number) => {
     try {
+      // Find the post before deleting so we can check its type and parent_id
+      const postToDelete = posts.find(p => p.id === postId)
+        ?? Object.values(repliesMap).flat().find(r => r.id === postId)
+
       await deletePost(postId)
+
       setPosts(prev => prev.filter(p => p.id !== postId))
+
       if (selectedPost?.id === postId) {
         setSelectedPost(null)
+      }
+
+      if (postToDelete?.type === 'answer' && postToDelete.parent_id) {
+        const questionId = postToDelete.parent_id
+
+        // Remove from replies map
+        setRepliesMap(prev => ({
+          ...prev,
+          [questionId]: (prev[questionId] ?? []).filter(r => r.id !== postId),
+        }))
+
+        // Decrement reply_count on parent question
+        setPosts(prev => prev.map(post =>
+          post.id === questionId
+            ? { ...post, reply_count: Math.max(0, post.reply_count - 1) }
+            : post
+        ))
       }
     } catch (err) {
       console.error('Delete failed:', err)
