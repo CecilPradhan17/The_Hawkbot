@@ -2,31 +2,31 @@ import { useState } from 'react'
 import { createPost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 
-interface CreatePostModalProps {
+interface AskQuestionModalProps {
   onClose: () => void
   onPostCreated: (newPost: PostResponse) => void
 }
 
-const MAX_POST_LENGTH = 500
+const MAX_QUESTION_LENGTH = 500
 
-export default function CreatePostModal({ onClose, onPostCreated }: CreatePostModalProps) {
+export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestionModalProps) {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const remainingChars = MAX_POST_LENGTH - content.length
-  const isOverLimit = content.length > MAX_POST_LENGTH
+  const remainingChars = MAX_QUESTION_LENGTH - content.length
+  const isOverLimit = content.length > MAX_QUESTION_LENGTH
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!content.trim()) {
-      setError('Post cannot be empty')
+      setError('Question cannot be empty')
       return
     }
 
-    if (content.length > MAX_POST_LENGTH) {
-      setError(`Post cannot exceed ${MAX_POST_LENGTH} characters`)
+    if (content.length > MAX_QUESTION_LENGTH) {
+      setError(`Question cannot exceed ${MAX_QUESTION_LENGTH} characters`)
       return
     }
 
@@ -34,11 +34,11 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
     setError(null)
 
     try {
-      const newPost = await createPost({ content, type: 'post' })
+      const newPost = await createPost({ content, type: 'question' })
       onPostCreated(newPost)
       onClose()
     } catch (err) {
-      setError('Failed to create post')
+      setError('Failed to submit question')
     } finally {
       setLoading(false)
     }
@@ -55,7 +55,7 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-[#8A244B]">Create Post</h2>
+          <h2 className="text-2xl font-bold text-[#1B5E8A]">Ask a Question</h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 text-2xl"
@@ -69,13 +69,13 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="What's on your mind?"
+            placeholder="What would you like to ask?"
             rows={6}
             className={`w-full px-4 py-3 rounded-lg border resize-none
                         focus:outline-none focus:ring-2 transition-colors
               ${isOverLimit
                 ? 'border-red-300 focus:ring-red-500'
-                : 'border-slate-200 focus:ring-[#8A244B]'
+                : 'border-slate-200 focus:ring-[#1B5E8A]'
               }`}
             required
           />
@@ -113,11 +113,11 @@ export default function CreatePostModal({ onClose, onPostCreated }: CreatePostMo
             <button
               type="submit"
               disabled={loading || !content.trim() || isOverLimit}
-              className="flex-1 px-4 py-2 bg-[#8A244B] text-white rounded-lg
+              className="flex-1 px-4 py-2 bg-[#1B5E8A] text-white rounded-lg
                          hover:scale-105 disabled:opacity-50 disabled:hover:scale-100
                          disabled:cursor-not-allowed transition-all"
             >
-              {loading ? 'Posting...' : 'Post'}
+              {loading ? 'Submitting...' : 'Ask'}
             </button>
           </div>
         </form>

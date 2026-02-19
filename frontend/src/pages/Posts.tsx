@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { getAllPosts, deletePost, votePost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 import CreatePostModal from '@/components/posts/CreatePostModal'
+import AskQuestionModal from '@/components/posts/AskQuestionModal'
 import PostList from '@/components/posts/PostList'
 import PostDetailModal from '@/components/posts/PostDetailModal'
 
@@ -11,6 +12,7 @@ export default function Posts() {
   const [posts, setPosts] = useState<PostResponse[]>([])
   const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showAskModal, setShowAskModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -64,7 +66,7 @@ export default function Posts() {
 
     try {
       const response = await votePost(postId, { vote: voteValue })
-      
+
       // Sync with backend
       setPosts(prev => prev.map(post =>
         post.id === postId
@@ -101,15 +103,23 @@ export default function Posts() {
           <button className="px-4 py-2 text-slate-200 hover:text-white transition-colors">
             Chatbot
           </button>
-          
+
           <h1 className="text-2xl font-bold text-white">Hawkbot</h1>
-          
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-white text-[#8A244B] rounded-lg hover:scale-105 transition-all"
-          >
-            Create Post
-          </button>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowAskModal(true)}
+              className="px-4 py-2 bg-[#1B5E8A] text-white rounded-lg hover:scale-105 transition-all"
+            >
+              Ask a Question
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-white text-[#8A244B] rounded-lg hover:scale-105 transition-all"
+            >
+              Create Post
+            </button>
+          </div>
         </div>
       </header>
 
@@ -145,6 +155,14 @@ export default function Posts() {
       {showCreateModal && (
         <CreatePostModal
           onClose={() => setShowCreateModal(false)}
+          onPostCreated={handlePostCreated}
+        />
+      )}
+
+      {/* Ask Question Modal */}
+      {showAskModal && (
+        <AskQuestionModal
+          onClose={() => setShowAskModal(false)}
           onPostCreated={handlePostCreated}
         />
       )}
