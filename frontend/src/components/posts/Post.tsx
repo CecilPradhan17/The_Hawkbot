@@ -138,52 +138,60 @@ export default function Post({
           {replies.length === 0 ? (
             <p className="text-slate-400 text-sm italic">No answers yet. Be the first!</p>
           ) : (
-            replies.map((reply) => (
-              <div
-                key={reply.id}
-                className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-200"
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-slate-400">{getTimeAgo(reply.created_at)}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                    ${reply.status === 'approved'
-                      ? 'bg-green-100 text-green-700'
-                      : reply.status === 'disapproved'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-slate-200 text-slate-500'
-                    }`}
-                  >
-                    {reply.status}
-                  </span>
-                </div>
-                <p className="text-slate-700 text-sm">{reply.content}</p>
+            replies.map((reply) => {
+              return (
+                <div
+                  key={reply.id}
+                  className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-200"
+                >
+                  {/* Reply header */}
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-slate-400">{getTimeAgo(reply.created_at)}</span>
+                    <div className="flex items-center gap-3">
+                      {isOwner && onDelete && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDelete(reply.id)
+                          }}
+                          className="text-black-500 hover:text-red-700 text-xs"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                {/* Answer votes */}
-                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onVote(reply.id, 1)
-                    }}
-                    className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
-                               hover:text-green-700 transition-colors"
-                  >
-                    HawkYeah
-                  </button>
-                  <span className="text-xs font-medium text-slate-600">{reply.vote_count}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onVote(reply.id, -1)
-                    }}
-                    className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
-                               hover:text-red-700 transition-colors"
-                  >
-                    HawkNah
-                  </button>
+                  {/* Reply content */}
+                  <p className="text-slate-700 text-sm">{reply.content}</p>
+
+                  {/* Answer votes */}
+                  <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onVote(reply.id, 1)
+                      }}
+                      className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
+                                 hover:text-green-700 transition-colors"
+                    >
+                      HawkYeah
+                    </button>
+                    <span className="text-xs font-medium text-slate-600">{reply.vote_count}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onVote(reply.id, -1)
+                      }}
+                      className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
+                                 hover:text-red-700 transition-colors"
+                    >
+                      HawkNah
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       )}
