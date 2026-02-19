@@ -48,15 +48,49 @@
  * - Can be extended to support soft deletes or admin-level overrides without changing controller logic
  */
 
-
 import pool from "../db.js";
 
 export const deletePostInDB = async (id) => {
-        const res = await pool.query(`DELETE FROM posts WHERE id = $1 RETURNING *;`,[id]);
-        return res.rows[0];    
+  try {
+    await pool.query("BEGIN");
+
+    // Get the post before deleting so we can check its type and parent_id
+    const postRes = await pool.query(
+      `SELECT type, parent_id FROM posts WHERE id = $1;`,
+      [id]
+    );
+
+    const post = postRes.rows[0];
+
+    const deleteRes = await pool.query(
+      `DELETE FROM posts WHERE id = $1 RETURNING *;`,
+      [id]
+    );
+
+    // If it was an answer, decrement the parent question's reply_count
+    if (post?.type === "answer" && post?.parent_id) {
+      await pool.query(
+        `
+        UPDATE posts
+        SET reply_count = reply_count - 1
+        WHERE id = $1;
+        `,
+        [post.parent_id]
+      );
+    }
+
+    await pool.query("COMMIT");
+    return deleteRes.rows[0];
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    throw err;
+  }
 };
 
 export const getAuthorIdByPost = async (id) => {
-        const res = await pool.query('SELECT author_id FROM posts WHERE id = $1;',[id]);
-        return res.rows[0];
+  const res = await pool.query(
+    `SELECT author_id FROM posts WHERE id = $1;`,
+    [id]
+  );
+  return res.rows[0];
 };

@@ -7,15 +7,6 @@ export const createPostInDB = async ({
     parent_id
 }) => {
 
-    const res = await pool.query(
-        `
-        INSERT INTO posts (content, author_id, type, parent_id)
-        VALUES ($1, $2, $3, $4)
-        RETURNING *;
-        `,
-        [content, author_id, type, parent_id]
-    );
-
     try {
         await pool.query("BEGIN");
 
