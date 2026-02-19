@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { PostResponse } from '@/api/posts.api'
+import type { PostResponse, PostDetailResponse } from '@/api/posts.api'
 import { getOnePost } from '@/api/posts.api'
 import { getTimeAgo } from '@/utils/timeAgo'
 
@@ -28,7 +28,7 @@ export default function PostDetailModal({
   const isQuestion = post.type === 'question'
   const isAnswer = post.type === 'answer'
 
-  const [parentQuestion, setParentQuestion] = useState<PostResponse | null>(null)
+  const [parentQuestion, setParentQuestion] = useState<PostDetailResponse | null>(null)
   const [parentLoading, setParentLoading] = useState(false)
 
   useEffect(() => {
@@ -79,8 +79,8 @@ export default function PostDetailModal({
                 <p className="text-sm text-slate-400 italic">Loading question...</p>
               ) : parentQuestion ? (
                 <div className="bg-[#1B5E8A]/5 border border-[#1B5E8A]/20 rounded-lg px-4 py-3">
-                  <p className="text-sm text-[#1B5E8A] font-medium">{parentQuestion.content}</p>
-                  <p className="text-xs text-slate-400 mt-1">{getTimeAgo(parentQuestion.created_at)}</p>
+                  <p className="text-sm text-[#1B5E8A] font-medium">{parentQuestion.post.content}</p>
+                  <p className="text-xs text-slate-400 mt-1">{getTimeAgo(parentQuestion.post.created_at)}</p>
                 </div>
               ) : null}
             </div>

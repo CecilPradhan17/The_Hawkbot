@@ -15,6 +15,11 @@ export interface PostResponse {
   reply_count: number
 }
 
+export interface PostDetailResponse {
+  post: PostResponse
+  answers: PostResponse[] | null
+}
+
 export interface CreatePostRequest {
  content: string
   type: 'post' | 'question' | 'answer'
@@ -37,8 +42,8 @@ export function getAllPosts():Promise<PostResponse[]> {
     return api.get<PostResponse[]>('/display')
 }
 
-export function getOnePost(data: number):Promise<PostResponse> {
-    return api.get<PostResponse>(`/displayPost/${data}`)
+export function getOnePost(data: number):Promise<PostDetailResponse> {
+    return api.get<PostDetailResponse>(`/displayPost/${data}`)
 }
 
 export function deletePost(id: number): Promise<void> {
