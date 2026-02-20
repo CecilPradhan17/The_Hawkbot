@@ -1,6 +1,6 @@
 import express from "express";
 import { handleChat } from "../controllers/chatbot.controllers.js";
-import { authenticateToken } from "../middleware/auth.middleware.js";
+import { requireAuth } from "../middleware/auth.middleware.js";
 
 /**
  * PURPOSE:
@@ -11,6 +11,6 @@ import { authenticateToken } from "../middleware/auth.middleware.js";
  */
 const router = express.Router();
 
-router.post("/", authenticateToken, handleChat);
+router.post("/", requireAuth, handleChat);
 
 export default router;

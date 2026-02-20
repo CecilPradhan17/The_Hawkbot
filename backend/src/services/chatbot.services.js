@@ -1,6 +1,6 @@
 import pool from "../db.js";
-import { generateEmbedding } from "./embedding.service.js";
-import { polishResponse } from "./llm.service.js";
+import { generateEmbedding } from "./embedding.services.js";
+import { polishResponse } from "./llm.services.js";
 
 /**
  * PURPOSE:
