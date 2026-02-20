@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import { processApproval } from "./approval.services.js";
 
 /**
  * PURPOSE:
@@ -9,14 +10,16 @@ import pool from "../db.js";
  *      → It becomes approved
  *      → Its parent question becomes approved
  *      → All sibling answers become disapproved
+ *      → processApproval() is triggered to store in approved_knowledge
  *
  * USED BY:
  * vote.controller.js → handleVote
  */
+const APPROVAL_THRESHOLD = 5;
 
 const determinePostStatus = (voteCount) => {
-  if (voteCount >= 5) return "approved";
-  if (voteCount <= -5) return "disapproved";
+  if (voteCount >= APPROVAL_THRESHOLD) return "approved";
+  if (voteCount <= -APPROVAL_THRESHOLD) return "disapproved";
   return "pending";
 };
 
@@ -59,14 +62,12 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
          VALUES ($1, $2, $3)`,
         [userId, postId, vote]
       );
-
       await pool.query(
         `UPDATE posts
          SET vote_count = vote_count + $1
          WHERE id = $2`,
         [vote, postId]
       );
-
     } else {
       const prevVote = existing.rows[0].vote;
 
@@ -77,14 +78,12 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
            WHERE user_id = $1 AND post_id = $2`,
           [userId, postId]
         );
-
         await pool.query(
           `UPDATE posts
            SET vote_count = vote_count - $1
            WHERE id = $2`,
           [vote, postId]
         );
-
       } else {
         // Switch vote
         await pool.query(
@@ -93,7 +92,6 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
            WHERE user_id = $2 AND post_id = $3`,
           [vote, userId, postId]
         );
-
         await pool.query(
           `UPDATE posts
            SET vote_count = vote_count + $1
@@ -121,7 +119,6 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
     );
 
     if (type === "answer" && newStatus === "approved") {
-
       await pool.query(
         `UPDATE posts
          SET status = 'approved'
@@ -129,7 +126,7 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
         [parent_id]
       );
 
-      // Disapprove ALL sibling answers
+      // Disapprove all sibling answers
       await pool.query(
         `UPDATE posts
          SET status = 'disapproved'
@@ -138,15 +135,22 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
          AND type = 'answer'`,
         [parent_id, postId]
       );
+
+      // Commit before triggering approval pipeline
+      // so the DB state is clean if approval takes time
+      await pool.query("COMMIT");
+
+      // Fire-and-forget: does not block the vote response
+      processApproval(postId, parent_id).catch((err) =>
+        console.error("processApproval error:", err)
+      );
+
+      return { voteCount, status: newStatus };
     }
 
     await pool.query("COMMIT");
 
-    return {
-      voteCount,
-      status: newStatus
-    };
-
+    return { voteCount, status: newStatus };
   } catch (err) {
     await pool.query("ROLLBACK");
     throw err;

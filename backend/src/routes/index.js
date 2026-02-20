@@ -33,6 +33,7 @@ import displayRoutes from './display.routes.js';
 import displayPostRoutes from './displayPost.routes.js';
 import registerRoutes from './register.routes.js';
 import loginRoutes from './login.routes.js';
+import chatbotRoutes from './chatbot.routes.js';
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.use("/display", displayRoutes);
 router.use("/displayPost", displayPostRoutes);
 router.use("/register", registerRoutes);
 router.use("/login", loginRoutes);
+router.use("/chat", chatbotRoutes);
 
 export default router;
 
