@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { getAllPosts, deletePost, votePost, getOnePost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
@@ -9,6 +10,7 @@ import PostList from '@/components/posts/PostList'
 import PostDetailModal from '@/components/posts/PostDetailModal'
 
 export default function Posts() {
+  const navigate = useNavigate()
   const { userId } = useAuth()
   const [posts, setPosts] = useState<PostResponse[]>([])
   const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
@@ -68,8 +70,6 @@ export default function Posts() {
     }
   }
 
-  // Handle "View post" — works for posts, questions, and answers
-  // Answers may only be in repliesMap, not in the main posts array
   const handleViewPost = async (id: number) => {
     const post =
       posts.find(p => p.id === id) ??
@@ -227,7 +227,10 @@ export default function Posts() {
       {/* Header */}
       <header className="bg-[#8A244B] border-b border-slate-200 px-6 py-4 z-40">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <button className="px-4 py-2 text-slate-200 hover:text-white transition-colors">
+          <button
+            onClick={() => navigate('/chat')}
+            className="px-4 py-2 text-slate-200 hover:text-white transition-colors"
+          >
             Chatbot
           </button>
 
