@@ -17,6 +17,6 @@ import { chatLimiter } from "../middleware/rateLimiter.js";
  */
 const router = express.Router();
 
-router.post("/chat", requireAuth, chatLimiter, handleChat);
+router.post("/", requireAuth, chatLimiter, handleChat);
 
 export default router;

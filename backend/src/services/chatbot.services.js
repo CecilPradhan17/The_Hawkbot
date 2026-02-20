@@ -21,7 +21,7 @@ import { polishResponse } from "./llm.services.js";
  * chatbot.controller.js
  */
 
-const SIMILARITY_THRESHOLD = 0.75;
+const SIMILARITY_THRESHOLD = 0.65;
 
 const FALLBACK_MESSAGE =
   "I don't have verified information about that yet. " +

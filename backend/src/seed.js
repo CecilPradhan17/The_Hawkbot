@@ -4,7 +4,7 @@
  * PURPOSE:
  * Populates the approved_knowledge table from knowledge.json.
  * Safe to re-run at any time — only new entries are processed.
- * Already-existing entries are skipped (checked by content match).
+ * Already-existing entries are skipped (checked by raw content match).
  *
  * USAGE:
  * node src/seed.js
@@ -12,7 +12,7 @@
  * WORKFLOW:
  * 1. Read all entries from knowledge.json
  * 2. For each entry, check if it already exists in approved_knowledge
- * 3. If new: clean with LLM, generate embedding, insert
+ * 3. If new: generate retrieval-optimized Q+A, embed, insert
  * 4. If already exists: skip
  *
  * TO ADD NEW KNOWLEDGE:
@@ -20,13 +20,18 @@
  * - Re-run: node src/seed.js
  *
  * TO UPDATE AN ENTRY:
- * - Delete the row from approved_knowledge in psql
- * - Update the text in knowledge.json
+ * - Delete the row from approved_knowledge in psql:
+ *     DELETE FROM approved_knowledge WHERE source_post_id IS NULL AND cleaned_content LIKE '%your text%';
+ * - Update the string in knowledge.json
  * - Re-run: node src/seed.js
  *
  * TO DELETE AN ENTRY:
  * - Delete the row from approved_knowledge in psql
  * - Remove the string from knowledge.json
+ *
+ * TO RESEED EVERYTHING FROM SCRATCH:
+ * - Run in psql: DELETE FROM approved_knowledge WHERE source_post_id IS NULL;
+ * - Re-run: node src/seed.js
  */
 
 import { readFileSync } from "fs";
@@ -40,7 +45,6 @@ import { generateEmbedding } from "./services/embedding.services.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const run = async () => {
-  // Load knowledge file
   const knowledgePath = join(__dirname, "../knowledge.json");
   const entries = JSON.parse(readFileSync(knowledgePath, "utf-8"));
 
@@ -49,7 +53,7 @@ const run = async () => {
     process.exit(0);
   }
 
-  console.log(`📚 Found ${entries.length} entries in knowledge.json`);
+  console.log(`📚 Found ${entries.length} entries in knowledge.json\n`);
 
   let inserted = 0;
   let skipped = 0;
@@ -61,9 +65,10 @@ const run = async () => {
       continue;
     }
 
-    // Check if this content already exists in approved_knowledge
+    // Check if this raw content has already been seeded
+    // We store the raw content in a separate column to track this
     const existing = await pool.query(
-      `SELECT id FROM approved_knowledge WHERE cleaned_content = $1`,
+      `SELECT id FROM approved_knowledge WHERE raw_content = $1`,
       [rawContent.trim()]
     );
 
@@ -76,31 +81,32 @@ const run = async () => {
     try {
       console.log(`⚙️  Processing: "${rawContent.substring(0, 60)}..."`);
 
-      // Clean with LLM
+      // Generate retrieval-optimized Q+A format
       const cleanedContent = await cleanContent({
         type: "post",
         content: rawContent,
       });
 
-      // Generate embedding
+      console.log(`   Cleaned: "${cleanedContent.substring(0, 80)}..."`);
+
+      // Generate embedding from the cleaned Q+A content
       const embedding = await generateEmbedding(cleanedContent);
 
-      // Insert into approved_knowledge
-      // source_post_id is NULL for admin-seeded entries
+      // Insert — source_post_id is NULL for admin-seeded entries
       await pool.query(
-        `INSERT INTO approved_knowledge (source_post_id, cleaned_content, embedding)
-         VALUES ($1, $2, $3)`,
-        [null, cleanedContent, JSON.stringify(embedding)]
+        `INSERT INTO approved_knowledge (source_post_id, cleaned_content, raw_content, embedding)
+         VALUES ($1, $2, $3, $4)`,
+        [null, cleanedContent, rawContent.trim(), JSON.stringify(embedding)]
       );
 
-      console.log(`✅ Inserted: "${cleanedContent.substring(0, 60)}..."`);
+      console.log(`✅ Inserted\n`);
       inserted++;
     } catch (err) {
-      console.error(`❌ Failed to process entry: "${rawContent.substring(0, 60)}..."`, err.message);
+      console.error(`❌ Failed: "${rawContent.substring(0, 60)}..."`, err.message, "\n");
     }
   }
 
-  console.log(`\n🎉 Done! ${inserted} inserted, ${skipped} skipped.`);
+  console.log(`🎉 Done! ${inserted} inserted, ${skipped} skipped.`);
   process.exit(0);
 };
 

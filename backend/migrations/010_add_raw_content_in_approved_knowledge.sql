@@ -1,0 +1,1 @@
+ALTER TABLE approved_knowledge ADD COLUMN raw_content TEXT;
