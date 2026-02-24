@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { sendChatMessage } from '@/api/chat.api'
+import Header from '@/components/Header'
 
 interface Message {
   id: number
@@ -11,7 +11,6 @@ interface Message {
 }
 
 export default function Chatbot() {
-  const navigate = useNavigate()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 0,
@@ -25,7 +24,6 @@ export default function Chatbot() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -59,9 +57,7 @@ export default function Chatbot() {
     } catch (err: any) {
       const isRateLimit = err?.message?.includes('daily limit')
 
-      if (isRateLimit) {
-        setRateLimited(true)
-      }
+      if (isRateLimit) setRateLimited(true)
 
       setMessages(prev => [
         ...prev,
@@ -88,21 +84,8 @@ export default function Chatbot() {
 
   return (
     <div className="min-h-screen bg-[#FAF3E1] flex flex-col">
-      {/* Header */}
-      <header className="bg-[#8A244B] px-6 py-4 z-40">
-        <div className="max-w-3xl mx-auto flex justify-between items-center">
-          <button
-            onClick={() => navigate('/posts')}
-            className="px-4 py-2 text-slate-200 hover:text-white transition-colors"
-          >
-            ← Back to Feed
-          </button>
-          <h1 className="text-2xl font-bold text-white">Hawkbot</h1>
-          <div className="w-24" />
-        </div>
-      </header>
+      <Header />
 
-      {/* Chat window */}
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-6 flex flex-col">
         <div className="flex-1 space-y-4 overflow-y-auto mb-4">
           {messages.map(message => (
@@ -129,7 +112,6 @@ export default function Chatbot() {
             </div>
           ))}
 
-          {/* Typing indicator */}
           {loading && (
             <div className="flex justify-start">
               <div className="bg-white border border-slate-200 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
@@ -143,14 +125,12 @@ export default function Chatbot() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Rate limit banner */}
         {rateLimited && (
           <div className="mb-3 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-700 text-center">
             Daily limit reached — you can send 10 messages per day. See you tomorrow!
           </div>
         )}
 
-        {/* Input bar */}
         <div className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors
           ${isInputDisabled ? 'border-slate-100 opacity-60' : 'border-slate-200'}`}
         >

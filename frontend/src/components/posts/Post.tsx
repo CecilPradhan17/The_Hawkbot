@@ -23,7 +23,6 @@ export default function Post({
   onToggleReplies
 }: PostProps) {
   const isQuestion = post.type === 'question'
-
   const [repliesLoading, setRepliesLoading] = useState(false)
 
   const handleToggleReplies = async (e: React.MouseEvent) => {
@@ -42,7 +41,7 @@ export default function Post({
         <p className="text-xs text-slate-500">{getTimeAgo(post.created_at)}</p>
         <button
           onClick={() => onViewPost(post.id)}
-          className="text-[#8A244B] hover:underline text-sm font-medium"
+          className="text-[#8A244B] hover:underline active:scale-95 transition-all text-sm font-medium"
         >
           View post
         </button>
@@ -59,7 +58,7 @@ export default function Post({
               onClick={handleToggleReplies}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-slate-100 hover:bg-[#1B5E8A]/10 hover:text-[#1B5E8A]
-                         transition-colors text-sm"
+                         active:scale-95 transition-all text-sm"
             >
               {repliesLoading
                 ? 'Loading...'
@@ -72,7 +71,7 @@ export default function Post({
               onClick={() => onAnswerQuestion?.(post)}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-[#8A244B]/10 hover:bg-[#8A244B]/20 text-[#8A244B]
-                         transition-colors text-sm"
+                         active:scale-95 transition-all text-sm"
             >
               Give Answer
             </button>
@@ -83,7 +82,7 @@ export default function Post({
               onClick={() => onVote(post.id, 1)}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-slate-100 hover:bg-green-100 hover:text-green-700
-                         transition-colors"
+                         active:scale-95 transition-all"
             >
               <span className="text-sm">HawkYeah</span>
             </button>
@@ -92,7 +91,7 @@ export default function Post({
               onClick={() => onVote(post.id, -1)}
               className="flex items-center gap-1 px-3 py-1 rounded-lg
                          bg-slate-100 hover:bg-red-100 hover:text-red-700
-                         transition-colors"
+                         active:scale-95 transition-all"
             >
               <span className="text-sm">HawkNah</span>
             </button>
@@ -115,7 +114,7 @@ export default function Post({
                   <span className="text-xs text-slate-400">{getTimeAgo(reply.created_at)}</span>
                   <button
                     onClick={() => onViewPost(reply.id)}
-                    className="text-[#8A244B] hover:underline text-xs font-medium"
+                    className="text-[#8A244B] hover:underline active:scale-95 transition-all text-xs font-medium"
                   >
                     View post
                   </button>
@@ -125,7 +124,7 @@ export default function Post({
                   <button
                     onClick={() => onVote(reply.id, 1)}
                     className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
-                               hover:text-green-700 transition-colors"
+                               hover:text-green-700 active:scale-95 transition-all"
                   >
                     HawkYeah
                   </button>
@@ -133,7 +132,7 @@ export default function Post({
                   <button
                     onClick={() => onVote(reply.id, -1)}
                     className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
-                               hover:text-red-700 transition-colors"
+                               hover:text-red-700 active:scale-95 transition-all"
                   >
                     HawkNah
                   </button>
