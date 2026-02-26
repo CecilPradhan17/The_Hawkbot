@@ -13,6 +13,7 @@ export interface PostResponse {
   approved_child_id: number | null
   answers?: PostResponse[]
   reply_count: number
+  user_vote: 1 | -1 | null 
 }
 
 export interface PostDetailResponse {

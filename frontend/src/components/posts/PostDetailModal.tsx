@@ -107,9 +107,11 @@ export default function PostDetailModal({
             <div className="flex items-center gap-4 py-4 border-y border-slate-200 mb-6">
               <button
                 onClick={() => onVote(post.id, 1)}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg
-                           bg-slate-100 hover:bg-green-100 hover:text-green-700
-                           active:scale-95 transition-all"
+                className={`flex items-center gap-1 px-3 py-1 rounded-lg active:scale-95 transition-all
+                  ${post.user_vote === 1
+                    ? 'bg-green-100 text-green-700 font-semibold'
+                    : 'bg-slate-100 hover:bg-green-100 hover:text-green-700'
+                  }`}
               >
                 <span className="text-sm">HawkYeah</span>
               </button>
@@ -119,9 +121,11 @@ export default function PostDetailModal({
               </div>
               <button
                 onClick={() => onVote(post.id, -1)}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg
-                           bg-slate-100 hover:bg-red-100 hover:text-red-700
-                           active:scale-95 transition-all"
+                className={`flex items-center gap-1 px-3 py-1 rounded-lg active:scale-95 transition-all
+                  ${post.user_vote === -1
+                    ? 'bg-red-100 text-red-700 font-semibold'
+                    : 'bg-slate-100 hover:bg-red-100 hover:text-red-700'
+                  }`}
               >
                 <span className="text-sm">HawkNah</span>
               </button>
@@ -171,16 +175,22 @@ export default function PostDetailModal({
                       <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
                         <button
                           onClick={() => onVote(reply.id, 1)}
-                          className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
-                                     hover:text-green-700 active:scale-95 transition-all"
+                          className={`px-2 py-0.5 rounded text-xs active:scale-95 transition-all
+                            ${reply.user_vote === 1
+                              ? 'bg-green-100 text-green-700 font-semibold'
+                              : 'bg-slate-100 hover:bg-green-100 hover:text-green-700'
+                            }`}
                         >
                           HawkYeah
                         </button>
                         <span className="text-xs font-medium text-slate-600">{reply.vote_count}</span>
                         <button
                           onClick={() => onVote(reply.id, -1)}
-                          className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
-                                     hover:text-red-700 active:scale-95 transition-all"
+                          className={`px-2 py-0.5 rounded text-xs active:scale-95 transition-all
+                            ${reply.user_vote === -1
+                              ? 'bg-red-100 text-red-700 font-semibold'
+                              : 'bg-slate-100 hover:bg-red-100 hover:text-red-700'
+                            }`}
                         >
                           HawkNah
                         </button>
@@ -193,7 +203,7 @@ export default function PostDetailModal({
           )}
         </div>
 
-        {/* Actions — fixed at bottom */}
+        {/* Actions */}
         <div className="flex gap-3 mt-6 flex-shrink-0 border-t border-slate-100 pt-4">
           {isQuestion && onAnswerQuestion && (
             <button

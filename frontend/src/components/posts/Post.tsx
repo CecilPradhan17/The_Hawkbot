@@ -77,25 +77,12 @@ export default function Post({
             </button>
           </>
         ) : (
-          <>
-            <button
-              onClick={() => onVote(post.id, 1)}
-              className="flex items-center gap-1 px-3 py-1 rounded-lg
-                         bg-slate-100 hover:bg-green-100 hover:text-green-700
-                         active:scale-95 transition-all"
-            >
-              <span className="text-sm">HawkYeah</span>
-            </button>
-            <span className="font-medium text-slate-700">{post.vote_count}</span>
-            <button
-              onClick={() => onVote(post.id, -1)}
-              className="flex items-center gap-1 px-3 py-1 rounded-lg
-                         bg-slate-100 hover:bg-red-100 hover:text-red-700
-                         active:scale-95 transition-all"
-            >
-              <span className="text-sm">HawkNah</span>
-            </button>
-          </>
+          <VoteButtons
+            postId={post.id}
+            voteCount={post.vote_count}
+            userVote={post.user_vote}
+            onVote={onVote}
+          />
         )}
       </div>
 
@@ -121,21 +108,13 @@ export default function Post({
                 </div>
                 <p className="text-slate-700 text-sm">{reply.content}</p>
                 <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
-                  <button
-                    onClick={() => onVote(reply.id, 1)}
-                    className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-green-100
-                               hover:text-green-700 active:scale-95 transition-all"
-                  >
-                    HawkYeah
-                  </button>
-                  <span className="text-xs font-medium text-slate-600">{reply.vote_count}</span>
-                  <button
-                    onClick={() => onVote(reply.id, -1)}
-                    className="px-2 py-0.5 rounded text-xs bg-slate-100 hover:bg-red-100
-                               hover:text-red-700 active:scale-95 transition-all"
-                  >
-                    HawkNah
-                  </button>
+                  <VoteButtons
+                    postId={reply.id}
+                    voteCount={reply.vote_count}
+                    userVote={reply.user_vote}
+                    onVote={onVote}
+                    small
+                  />
                 </div>
               </div>
             ))
@@ -143,5 +122,52 @@ export default function Post({
         </div>
       )}
     </div>
+  )
+}
+
+// ─── Shared vote buttons component ───────────────────────────────────────────
+
+interface VoteButtonsProps {
+  postId: number
+  voteCount: number
+  userVote: 1 | -1 | null
+  onVote: (postId: number, voteValue: 1 | -1) => void
+  small?: boolean
+}
+
+function VoteButtons({ postId, voteCount, userVote, onVote, small }: VoteButtonsProps) {
+  const base = small
+    ? 'px-2 py-0.5 rounded text-xs transition-all active:scale-95'
+    : 'flex items-center gap-1 px-3 py-1 rounded-lg transition-all active:scale-95'
+
+  const upActive   = userVote === 1
+  const downActive = userVote === -1
+
+  return (
+    <>
+      <button
+        onClick={() => onVote(postId, 1)}
+        className={`${base} ${
+          upActive
+            ? 'bg-green-100 text-green-700 font-semibold'
+            : 'bg-slate-100 hover:bg-green-100 hover:text-green-700'
+        }`}
+      >
+        {small ? 'HawkYeah' : <span className="text-sm">HawkYeah</span>}
+      </button>
+      <span className={`font-medium ${small ? 'text-xs text-slate-600' : 'text-slate-700'}`}>
+        {voteCount}
+      </span>
+      <button
+        onClick={() => onVote(postId, -1)}
+        className={`${base} ${
+          downActive
+            ? 'bg-red-100 text-red-700 font-semibold'
+            : 'bg-slate-100 hover:bg-red-100 hover:text-red-700'
+        }`}
+      >
+        {small ? 'HawkNah' : <span className="text-sm">HawkNah</span>}
+      </button>
+    </>
   )
 }

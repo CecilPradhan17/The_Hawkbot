@@ -118,26 +118,51 @@ export default function Posts() {
     }
   }
 
-  const handleVote = async (postId: number, voteValue: 1 | -1) => {
-    setPosts(prev => prev.map(post =>
-      post.id === postId ? { ...post, vote_count: post.vote_count + voteValue } : post
-    ))
-    setRepliesMap(prev => {
-      const updated = { ...prev }
-      for (const questionId in updated) {
-        updated[questionId] = updated[questionId].map(reply =>
-          reply.id === postId
-            ? { ...reply, vote_count: reply.vote_count + voteValue }
-            : reply
-        )
-      }
-      return updated
-    })
-    if (selectedPost?.id === postId) {
-      setSelectedPost(prev => prev ? { ...prev, vote_count: prev.vote_count + voteValue } : null)
+  // Derives the new user_vote state after a vote action:
+  // - Clicking the same vote toggles it off (null)
+  // - Clicking a different vote switches to it
+  const deriveUserVote = (current: 1 | -1 | null, clicked: 1 | -1): 1 | -1 | null => {
+    return current === clicked ? null : clicked
+  }
+
+  const updatePost = (post: PostResponse, voteValue: 1 | -1, newVoteCount?: number): PostResponse => {
+    const newUserVote = deriveUserVote(post.user_vote, voteValue)
+    return {
+      ...post,
+      user_vote: newUserVote,
+      vote_count: newVoteCount ?? post.vote_count + voteValue,
     }
+  }
+
+  const applyVoteToMap = (
+    prev: Record<number, PostResponse[]>,
+    postId: number,
+    voteValue: 1 | -1,
+    newVoteCount?: number
+  ) => {
+    const updated = { ...prev }
+    for (const questionId in updated) {
+      updated[questionId] = updated[questionId].map(reply =>
+        reply.id === postId ? updatePost(reply, voteValue, newVoteCount) : reply
+      )
+    }
+    return updated
+  }
+
+  const handleVote = async (postId: number, voteValue: 1 | -1) => {
+    // Optimistic update
+    setPosts(prev => prev.map(post =>
+      post.id === postId ? updatePost(post, voteValue) : post
+    ))
+    setRepliesMap(prev => applyVoteToMap(prev, postId, voteValue))
+    if (selectedPost?.id === postId) {
+      setSelectedPost(prev => prev ? updatePost(prev, voteValue) : null)
+    }
+
     try {
       const response = await votePost(postId, { vote: voteValue })
+
+      // Reconcile with server vote count (user_vote already set optimistically)
       setPosts(prev => prev.map(post =>
         post.id === postId ? { ...post, vote_count: response.voteCount } : post
       ))
@@ -154,22 +179,13 @@ export default function Posts() {
         setSelectedPost(prev => prev ? { ...prev, vote_count: response.voteCount } : null)
       }
     } catch {
+      // Rollback optimistic update
       setPosts(prev => prev.map(post =>
-        post.id === postId ? { ...post, vote_count: post.vote_count - voteValue } : post
+        post.id === postId ? updatePost(post, voteValue) : post
       ))
-      setRepliesMap(prev => {
-        const updated = { ...prev }
-        for (const questionId in updated) {
-          updated[questionId] = updated[questionId].map(reply =>
-            reply.id === postId
-              ? { ...reply, vote_count: reply.vote_count - voteValue }
-              : reply
-          )
-        }
-        return updated
-      })
+      setRepliesMap(prev => applyVoteToMap(prev, postId, voteValue))
       if (selectedPost?.id === postId) {
-        setSelectedPost(prev => prev ? { ...prev, vote_count: prev.vote_count - voteValue } : null)
+        setSelectedPost(prev => prev ? updatePost(prev, voteValue) : null)
       }
     }
   }
