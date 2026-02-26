@@ -27,10 +27,10 @@
 import { displayAllPostsFromDB } from "../services/display.services.js";
 
 export const displayAllPosts = async (req, res, next) => {
-    try {
-        const posts = await displayAllPostsFromDB();
-        res.status(200).json(posts);
-    } catch (error) {
-        next(error);
-    }
+  try {
+    const posts = await displayAllPostsFromDB(req.user.id);
+    res.status(200).json(posts);
+  } catch (error) {
+    next(error);
+  }
 };

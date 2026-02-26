@@ -21,12 +21,12 @@
  * - Keeps routing logic separated for maintainability and scalability
  */
 
-
 import express from 'express';
 import { displayAllPosts } from '../controllers/display.controllers.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-router.get("/", displayAllPosts);
+router.get("/", requireAuth, displayAllPosts);
 
 export default router;

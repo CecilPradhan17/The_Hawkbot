@@ -30,26 +30,25 @@
 import { displayOnePostFromDB } from "../services/displayPost.services.js";
 
 export const displayOnePost = async (req, res, next) => {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    if (!id) {
-        const error = new Error("ID is required");
-        error.status = 400;
-        return next(error);
+  if (!id) {
+    const error = new Error("ID is required");
+    error.status = 400;
+    return next(error);
+  }
+
+  try {
+    const post = await displayOnePostFromDB(id, req.user.id);
+
+    if (!post) {
+      const error = new Error("Post not found");
+      error.status = 404;
+      return next(error);
     }
 
-    try {
-        const post = await displayOnePostFromDB(id);
-
-        if (!post) {
-            const error = new Error("Post not found");
-            error.status = 404;
-            return next(error);
-        }
-
-        res.status(200).json(post);
-
-    } catch (error) {
-        next(error);
-    }
+    res.status(200).json(post);
+  } catch (error) {
+    next(error);
+  }
 };

@@ -27,9 +27,10 @@
 
 import express from 'express';
 import { displayOnePost } from '../controllers/displayPost.controllers.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-router.get("/:id", displayOnePost);
+router.get("/:id", requireAuth, displayOnePost);
 
 export default router;

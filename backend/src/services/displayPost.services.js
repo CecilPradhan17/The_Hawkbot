@@ -26,39 +26,40 @@
 
 import pool from "../db.js";
 
-export const displayOnePostFromDB = async (id) => {
+export const displayOnePostFromDB = async (id, userId) => {
+  const postRes = await pool.query(
+    `SELECT p.*,
+            pv.vote AS user_vote
+     FROM posts p
+     LEFT JOIN post_votes pv
+       ON pv.post_id = p.id AND pv.user_id = $2
+     WHERE p.id = $1
+       AND p.status = 'pending'`,
+    [id, userId]
+  );
 
-    const postRes = await pool.query(
-        `
-        SELECT * FROM posts 
-        WHERE id = $1 
-        AND status = 'pending';
-        `,
-        [id]
-    );
+  if (postRes.rows.length === 0) return null;
 
-    if (postRes.rows.length === 0) {
-        return null;
-    }
+  const post = postRes.rows[0];
 
-    const post = postRes.rows[0];
+  if (post.type !== "question") {
+    return { post };
+  }
 
-    if (post.type !== "question") {
-        return {post};
-    }
+  const answersRes = await pool.query(
+    `SELECT p.*,
+            pv.vote AS user_vote
+     FROM posts p
+     LEFT JOIN post_votes pv
+       ON pv.post_id = p.id AND pv.user_id = $2
+     WHERE p.parent_id = $1
+       AND p.status = 'pending'
+     ORDER BY p.created_at ASC`,
+    [id, userId]
+  );
 
-    const answersRes = await pool.query(
-        `
-        SELECT * FROM posts
-        WHERE parent_id = $1
-        AND status = 'pending'
-        ORDER BY created_at ASC;
-        `,
-        [id]
-    );
-
-    return {
-        post,
-        answers: answersRes.rows
-    };
+  return {
+    post,
+    answers: answersRes.rows,
+  };
 };

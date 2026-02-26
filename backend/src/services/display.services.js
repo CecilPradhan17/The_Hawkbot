@@ -25,7 +25,17 @@
 
 import pool from "../db.js";
 
-export const displayAllPostsFromDB = async () => {
-        const res = await pool.query(`SELECT * FROM posts WHERE status = 'pending' AND type <> 'answer' ORDER BY created_at DESC;`);
-        return res.rows;    
-}
+export const displayAllPostsFromDB = async (userId) => {
+  const res = await pool.query(
+    `SELECT p.*,
+            pv.vote AS user_vote
+     FROM posts p
+     LEFT JOIN post_votes pv
+       ON pv.post_id = p.id AND pv.user_id = $1
+     WHERE p.status = 'pending'
+       AND p.type <> 'answer'
+     ORDER BY p.created_at DESC`,
+    [userId]
+  );
+  return res.rows;
+};
