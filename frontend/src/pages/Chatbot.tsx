@@ -24,6 +24,12 @@ export default function Chatbot() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Auto-focus input on page load to show keyboard immediately on mobile
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
@@ -83,11 +89,17 @@ export default function Chatbot() {
   const isInputDisabled = loading || rateLimited
 
   return (
-    <div className="min-h-screen bg-[#FAF3E1] flex flex-col">
+    /*
+     * Use 100dvh (dynamic viewport height) instead of 100vh.
+     * dvh accounts for the mobile browser's UI (address bar, keyboard)
+     * so the layout stays correct when the keyboard opens.
+     */
+    <div className="flex flex-col bg-[#FAF3E1]" style={{ height: '100dvh' }}>
       <Header />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-6 flex flex-col">
-        <div className="flex-1 space-y-4 overflow-y-auto mb-4">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-4 flex flex-col min-h-0">
+        {/* min-h-0 is required for flex children to scroll correctly */}
+        <div className="flex-1 space-y-4 overflow-y-auto mb-4 min-h-0">
           {messages.map(message => (
             <div
               key={message.id}
@@ -112,6 +124,7 @@ export default function Chatbot() {
             </div>
           ))}
 
+          {/* Typing indicator */}
           {loading && (
             <div className="flex justify-start">
               <div className="bg-white border border-slate-200 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
@@ -125,13 +138,15 @@ export default function Chatbot() {
           <div ref={bottomRef} />
         </div>
 
+        {/* Rate limit banner */}
         {rateLimited && (
           <div className="mb-3 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-700 text-center">
             Daily limit reached — you can send 10 messages per day. See you tomorrow!
           </div>
         )}
 
-        <div className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors
+        {/* Input bar */}
+        <div className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors flex-shrink-0
           ${isInputDisabled ? 'border-slate-100 opacity-60' : 'border-slate-200'}`}
         >
           <input
@@ -142,15 +157,20 @@ export default function Chatbot() {
             onKeyDown={handleKeyDown}
             placeholder={rateLimited ? 'Daily limit reached' : 'Ask about campus...'}
             disabled={isInputDisabled}
-            className="flex-1 text-sm text-slate-700 placeholder-slate-400
+            /*
+             * font-size must be at least 16px on iOS to prevent
+             * Safari from auto-zooming when the input is focused.
+             * We use text-base (16px) here instead of text-sm (14px).
+             */
+            className="flex-1 text-base text-slate-700 placeholder-slate-400
                        focus:outline-none disabled:cursor-not-allowed bg-transparent"
           />
           <button
             onClick={handleSend}
             disabled={isInputDisabled || !input.trim()}
             className="px-4 py-1.5 bg-[#8A244B] text-white text-sm rounded-xl
-                       hover:scale-105 disabled:opacity-50 disabled:hover:scale-100
-                       transition-all"
+                       hover:scale-105 active:scale-95 disabled:opacity-50
+                       disabled:hover:scale-100 transition-all"
           >
             Send
           </button>
