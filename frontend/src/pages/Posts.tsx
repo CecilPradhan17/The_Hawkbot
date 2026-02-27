@@ -118,21 +118,37 @@ export default function Posts() {
     }
   }
 
-  // Derives the new user_vote state after a vote action:
-  // - Clicking the same vote toggles it off (null)
-  // - Clicking a different vote switches to it
+  /**
+   * Derives the new user_vote after clicking a vote button.
+   * Clicking the same vote again toggles it off (null).
+   * Clicking a different vote switches to it.
+   */
   const deriveUserVote = (current: 1 | -1 | null, clicked: 1 | -1): 1 | -1 | null => {
     return current === clicked ? null : clicked
   }
 
-  const updatePost = (post: PostResponse, voteValue: 1 | -1, newVoteCount?: number): PostResponse => {
-    const newUserVote = deriveUserVote(post.user_vote, voteValue)
-    return {
-      ...post,
-      user_vote: newUserVote,
-      vote_count: newVoteCount ?? post.vote_count + voteValue,
-    }
+  /**
+   * Calculates the correct vote_count delta for optimistic update.
+   * 
+   * Cases:
+   * null  → +1:  +1  (new upvote)
+   * null  → -1:  -1  (new downvote)
+   * +1    → +1:  -1  (toggle off upvote)
+   * -1    → -1:  +1  (toggle off downvote)
+   * +1    → -1:  -2  (switch from up to down)
+   * -1    → +1:  +2  (switch from down to up)
+   */
+  const deriveVoteCountDelta = (current: 1 | -1 | null, clicked: 1 | -1): number => {
+    if (current === null) return clicked        // new vote
+    if (current === clicked) return -clicked    // toggle off
+    return clicked * 2                          // switch direction
   }
+
+  const updatePost = (post: PostResponse, voteValue: 1 | -1, newVoteCount?: number): PostResponse => ({
+    ...post,
+    user_vote: deriveUserVote(post.user_vote, voteValue),
+    vote_count: newVoteCount ?? post.vote_count + deriveVoteCountDelta(post.user_vote, voteValue),
+  })
 
   const applyVoteToMap = (
     prev: Record<number, PostResponse[]>,
@@ -162,24 +178,16 @@ export default function Posts() {
     try {
       const response = await votePost(postId, { vote: voteValue })
 
-      // Reconcile with server vote count (user_vote already set optimistically)
+      // Reconcile vote_count with server (user_vote already correct)
       setPosts(prev => prev.map(post =>
         post.id === postId ? { ...post, vote_count: response.voteCount } : post
       ))
-      setRepliesMap(prev => {
-        const updated = { ...prev }
-        for (const questionId in updated) {
-          updated[questionId] = updated[questionId].map(reply =>
-            reply.id === postId ? { ...reply, vote_count: response.voteCount } : reply
-          )
-        }
-        return updated
-      })
+      setRepliesMap(prev => applyVoteToMap(prev, postId, voteValue, response.voteCount))
       if (selectedPost?.id === postId) {
         setSelectedPost(prev => prev ? { ...prev, vote_count: response.voteCount } : null)
       }
     } catch {
-      // Rollback optimistic update
+      // Rollback: apply same vote again to reverse the optimistic update
       setPosts(prev => prev.map(post =>
         post.id === postId ? updatePost(post, voteValue) : post
       ))
