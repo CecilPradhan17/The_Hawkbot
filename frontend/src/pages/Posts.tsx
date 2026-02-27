@@ -178,11 +178,19 @@ export default function Posts() {
     try {
       const response = await votePost(postId, { vote: voteValue })
 
-      // Reconcile vote_count with server (user_vote already correct)
+      // Reconcile vote_count with server (user_vote already correct from optimistic update)
       setPosts(prev => prev.map(post =>
         post.id === postId ? { ...post, vote_count: response.voteCount } : post
       ))
-      setRepliesMap(prev => applyVoteToMap(prev, postId, voteValue, response.voteCount))
+      setRepliesMap(prev => {
+        const updated = { ...prev }
+        for (const questionId in updated) {
+          updated[questionId] = updated[questionId].map(reply =>
+            reply.id === postId ? { ...reply, vote_count: response.voteCount } : reply
+          )
+        }
+        return updated
+      })
       if (selectedPost?.id === postId) {
         setSelectedPost(prev => prev ? { ...prev, vote_count: response.voteCount } : null)
       }
