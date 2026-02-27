@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 
@@ -13,6 +13,12 @@ export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestion
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-focus to open keyboard on mobile
+  useEffect(() => {
+    textareaRef.current?.focus()
+  }, [])
 
   const remainingChars = MAX_QUESTION_LENGTH - content.length
   const isOverLimit = content.length > MAX_QUESTION_LENGTH
@@ -55,11 +61,13 @@ export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestion
 
         <form onSubmit={handleSubmit}>
           <textarea
+            ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="What would you like to ask?"
             rows={6}
-            className={`w-full px-4 py-3 rounded-lg border resize-none
+            // text-base (16px) prevents iOS auto-zoom on focus
+            className={`w-full px-4 py-3 rounded-lg border resize-none text-base
                         focus:outline-none focus:ring-2 transition-colors
               ${isOverLimit ? 'border-red-300 focus:ring-red-500' : 'border-slate-200 focus:ring-[#1B5E8A]'}`}
             required
