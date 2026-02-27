@@ -24,19 +24,27 @@ import routes from './routes/index.js';
 import cors from 'cors';
 import errorHandler from './middleware/errorHandler.middleware.js';
 
- const app = express();
+const app = express();
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONTEND_URL,
+].filter(Boolean)
 
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. Render health checks, mobile apps)
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+      callback(new Error(`CORS blocked: ${origin}`))
+    },
     credentials: true,
   })
 );
 
- app.use(express.json());
+app.use(express.json());
+app.use("/api", routes);
+app.use(errorHandler);
 
- app.use("/api", routes);
-
- app.use(errorHandler);
-
- export default app;
+export default app;
