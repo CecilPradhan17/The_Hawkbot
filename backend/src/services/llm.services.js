@@ -5,28 +5,18 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 /**
  * PURPOSE:
  * Two responsibilities:
- * 1. cleanContent() - called once at approval/seed time to transform raw content
- *    into a retrieval-optimized Q+A format for the vector store.
- * 2. polishResponse() - called at query time to rewrite retrieved knowledge
- *    conversationally for the end user.
+ * 1. cleanContent() - transforms raw content into a retrieval-optimized Q+A format.
+ * 2. polishResponse() - rewrites retrieved knowledge conversationally for the user.
  *
- * KEY DESIGN DECISION:
- * All content is stored as "Q: ...\nA: ..." format regardless of source.
- * This dramatically improves embedding recall because:
- * - Users ask questions conversationally
- * - Storing question phrasings alongside the answer closes the vector space gap
- * - The embedding captures both "how users ask" and "what the answer is"
- *
- * USED BY:
- * - approval.service.js → cleanContent()
- * - seed.js → cleanContent()
- * - chatbot.service.js → polishResponse()
+ * KEY DESIGN DECISIONS:
+ * - All content stored as "Q: ...\nA: ..." format for better embedding recall
+ * - Question phrasings include both full names AND abbreviations/short forms
+ *   so queries like "AC hours" and "Activity Center hours" both score well
+ * - LLM is never asked to generate new campus information
  */
 
 /**
  * Transforms raw content into a retrieval-optimized Q+A format.
- * For facts: generates natural question phrasings + clean answer.
- * For Q+A pairs: cleans and structures the existing question + answer.
  *
  * @param {object} params
  * @param {'post' | 'question'} params.type
@@ -42,11 +32,13 @@ export const cleanContent = async ({ type, content, question, answer }) => {
     prompt = `You are preparing campus knowledge for a university chatbot's knowledge base.
 
 Given the following campus fact, do two things:
-1. Write 2-3 natural question phrasings that students might ask to find this information
-2. Write a clean, clear answer based strictly on the fact provided
+1. Write 4-5 natural question phrasings that students might ask to find this information.
+   - If the fact mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
+   - Cover different ways a student might ask — e.g. "What time does X open?", "When does X close?", "What are X's hours?", "Is X open on Sundays?"
+2. Write a clean, clear answer based strictly on the fact provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
 
 Return in this exact format:
-Q: <question 1> | <question 2> | <question 3>
+Q: <question 1> | <question 2> | <question 3> | <question 4> | <question 5>
 A: <clean answer>
 
 Do not add any information not present in the fact. Do not add any preamble or explanation.
@@ -56,11 +48,13 @@ Fact: "${content}"`;
     prompt = `You are preparing campus knowledge for a university chatbot's knowledge base.
 
 Given the following student question and answer, do two things:
-1. Write 2-3 natural question phrasings that students might ask to find this information (include the original question)
-2. Write a clean, clear answer based strictly on the answer provided
+1. Write 4-5 natural question phrasings that students might ask to find this information (include the original question).
+   - If the question or answer mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
+   - Cover different ways a student might ask the same thing.
+2. Write a clean, clear answer based strictly on the answer provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
 
 Return in this exact format:
-Q: <question 1> | <question 2> | <question 3>
+Q: <question 1> | <question 2> | <question 3> | <question 4> | <question 5>
 A: <clean answer>
 
 Do not add any information not present in the answer. Do not add any preamble or explanation.
@@ -73,7 +67,7 @@ Answer: "${answer}"`;
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
-    max_tokens: 300,
+    max_tokens: 400,
   });
 
   return response.choices[0].message.content.trim();
