@@ -1,5 +1,5 @@
 import pool from "../db.js";
-import { generateQueryEmbedding } from "./embedding.service.js";
+import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.service.js";
 
 /**
