@@ -10,10 +10,19 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  *
  * KEY DESIGN DECISIONS:
  * - All content stored as "Q: ...\nA: ..." format for better embedding recall
- * - Question phrasings include both full names AND abbreviations/short forms
- *   so queries like "AC hours" and "Activity Center hours" both score well
+ * - Question phrasings include both full names AND abbreviations/short forms/nicknames
+ * - Day-specific facts MUST have day-specific questions only — no generic phrasings
+ *   that would cause retrieval conflicts between entries for different days
  * - LLM is never asked to generate new campus information
  */
+
+const DAY_SPECIFIC_INSTRUCTION = `
+CRITICAL RULE: If the fact is specific to a particular day (e.g. mentions Monday, Saturday, Sundays etc.),
+ALL question phrasings MUST include that specific day.
+NEVER write generic phrasings like "What are the hours?" or "What time does X open?" without the day name.
+Generic phrasings cause retrieval conflicts with other day-specific entries and break the chatbot.
+Good example for a Saturday fact: "What time does the AC open on Saturdays?" / "When does the AC close on Saturdays?" / "Is the AC open on Saturdays?"
+Bad example: "What are the AC hours?" / "When does the AC open?" (no day = conflict)`;
 
 /**
  * Transforms raw content into a retrieval-optimized Q+A format.
@@ -34,7 +43,8 @@ export const cleanContent = async ({ type, content, question, answer }) => {
 Given the following campus fact, do two things:
 1. Write 4-5 natural question phrasings that students might ask to find this information.
    - If the fact mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
-   - Cover different ways a student might ask — e.g. "What time does X open?", "When does X close?", "What are X's hours?", "Is X open on Sundays?"
+   - Cover different angles: opening time, closing time, whether it is open at all.
+   ${DAY_SPECIFIC_INSTRUCTION}
 2. Write a clean, clear answer based strictly on the fact provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
 
 Return in this exact format:
@@ -50,7 +60,8 @@ Fact: "${content}"`;
 Given the following student question and answer, do two things:
 1. Write 4-5 natural question phrasings that students might ask to find this information (include the original question).
    - If the question or answer mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
-   - Cover different ways a student might ask the same thing.
+   - Cover different angles: opening time, closing time, whether it is open at all.
+   ${DAY_SPECIFIC_INSTRUCTION}
 2. Write a clean, clear answer based strictly on the answer provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
 
 Return in this exact format:
