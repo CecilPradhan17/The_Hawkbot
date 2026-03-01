@@ -1,59 +1,34 @@
-/**
- *
- * Purpose:
- * - Provides a centralized HTTP request utility for the frontend
- * - Standardizes API communication and authentication handling
- *
- * Responsibilities:
- * - Builds and sends HTTP requests to the backend API
- * - Automatically attaches JWTs to authenticated requests
- * - Handles JSON serialization and response parsing
- * - Normalizes error handling for non-successful responses
- *
- * Used by:
- * - Page components (Login, Register, Posts, etc.)
- * - Service or data-fetching utilities
- * - Any frontend logic that communicates with the backend API
- *
- * Functions:
- * - request<T>(endpoint, method, body?)
- *   - Parameters:
- *       - endpoint: API path relative to the base URL (e.g., `/login`, `/posts`)
- *       - method: HTTP method (`GET`, `POST`, `DELETE`)
- *       - body: Optional request payload (automatically JSON-stringified)
- *   - Returns:
- *       - A Promise resolving to type `T`
- *   - Behavior:
- *       - Reads the JWT using `getToken()`
- *       - Attaches Authorization header when a token exists
- *       - Sends a fetch request to the configured backend API
- *       - Throws a normalized error for non-2xx responses
- *       - Safely handles 204 No Content responses
- *
- * Security notes:
- * - JWTs are never manually passed by components
- * - Authorization headers are attached automatically and consistently
- *
- * Error handling:
- * - Throws a descriptive Error for failed requests
- * - Falls back to a generic error message if response parsing fails
- *
- * Extra notes:
- * - Base API URL is configurable via environment variables
- * - Strong typing via generics improves safety and DX
- *
- * Additional info for Future Modification / Integration:
- * - Can be extended to support PUT/PATCH methods
- * - Ideal place to add request/response interceptors (logging, retries)
- * - Can integrate token refresh or global logout on 401 responses
- * - If backend routes change, updates are isolated to this layer
- */
-
 import { getToken } from "@/utils/token"
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4005/api'
 
 type HttpMethod = 'GET' | 'POST' | 'DELETE'
+
+// Cold start timeout — if a request takes longer than this (ms),
+// we assume the server is waking up from sleep and show the modal.
+const COLD_START_TIMEOUT_MS = 8000
+
+// Retry interval — how often to retry while server is waking (ms)
+const RETRY_INTERVAL_MS = 3000
+
+// Max retries before giving up
+const MAX_RETRIES = 25
+
+// Global wake trigger — set by ServerWakeProvider via setWakeTrigger()
+let wakeTrigger: (() => Promise<void>) | null = null
+let resolveWake: (() => void) | null = null
+
+export function setWakeTrigger(
+  trigger: () => Promise<void>,
+  resolve: () => void
+) {
+  wakeTrigger = trigger
+  resolveWake = resolve
+}
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 export default async function request<T>(
   endpoint: string,
@@ -61,44 +36,95 @@ export default async function request<T>(
   body?: unknown
 ): Promise<T> {
   const token = getToken()
-  
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  }
-  
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-  
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const fetchOptions: RequestInit = {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-  })
+  }
 
-  // Handle token expiration (401 Unauthorized)
-  if (res.status === 401) {
-    // Clear auth state
+  const url = `${BASE_URL}${endpoint}`
+
+  // Attempt the request with a timeout to detect cold starts
+  const attemptRequest = (): Promise<Response> => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('COLD_START'))
+      }, COLD_START_TIMEOUT_MS)
+
+      fetch(url, fetchOptions)
+        .then(res => {
+          clearTimeout(timeout)
+          resolve(res)
+        })
+        .catch(() => {
+          clearTimeout(timeout)
+          // Network errors (e.g. server completely down) also treated as cold start
+          reject(new Error('COLD_START'))
+        })
+    })
+  }
+
+  let res: Response
+
+  try {
+    res = await attemptRequest()
+  } catch (err: any) {
+    if (err.message === 'COLD_START' && wakeTrigger) {
+      // Show the wake modal
+      wakeTrigger()
+
+      // Keep retrying until the server responds
+      let retries = 0
+      while (retries < MAX_RETRIES) {
+        await sleep(RETRY_INTERVAL_MS)
+        try {
+          res = await attemptRequest()
+          // Server is back — dismiss the modal
+          resolveWake?.()
+          break
+        } catch {
+          retries++
+        }
+      }
+
+      if (!res!) {
+        resolveWake?.()
+        throw new Error('Server failed to wake up. Please try again.')
+      }
+    } else {
+      throw err
+    }
+  }
+
+  // Handle token expiration
+  if (res!.status === 401) {
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
-    
-    // Redirect to login
     window.location.href = '/login'
-    
     throw new Error('Session expired. Please login again.')
   }
 
   // Handle non-2xx responses
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => null)
+  if (!res!.ok) {
+    const errorData = await res!.json().catch(() => null)
     const message = errorData?.message || 'Request failed'
     throw new Error(message)
   }
 
-  // Some endpoints may return no content (204)
-  if (res.status === 204) {
-    return null as T
-  }
+  // 204 No Content
+  if (res!.status === 204) return null as T
 
-  return res.json()
+  return res!.json()
+}
+
+export const api = {
+  get: <T>(endpoint: string) =>
+    request<T>(endpoint, 'GET'),
+  post: <T>(endpoint: string, body: unknown) =>
+    request<T>(endpoint, 'POST', body),
+  delete: <T>(endpoint: string) =>
+    request<T>(endpoint, 'DELETE'),
 }
