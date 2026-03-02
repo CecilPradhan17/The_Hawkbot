@@ -29,7 +29,6 @@
  * - Can be extended to support role-based routing or route-level loaders
  */
 import { Routes, Route } from 'react-router-dom'
-import { useEffect } from 'react'
 import ProtectedRoute from '@/routes/ProtectedRoute'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
@@ -37,16 +36,9 @@ import Posts from '@/pages/Posts'
 import Chatbot from '@/pages/Chatbot'
 import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
 import ServerWakeModal from '@/components/ServerWakeModal'
-import { setWakeTrigger } from '@/api/request'
 
-// Inner component so it can access the ServerWakeContext
 function AppInner() {
-  const { isWaking, triggerWake, resolveWake } = useServerWake()
-
-  // Register the wake trigger with request.ts so it can call it globally
-  useEffect(() => {
-    setWakeTrigger(triggerWake, resolveWake)
-  }, [triggerWake, resolveWake])
+  const { isWaking } = useServerWake()
 
   return (
     <>
