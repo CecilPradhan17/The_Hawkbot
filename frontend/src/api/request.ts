@@ -1,6 +1,8 @@
 import { getToken } from "@/utils/token"
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4005/api'
+const SERVER_URL = BASE_URL.replace(/\/api$/, '')
+const HEALTH_CHECK_TIMEOUT_MS = 2000
 
 type HttpMethod = 'GET' | 'POST' | 'DELETE'
 
@@ -28,6 +30,35 @@ export function setWakeTrigger(
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function isServerAwake(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(false), HEALTH_CHECK_TIMEOUT_MS)
+    fetch(`${SERVER_URL}/health`)
+      .then(res => { clearTimeout(timeout); resolve(res.ok) })
+      .catch(() => { clearTimeout(timeout); resolve(false) })
+  })
+}
+
+// helper that performs fetch with an explicit timeout
+async function attemptFetch(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
+    fetch(url, options)
+      .then(r => {
+        clearTimeout(timer)
+        resolve(r)
+      })
+      .catch(err => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
 }
 
 export default async function request<T>(
@@ -67,40 +98,46 @@ export default async function request<T>(
     })
   }
 
-  let res: Response
+  let res: Response | null = null
 
   try {
     res = await attemptRequest()
-  } catch (err: any) {
-    if (err.message === 'COLD_START' && wakeTrigger) {
-      // Show the wake modal
-      wakeTrigger()
+  } catch {
+    const awake = await isServerAwake()
 
-      // Keep retrying until the server responds
-      let retries = 0
-      while (retries < MAX_RETRIES) {
-        await sleep(RETRY_INTERVAL_MS)
+    if (awake) {
+      // Server up but slow — retry silently, no modal
+      try {
+        res = await attemptFetch(url, fetchOptions, 30000)
+      } catch {
+        throw new Error('The server is taking too long to respond. Please try again.')
+      }
+    } else {
+      // Genuinely asleep — show modal and retry
+      if (wakeTrigger) wakeTrigger()
+
+      // simple retry loop while the server wakes
+      let attempt = 0
+      while (attempt < MAX_RETRIES) {
         try {
-          res = await attemptRequest()
-          // Server is back — dismiss the modal
+          res = await attemptFetch(url, fetchOptions, COLD_START_TIMEOUT_MS)
           resolveWake?.()
           break
         } catch {
-          retries++
+          await sleep(RETRY_INTERVAL_MS)
+          attempt++
         }
       }
 
-      if (!res!) {
+      if (!res) {
         resolveWake?.()
-        throw new Error('Server failed to wake up. Please try again.')
+        throw new Error('The server did not wake up. Please try again later.')
       }
-    } else {
-      throw err
     }
   }
 
   // Handle token expiration
-  if (res!.status === 401) {
+  if (res.status === 401) {
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
     window.location.href = '/login'
@@ -108,16 +145,16 @@ export default async function request<T>(
   }
 
   // Handle non-2xx responses
-  if (!res!.ok) {
-    const errorData = await res!.json().catch(() => null)
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null)
     const message = errorData?.message || 'Request failed'
     throw new Error(message)
   }
 
   // 204 No Content
-  if (res!.status === 204) return null as T
+  if (res.status === 204) return null as T
 
-  return res!.json()
+  return res.json()
 }
 
 export const api = {
