@@ -45,7 +45,7 @@ export default function Header({ rightContent }: HeaderProps) {
         {/* Center — animated cursive SVG title */}
         <button
           onClick={() => setAnimKey(k => k + 1)}
-          className="flex justify-center cursor-pointer select-none bg-transparent border-none p-0"
+          className="flex justify-center cursor-pointer select-none bg-transparent border-none p-0 -translate-x-3 sm:translate-x-0"
           aria-label="Replay Hawkbot animation"
         >
           <HawkbotTitle animKey={animKey} />
