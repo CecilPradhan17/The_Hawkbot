@@ -140,7 +140,13 @@ export default async function request<T>(
   if (res.status === 401) {
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
-    window.location.href = '/login'
+    // Don't force a reload if the request was the login request
+    // or if the user is already on the login page — let the caller
+    // handle showing the error so they can display it persistently.
+    const onLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login'
+    if (!onLoginPage && endpoint !== '/login') {
+      window.location.href = '/login'
+    }
     throw new Error('Session expired. Please login again.')
   }
 
