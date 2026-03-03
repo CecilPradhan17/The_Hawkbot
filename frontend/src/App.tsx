@@ -36,7 +36,8 @@ import Posts from '@/pages/Posts'
 import Chatbot from '@/pages/Chatbot'
 import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
 import ServerWakeModal from '@/components/ServerWakeModal'
-import { Analytics } from '@vercel/analytics/next';
+import { Analytics } from '@vercel/analytics/react';
+
 
 function AppInner() {
   const { isWaking } = useServerWake()
