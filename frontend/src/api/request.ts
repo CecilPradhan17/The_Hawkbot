@@ -140,14 +140,16 @@ export default async function request<T>(
   if (res.status === 401) {
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
-    // Don't force a reload if the request was the login request
-    // or if the user is already on the login page — let the caller
-    // handle showing the error so they can display it persistently.
-    const onLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login'
-    if (!onLoginPage && endpoint !== '/login') {
-      window.location.href = '/login'
-    }
-    throw new Error('Session expired. Please login again.')
+      const errorData = await res.json().catch(() => null)
+      const onLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login'
+      // If this was not a login request and user isn't on login page, redirect
+      if (!onLoginPage && endpoint !== '/login') {
+        window.location.href = '/login'
+        throw new Error('Session expired. Please login again.')
+      }
+      // For login requests, throw the backend-provided message (or a sensible default)
+      const message = errorData?.message || 'Invalid email or password.'
+      throw new Error(message)
   }
 
   // Handle non-2xx responses
