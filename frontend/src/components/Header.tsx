@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
+import iconPosts from '../assets/icon-posts.png'
+import iconChatbot from '../assets/icon-chatbot.png'
 
 interface HeaderProps {
   rightContent?: React.ReactNode
@@ -27,7 +29,7 @@ export default function Header({ rightContent }: HeaderProps) {
           aria-label={isOnChat ? 'Go to Feed' : 'Go to Chatbot'}
         >
           <img
-            src={isOnChat ? '/icon-posts.png' : '/icon-chatbot.png'}
+            src={isOnChat ? iconPosts : iconChatbot}
             alt={isOnChat ? 'Posts' : 'Chatbot'}
             className="
               w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover
