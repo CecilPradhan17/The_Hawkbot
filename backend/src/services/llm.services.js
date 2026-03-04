@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import "dotenv/config";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -12,18 +11,29 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  * KEY DESIGN DECISIONS:
  * - All content stored as "Q: ...\nA: ..." format for better embedding recall
  * - Question phrasings include both full names AND abbreviations/short forms/nicknames
- * - Day-specific facts MUST have day-specific questions only — no generic phrasings
- *   that would cause retrieval conflicts between entries for different days
+ * - Day-specific facts MUST have day-specific questions only — but ONLY when the fact
+ *   actually mentions a specific day. Non-day facts get natural open-ended questions.
  * - LLM is never asked to generate new campus information
  */
 
+const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+/**
+ * Returns true if the text mentions a specific day of the week.
+ */
+const mentionsDay = (text) =>
+  DAYS.some(day => text.toLowerCase().includes(day));
+
 const DAY_SPECIFIC_INSTRUCTION = `
-CRITICAL RULE: If the fact is specific to a particular day (e.g. mentions Monday, Saturday, Sundays etc.),
-ALL question phrasings MUST include that specific day.
-NEVER write generic phrasings like "What are the hours?" or "What time does X open?" without the day name.
-Generic phrasings cause retrieval conflicts with other day-specific entries and break the chatbot.
+CRITICAL RULE: This fact is specific to a particular day.
+ALL 4-5 question phrasings MUST include that specific day name.
+NEVER write generic phrasings like "What are the hours?" or "What time does X open?" without the day name — these cause retrieval conflicts with other day-specific entries.
 Good example for a Saturday fact: "What time does the AC open on Saturdays?" / "When does the AC close on Saturdays?" / "Is the AC open on Saturdays?"
-Bad example: "What are the AC hours?" / "When does the AC open?" (no day = conflict)`;
+Bad example: "What are the AC hours?" / "When does the AC open?" (missing the day = conflict)`;
+
+const GENERAL_INSTRUCTION = `
+Write varied, natural question phrasings covering different ways a student might ask about this topic.
+Do NOT force day names into questions if the fact is not about a specific day.`;
 
 /**
  * Transforms raw content into a retrieval-optimized Q+A format.
@@ -38,14 +48,19 @@ Bad example: "What are the AC hours?" / "When does the AC open?" (no day = confl
 export const cleanContent = async ({ type, content, question, answer }) => {
   let prompt;
 
+  // Determine if this fact is day-specific so we inject the right instruction
+  const textToCheck = type === "post" ? content : `${question} ${answer}`;
+  const dayInstruction = mentionsDay(textToCheck)
+    ? DAY_SPECIFIC_INSTRUCTION
+    : GENERAL_INSTRUCTION;
+
   if (type === "post") {
     prompt = `You are preparing campus knowledge for a university chatbot's knowledge base.
 
 Given the following campus fact, do two things:
 1. Write 4-5 natural question phrasings that students might ask to find this information.
    - If the fact mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
-   - Cover different angles: opening time, closing time, whether it is open at all.
-   ${DAY_SPECIFIC_INSTRUCTION}
+   ${dayInstruction}
 2. Write a clean, clear answer based strictly on the fact provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
 
 Return in this exact format:
@@ -61,8 +76,7 @@ Fact: "${content}"`;
 Given the following student question and answer, do two things:
 1. Write 4-5 natural question phrasings that students might ask to find this information (include the original question).
    - If the question or answer mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
-   - Cover different angles: opening time, closing time, whether it is open at all.
-   ${DAY_SPECIFIC_INSTRUCTION}
+   ${dayInstruction}
 2. Write a clean, clear answer based strictly on the answer provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
 
 Return in this exact format:
