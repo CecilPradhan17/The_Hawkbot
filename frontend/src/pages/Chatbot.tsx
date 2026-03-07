@@ -11,6 +11,7 @@ interface Message {
 }
 
 const DAILY_LIMIT = 7
+const MAX_MESSAGE_LENGTH = 250
 
 function getTodayKey() {
   return `hawkbot_usage_${new Date().toISOString().split('T')[0]}`
@@ -35,6 +36,7 @@ export default function Chatbot() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [inputError, setInputError] = useState<string | null>(null)
   const [messagesUsed, setMessagesUsed] = useState(() => getStoredUsage())
   const [rateLimited, setRateLimited] = useState(() => getStoredUsage() >= DAILY_LIMIT)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -53,6 +55,11 @@ export default function Chatbot() {
   const handleSend = async () => {
     const trimmed = input.trim()
     if (!trimmed || loading || rateLimited) return
+    if (trimmed.length > MAX_MESSAGE_LENGTH) {
+      setInputError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer`)
+      return
+    }
+    setInputError(null)
 
     const userMessage: Message = {
       id: Date.now(),
@@ -191,10 +198,18 @@ export default function Chatbot() {
             ref={inputRef}
             type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value)
+              if (e.target.value.length > MAX_MESSAGE_LENGTH) {
+                setInputError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer`)
+              } else {
+                setInputError(null)
+              }
+            }}
             onKeyDown={handleKeyDown}
             placeholder={rateLimited ? 'Daily limit reached' : 'Ask about campus...'}
             disabled={isInputDisabled}
+            maxLength={MAX_MESSAGE_LENGTH + 50}
             /*
              * font-size must be at least 16px on iOS to prevent
              * Safari from auto-zooming when the input is focused.
@@ -205,7 +220,7 @@ export default function Chatbot() {
           />
           <button
             onClick={handleSend}
-            disabled={isInputDisabled || !input.trim()}
+            disabled={isInputDisabled || !input.trim() || !!inputError}
             className="px-4 py-1.5 bg-[#8A244B] text-white text-sm rounded-xl
                        hover:scale-105 active:scale-95 disabled:opacity-50
                        disabled:hover:scale-100 transition-all"
@@ -213,6 +228,14 @@ export default function Chatbot() {
             Send
           </button>
         </div>
+        {inputError && (
+          <p className="text-xs text-[#8A244B] mt-1.5 px-1">{inputError}</p>
+        )}
+        {!inputError && input.length > 200 && (
+          <p className="text-xs text-slate-400 mt-1.5 px-1 text-right">
+            {input.length}/{MAX_MESSAGE_LENGTH}
+          </p>
+        )}
       </main>
     </div>
   )

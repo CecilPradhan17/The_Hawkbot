@@ -21,6 +21,12 @@ export const handleChat = async (req, res, next) => {
       return next(error);
     }
 
+    if (message.trim().length > 250) {
+      const error = new Error("Message must be 250 characters or fewer");
+      error.status = 400;
+      return next(error);
+    }
+
     const result = await handleChatQuery(message.trim());
 
     res.status(200).json(result);
