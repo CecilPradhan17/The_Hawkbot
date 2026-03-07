@@ -10,6 +10,21 @@ interface Message {
   isError?: boolean
 }
 
+const DAILY_LIMIT = 7
+
+function getTodayKey() {
+  return `hawkbot_usage_${new Date().toISOString().split('T')[0]}`
+}
+
+function getStoredUsage(): number {
+  const stored = localStorage.getItem(getTodayKey())
+  return stored ? parseInt(stored, 10) : 0
+}
+
+function saveUsage(count: number) {
+  localStorage.setItem(getTodayKey(), String(count))
+}
+
 export default function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -20,7 +35,8 @@ export default function Chatbot() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [rateLimited, setRateLimited] = useState(false)
+  const [messagesUsed, setMessagesUsed] = useState(() => getStoredUsage())
+  const [rateLimited, setRateLimited] = useState(() => getStoredUsage() >= DAILY_LIMIT)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -51,6 +67,13 @@ export default function Chatbot() {
     try {
       const data = await sendChatMessage({ message: trimmed })
 
+      setMessagesUsed(prev => {
+        const next = prev + 1
+        saveUsage(next)
+        if (next >= DAILY_LIMIT) setRateLimited(true)
+        return next
+      })
+
       setMessages(prev => [
         ...prev,
         {
@@ -63,7 +86,11 @@ export default function Chatbot() {
     } catch (err: any) {
       const isRateLimit = err?.message?.includes('daily limit')
 
-      if (isRateLimit) setRateLimited(true)
+      if (isRateLimit) {
+        setRateLimited(true)
+        setMessagesUsed(DAILY_LIMIT)
+        saveUsage(DAILY_LIMIT)
+      }
 
       setMessages(prev => [
         ...prev,
@@ -71,7 +98,7 @@ export default function Chatbot() {
           id: Date.now() + 1,
           role: 'bot',
           content: isRateLimit
-            ? "You've reached your daily limit of 10 messages. Come back tomorrow! 🦅"
+            ? "You've reached your daily limit of 7 messages. Come back tomorrow!"
             : 'Something went wrong. Please try again.',
           isError: true,
         },
@@ -138,12 +165,23 @@ export default function Chatbot() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Rate limit banner */}
-        {rateLimited && (
-          <div className="mb-3 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-700 text-center">
-            Daily limit reached — you can send 10 messages per day. See you tomorrow!
+        {/* Usage bar */}
+        <div className="mb-3 bg-white/35 backdrop-blur-md border border-white/50 rounded-2xl px-3 py-2.5 shadow-sm ring-1 ring-black/5">
+          <p className={`text-xs font-medium mb-1.5 ${rateLimited ? 'text-[#8A244B]' : 'text-slate-500'}`}>
+            {rateLimited
+              ? 'Daily limit reached — see you tomorrow!'
+              : `${DAILY_LIMIT - messagesUsed} question${DAILY_LIMIT - messagesUsed !== 1 ? 's' : ''} remaining today`}
+          </p>
+          <div className="flex gap-1.5">
+            {Array.from({ length: DAILY_LIMIT }).map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 h-1 rounded-full transition-colors duration-300"
+                style={{ backgroundColor: i < messagesUsed ? '#8A244B' : '#D6C9B0' }}
+              />
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Input bar */}
         <div className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors flex-shrink-0

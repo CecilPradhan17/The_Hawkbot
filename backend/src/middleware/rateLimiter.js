@@ -27,20 +27,20 @@ export const registerLimiter = rateLimit({
 
 /**
  * Chatbot rate limiter — tracks by authenticated user ID, not IP.
- * Allows 10 messages per user per day.
+ * Allows 7 messages per user per day.
  *
  * IMPORTANT: This must be applied AFTER authenticateToken middleware
  * so that req.user.id is available.
  */
 export const chatLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 10,
+  max: 1,
   standardHeaders: true,
   legacyHeaders: false,
   // Key by user ID instead of IP
   keyGenerator: (req) => `chatbot_user_${req.user.id}`,
   handler: (req, res, next) => {
-    const error = new Error('You have reached your daily limit of 10 messages. Please try again tomorrow.')
+    const error = new Error('You have reached your daily limit of 7 messages. Please try again tomorrow.')
     error.status = 429
     next(error)
   }
