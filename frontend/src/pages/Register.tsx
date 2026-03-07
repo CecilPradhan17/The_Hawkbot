@@ -39,7 +39,7 @@ export default function Register() {
               Join Hawkbot
             </h1>
             <p className="text-slate-600 text-sm">
-              Create your account and start posting
+              Create your account and start asking
             </p>
           </div>
 

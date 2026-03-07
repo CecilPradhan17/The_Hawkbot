@@ -1,1 +1,46 @@
 @import "tailwindcss";
+
+* {
+  font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: 'Playfair Display', serif;
+}
+
+/* Flip card */
+.flip-card {
+  perspective: 1000px;
+  position: relative;
+}
+
+.flip-card-inner {
+  position: relative;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.flip-card-front {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: rotateX(180deg);
+}
+
+/* Desktop: flip on hover (bottom-to-top) */
+@media (hover: hover) {
+  .flip-card:hover .flip-card-inner {
+    transform: rotateX(-180deg);
+  }
+}
+
+/* Mobile: flip on click via .flipped class */
+.flip-card.flipped .flip-card-inner {
+  transform: rotateX(-180deg);
+}

@@ -9,31 +9,31 @@ export default function Landing() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-[#FAF3E1] flex flex-col">
+    <div className="min-h-screen bg-[#FAF3E1] flex flex-col overflow-x-hidden">
       <Nav onLogin={() => navigate('/login')} onRegister={() => navigate('/register')} />
       <Hero />
       <VideoSection />
+      <HowItWorks />
     </div>
   )
 }
 
 function Nav({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => void }) {
   return (
-    <nav className="w-full px-6 sm:px-10 py-4 flex justify-between items-center">
+    <nav className="w-full px-6 sm:px-10 py-4 flex justify-between items-center border-b border-[#8A244B]/10">
       <HawkbotLogo />
       <div className="flex gap-3 items-center">
         <button
           onClick={onLogin}
-          className="px-4 py-2 text-sm font-medium text-[#8A244B] border border-[#8A244B]
-                     rounded-lg hover:bg-[#8A244B] hover:text-white active:scale-95
-                     transition-all duration-150"
+          className="px-4 py-2 text-sm font-medium text-[#8A244B] border border-[#8A244B]/40
+                     rounded-lg hover:bg-[#8A244B] hover:text-white active:scale-95 transition-all duration-150"
         >
           Login
         </button>
         <button
           onClick={onRegister}
           className="px-4 py-2 text-sm font-medium text-white bg-[#8A244B]
-                     rounded-lg hover:opacity-90 active:scale-95 transition-all duration-150 shadow-sm"
+                     rounded-lg hover:bg-[#6e1c3b] active:scale-95 transition-all duration-150 shadow-sm"
         >
           Register
         </button>
@@ -93,16 +93,134 @@ function HawkbotLogo() {
   )
 }
 
+function DotGrid({ cols, rows }: { cols: number; rows: number }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '8px' }}>
+      {Array.from({ length: cols * rows }).map((_, i) => (
+        <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#8A244B]" />
+      ))}
+    </div>
+  )
+}
+
+function SectionDivider() {
+  return (
+    <div className="flex items-center justify-center px-10 py-2">
+      <div className="flex-1 h-px bg-gradient-to-r from-transparent via-[#8A244B]/20 to-transparent" />
+    </div>
+  )
+}
+
 function Hero() {
   return (
-    <section className="flex flex-col items-center text-center px-6 pt-12 pb-10 sm:pt-20 sm:pb-16">
+    <section className="relative flex flex-col items-center text-center px-6 pt-16 pb-12 sm:pt-24 sm:pb-20 overflow-hidden">
+      {/* Decorative background blobs */}
+      <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#8A244B]/8 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-16 -left-24 w-72 h-72 rounded-full bg-[#C4933A]/10 blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-[#8A244B]/4 blur-3xl pointer-events-none" />
+
       <h1 className="text-4xl sm:text-6xl font-bold text-slate-800 leading-tight max-w-2xl">
-        Know Everything About Your College
+        Ask Anything About<br />
+        Your College
       </h1>
-      <p className="mt-4 text-lg sm:text-xl text-slate-500 max-w-md">
+      <p className="mt-5 text-lg sm:text-xl text-slate-500 max-w-md leading-relaxed">
         Everybody's knowledge, collected as one.
       </p>
+
+      {/* Decorative dots */}
+      <div className="absolute right-8 top-16 opacity-20 pointer-events-none hidden sm:block">
+        <DotGrid cols={4} rows={4} />
+      </div>
+      <div className="absolute left-8 bottom-8 opacity-15 pointer-events-none hidden sm:block">
+        <DotGrid cols={3} rows={3} />
+      </div>
     </section>
+  )
+}
+
+function HowItWorks() {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  const steps = [
+    {
+      num: 1,
+      text: "Ask Hawkbot any questions about your college. Location, classes, professors, campus life.... everything you've always wanted to know!",
+    },
+    {
+      num: 2,
+      text: "If it answers: great! Ask whatever else you want to know. However, if it doesn't answer, follow the next steps.",
+    },
+    {
+      num: 3,
+      text: "Post your unanswered question on the Hawkwall for other students to answer.",
+    },
+    {
+      num: 4,
+      text: "Once another student's reply is Hawkyeah-ed (approved) a certain number of times, it is considered truthful!",
+    },
+    {
+      num: 5,
+      text: "The approved answer then gets sent to Hawkbot's knowledge base. So, now Hawkbot can answer that question as well!",
+    },
+  ]
+
+  return (
+    <>
+      <SectionDivider />
+      <section className="relative flex flex-col items-center text-center px-6 py-14 sm:py-20 overflow-hidden">
+        {/* Background accent */}
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-[#C4933A]/6 blur-3xl pointer-events-none" />
+
+        <h2 className="text-3xl sm:text-5xl font-bold text-slate-800 leading-tight max-w-2xl mb-10">
+          How Hawkbot Works
+        </h2>
+
+        <div className="max-w-2xl w-full space-y-3">
+          {steps.map((step) => (
+            <FlipCard key={step.num} num={step.num} text={step.text} isMobile={isMobile} />
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
+function FlipCard({ num, text, isMobile }: { num: number; text: string; isMobile: boolean }) {
+  const [flipped, setFlipped] = useState(false)
+
+  return (
+    <div
+      className={`flip-card${flipped ? ' flipped' : ''}`}
+      onClick={() => { if (isMobile) setFlipped(f => !f) }}
+    >
+      <div className="flip-card-inner">
+        {/* Back — in normal flow so it sets the container height */}
+        <div className="flip-card-back bg-white/50 backdrop-blur-sm rounded-2xl px-5 py-4 border border-[#8A244B]/10 shadow-sm">
+          <div className="flex items-start gap-4 text-left">
+            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[#8A244B] text-white flex items-center justify-center text-sm font-semibold shadow-sm">
+              {num}
+            </span>
+            <p className="text-slate-600 leading-relaxed pt-0.5">{text}</p>
+          </div>
+        </div>
+        {/* Front — absolutely covers the card */}
+        <div className="flip-card-front bg-[#8A244B] rounded-2xl shadow-sm overflow-hidden flex items-center justify-center">
+          <span className="absolute text-white/10 font-bold select-none pointer-events-none" style={{ fontSize: '7rem', fontFamily: "'Playfair Display', serif", lineHeight: 1 }}>
+            {num}
+          </span>
+          <span className="text-white text-4xl font-bold relative z-10" style={{ fontFamily: "'Playfair Display', serif" }}>
+            {num}
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -118,10 +236,10 @@ function VideoSection() {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
-    
+
     checkMobile()
     window.addEventListener('resize', checkMobile)
-    
+
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
@@ -178,8 +296,8 @@ function VideoSection() {
 
   return (
     <section className="flex flex-col items-center px-4 sm:px-10 pb-16">
-      <div 
-        className="w-full rounded-2xl overflow-hidden shadow-2xl border border-slate-200 relative"
+      <div
+        className="w-full sm:max-w-7.5xl rounded-2xl overflow-hidden shadow-2xl border border-[#8A244B]/15 relative"
         onMouseEnter={() => {
           if (!isMobile) showControlsWithTimeout()
         }}
@@ -192,7 +310,7 @@ function VideoSection() {
       >
         <video
           ref={videoRef}
-          src={isMobile ? mobileDemoSrc : demoSrc} // Replace demoSrc with mobile video when available
+          src={isMobile ? mobileDemoSrc : demoSrc}
           muted
           loop
           playsInline
@@ -212,9 +330,9 @@ function VideoSection() {
                 setPlaying(true)
               }}
               aria-label="Rewind 5s"
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white shadow-sm transition hover:bg-white/20"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-500/30 backdrop-blur-md border border-gray-400/50 text-white shadow-lg transition hover:bg-gray-500/40 hover:border-gray-400/70"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="11 19 2 12 11 5 11 19" />
                 <polygon points="22 19 13 12 22 5 22 19" />
               </svg>
@@ -225,16 +343,16 @@ function VideoSection() {
             <button
               onClick={toggleMute}
               aria-label={muted ? 'Unmute' : 'Mute'}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white shadow-sm transition hover:bg-white/20"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-500/30 backdrop-blur-md border border-gray-400/50 text-white shadow-lg transition hover:bg-gray-500/40 hover:border-gray-400/70"
             >
               {muted ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                   <line x1="15.5" y1="8.5" x2="19.5" y2="12.5" />
                   <line x1="19.5" y1="8.5" x2="15.5" y2="12.5" />
                 </svg>
               ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                   <path d="M15.5 11a3 3 0 0 1 0 2" />
                   <path d="M19 8a7 7 0 0 1 0 8" />
@@ -247,7 +365,7 @@ function VideoSection() {
             <button
               onClick={togglePlay}
               aria-label={playing ? 'Pause' : 'Play'}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/12 backdrop-blur-sm border border-white/20 text-white shadow-md transition hover:scale-105"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-500/35 backdrop-blur-md border border-gray-400/50 text-white shadow-lg transition hover:scale-105 hover:bg-gray-500/45 hover:border-gray-400/70"
             >
               {playing ? (
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
