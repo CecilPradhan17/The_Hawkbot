@@ -34,7 +34,7 @@ export const registerLimiter = rateLimit({
  */
 export const chatLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 1,
+  max: 7,
   standardHeaders: true,
   legacyHeaders: false,
   // Key by user ID instead of IP
