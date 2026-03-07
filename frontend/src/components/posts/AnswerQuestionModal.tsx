@@ -8,7 +8,7 @@ interface AnswerQuestionModalProps {
   onAnswerCreated: (answer: PostResponse) => void
 }
 
-const MAX_ANSWER_LENGTH = 500
+const MAX_ANSWER_LENGTH = 250
 
 export default function AnswerQuestionModal({ question, onClose, onAnswerCreated }: AnswerQuestionModalProps) {
   const [content, setContent] = useState('')

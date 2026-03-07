@@ -7,7 +7,7 @@ interface CreatePostModalProps {
   onPostCreated: (newPost: PostResponse) => void
 }
 
-const MAX_POST_LENGTH = 500
+const MAX_POST_LENGTH = 250
 
 export default function CreatePostModal({ onClose, onPostCreated }: CreatePostModalProps) {
   const [content, setContent] = useState('')

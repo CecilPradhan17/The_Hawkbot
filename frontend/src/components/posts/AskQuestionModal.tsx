@@ -7,7 +7,7 @@ interface AskQuestionModalProps {
   onPostCreated: (newPost: PostResponse) => void
 }
 
-const MAX_QUESTION_LENGTH = 500
+const MAX_QUESTION_LENGTH = 250
 
 export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestionModalProps) {
   const [content, setContent] = useState('')

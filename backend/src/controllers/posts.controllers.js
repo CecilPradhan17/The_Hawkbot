@@ -10,8 +10,8 @@ export const createPost = async (req, res, next) => {
         return next(error);
     }
 
-    if (content.length > 500) {
-        const error = new Error("Content exceeds 500 characters");
+    if (content.length > 250) {
+        const error = new Error("Content exceeds 250 characters");
         error.status = 400;
         return next(error);
     }
