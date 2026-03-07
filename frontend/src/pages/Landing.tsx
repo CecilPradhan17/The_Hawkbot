@@ -14,6 +14,7 @@ export default function Landing() {
       <Hero />
       <VideoSection />
       <HowItWorks />
+      <GetStarted onRegister={() => navigate('/register')} />
     </div>
   )
 }
@@ -163,7 +164,7 @@ function HowItWorks() {
     },
     {
       num: 4,
-      text: "Once another student's reply is Hawkyeah-ed (approved) a certain number of times, it is considered truthful!",
+      text: "Once another student's reply is Hawkyeah-ed (approved) by a certain number of students, it is considered truthful!",
     },
     {
       num: 5,
@@ -187,6 +188,26 @@ function HowItWorks() {
             <FlipCard key={step.num} num={step.num} text={step.text} isMobile={isMobile} />
           ))}
         </div>
+      </section>
+    </>
+  )
+}
+
+function GetStarted({ onRegister }: { onRegister: () => void }) {
+  return (
+    <>
+      <SectionDivider />
+      <section className="flex flex-col items-center text-center px-6 py-14 sm:py-20">
+        <h2 className="text-3xl sm:text-5xl font-bold text-slate-800 leading-tight max-w-2xl mb-8">
+          Get Started
+        </h2>
+        <button
+          onClick={onRegister}
+          className="px-8 py-3 text-base font-medium text-white bg-[#8A244B]
+                     rounded-xl hover:bg-[#6e1c3b] active:scale-95 transition-all duration-150 shadow-md"
+        >
+          Register
+        </button>
       </section>
     </>
   )
