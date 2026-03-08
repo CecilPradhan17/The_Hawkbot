@@ -27,7 +27,7 @@ export default function Header({ rightContent }: HeaderProps) {
           aria-label={isOnChat ? 'Go to Feed' : 'Go to Chatbot'}
         >
           <div className="
-              px-2 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-[#6d1c3a] text-white text-xs sm:text-base font-semibold whitespace-nowrap [font-family:'Playfair_Display',serif]
+              px-2 py-2 sm:px-3 sm:py-1.5 rounded-xl bg-[#6d1c3a] text-white text-xs sm:text-sm font-semibold whitespace-nowrap [font-family:'Playfair_Display',serif]
               shadow-[0_6px_0_rgba(0,0,0,0.35)]
               translate-y-0
               transition-all duration-100 ease-in-out
