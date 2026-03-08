@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
+import { HeroHighlight } from '../components/ui/hero-highlight'
 import demoSrc from '../assets/demo.mp4'
 import mobileDemoSrc from '../assets/mobile_demo.mp4'
 import { useNavigate } from 'react-router-dom'
@@ -113,29 +115,52 @@ function SectionDivider() {
 }
 
 function Hero() {
+  const [titleNumber, setTitleNumber] = useState(0)
+  const titles = useMemo(() => ['College', 'Classes', 'Events', 'Campus'], [])
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setTitleNumber(n => (n === titles.length - 1 ? 0 : n + 1))
+    }, 2000)
+    return () => clearTimeout(id)
+  }, [titleNumber, titles])
+
   return (
-    <section className="relative flex flex-col items-center text-center px-6 pt-16 pb-12 sm:pt-24 sm:pb-20 overflow-hidden">
-      {/* Decorative background blobs */}
-      <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-[#8A244B]/8 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-16 -left-24 w-72 h-72 rounded-full bg-[#C4933A]/10 blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-[#8A244B]/4 blur-3xl pointer-events-none" />
+    <HeroHighlight containerClassName="bg-[#FAF3E1]">
+      <section className="relative flex flex-col items-center text-center px-6 py-8 overflow-hidden">
+        <h1 className="text-4xl sm:text-6xl font-bold text-slate-800 leading-tight max-w-2xl">
+          Ask Anything About<br />
+          <span className="relative inline-flex justify-center overflow-hidden h-[1.2em] w-full">
+            {titles.map((title, index) => (
+              <motion.span
+                key={index}
+                className="absolute text-[#8A244B]"
+                initial={{ opacity: 0, y: -60 }}
+                transition={{ type: 'spring', stiffness: 50 }}
+                animate={
+                  titleNumber === index
+                    ? { y: 0, opacity: 1 }
+                    : { y: titleNumber > index ? -60 : 60, opacity: 0 }
+                }
+              >
+                {title}
+              </motion.span>
+            ))}
+          </span>
+        </h1>
+        <p className="mt-5 text-lg sm:text-xl text-slate-500 max-w-md leading-relaxed">
+          Everybody's knowledge, collected as one.
+        </p>
 
-      <h1 className="text-4xl sm:text-6xl font-bold text-slate-800 leading-tight max-w-2xl">
-        Ask Anything About<br />
-        Your College
-      </h1>
-      <p className="mt-5 text-lg sm:text-xl text-slate-500 max-w-md leading-relaxed">
-        Everybody's knowledge, collected as one.
-      </p>
-
-      {/* Decorative dots */}
-      <div className="absolute right-8 top-16 opacity-20 pointer-events-none hidden sm:block">
-        <DotGrid cols={4} rows={4} />
-      </div>
-      <div className="absolute left-8 bottom-8 opacity-15 pointer-events-none hidden sm:block">
-        <DotGrid cols={3} rows={3} />
-      </div>
-    </section>
+        {/* Decorative dots */}
+        <div className="absolute right-8 top-16 opacity-20 pointer-events-none hidden sm:block">
+          <DotGrid cols={4} rows={4} />
+        </div>
+        <div className="absolute left-8 bottom-8 opacity-15 pointer-events-none hidden sm:block">
+          <DotGrid cols={3} rows={3} />
+        </div>
+      </section>
+    </HeroHighlight>
   )
 }
 
@@ -247,6 +272,7 @@ function FlipCard({ num, text, isMobile }: { num: number; text: string; isMobile
 
 function VideoSection() {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoContainerRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(true)
@@ -316,8 +342,35 @@ function VideoSection() {
   }
 
   return (
-    <section className="flex flex-col items-center px-4 sm:px-10 pb-16">
+    <><SectionDivider />
+    <section id="video-demo" className="flex flex-col items-center px-4 sm:px-10 pb-16 pt-14 sm:pt-20">
+      <h2 className="text-3xl sm:text-5xl font-bold text-slate-800 leading-tight max-w-2xl mb-6">
+          Watch Hawkbot in Action
+        </h2>
+
+        <button
+          onClick={() => {
+            const v = videoRef.current
+            if (v) {
+              v.currentTime = 0
+              v.muted = false
+              v.play()
+              setPlaying(true)
+              setMuted(false)
+            }
+            videoContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }}
+          className="mb-8 px-6 py-2.5 text-sm font-semibold text-yellow-900
+                     bg-yellow-300/30 backdrop-blur-md
+                     border border-yellow-400/60 rounded-full shadow-lg
+                     hover:bg-yellow-300/50 hover:border-yellow-400/80
+                     active:scale-95 transition-all duration-150"
+        >
+          Video Demo
+        </button>
+
       <div
+        ref={videoContainerRef}
         className="w-full sm:max-w-7.5xl rounded-2xl overflow-hidden shadow-2xl border border-[#8A244B]/15 relative"
         onMouseEnter={() => {
           if (!isMobile) showControlsWithTimeout()
@@ -402,6 +455,6 @@ function VideoSection() {
           </div>
         </div>
       </div>
-    </section>
+    </section></>
   )
 }
