@@ -1,5 +1,5 @@
 import pool from "../db.js";
-import { processApproval } from "./approval.services.js";
+import { processApproval, processPostApproval } from "./approval.services.js";
 
 /**
  * PURPOSE:
@@ -117,6 +117,16 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
        WHERE id = $2`,
       [newStatus, postId]
     );
+
+    if (type === "post" && newStatus === "approved") {
+      await pool.query("COMMIT");
+
+      processPostApproval(postId).catch((err) =>
+        console.error("processPostApproval error:", err)
+      );
+
+      return { voteCount, status: newStatus };
+    }
 
     if (type === "answer" && newStatus === "approved") {
       await pool.query(
