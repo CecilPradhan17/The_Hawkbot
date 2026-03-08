@@ -1,7 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
-import iconPosts from '../assets/icon-posts.png'
-import iconChatbot from '../assets/icon-chatbot.png'
 
 interface HeaderProps {
   rightContent?: React.ReactNode
@@ -25,27 +23,25 @@ export default function Header({ rightContent }: HeaderProps) {
         {/* Left — nav icon button */}
         <button
           onClick={() => navigate(isOnChat ? '/posts' : '/chat')}
-          className="group relative flex-shrink-0"
+          className="group relative flex-shrink-0 w-fit"
           aria-label={isOnChat ? 'Go to Feed' : 'Go to Chatbot'}
         >
-          <img
-            src={isOnChat ? iconPosts : iconChatbot}
-            alt={isOnChat ? 'Posts' : 'Chatbot'}
-            className="
-              w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover
+          <div className="
+              px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-[#6d1c3a] text-white text-sm sm:text-base font-semibold whitespace-nowrap [font-family:'Playfair_Display',serif]
               shadow-[0_6px_0_rgba(0,0,0,0.35)]
               translate-y-0
               transition-all duration-100 ease-in-out
               group-hover:shadow-[0_4px_0_rgba(0,0,0,0.35)] group-hover:translate-y-[2px]
               group-active:shadow-[0_1px_0_rgba(0,0,0,0.35)] group-active:translate-y-[5px]
-            "
-          />
+            ">
+            {isOnChat ? '← Posts' : 'Ask Hawkbot'}
+          </div>
         </button>
 
         {/* Center — animated cursive SVG title */}
         <button
           onClick={() => setAnimKey(k => k + 1)}
-          className="flex justify-center cursor-pointer select-none bg-transparent border-none p-0 -translate-x-3 sm:translate-x-0"
+          className="flex ml-4 justify-center cursor-pointer select-none bg-transparent border-none p-0 -translate-x-3 sm:translate-x-0"
           aria-label="Replay Hawkbot animation"
         >
           <HawkbotTitle animKey={animKey} />
