@@ -305,9 +305,32 @@ function VideoSection() {
         v.play()
         setPlaying(true)
       }
-    }, 2000)
+    }, 3000)
 
     return () => clearTimeout(autoplayTimer)
+  }, [])
+
+  useEffect(() => {
+    const container = videoContainerRef.current
+    if (!container) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const v = videoRef.current
+        if (!v) return
+        if (entry.isIntersecting) {
+          v.play()
+          setPlaying(true)
+        } else {
+          v.pause()
+          setPlaying(false)
+        }
+      },
+      { threshold: 0.3 }
+    )
+
+    observer.observe(container)
+    return () => observer.disconnect()
   }, [])
 
   const togglePlay = () => {
