@@ -1,8 +1,11 @@
 export default function errorHandler(err, req, res, next) {
-    console.error(err);
+    if (process.env.NODE_ENV !== 'production') {
+        console.error(err);
+    }
 
-    res.status(err.status || 500).json({
-        message: err.message || "Internal Server Error"
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({
+        message: statusCode === 500 ? "Internal Server Error" : err.message
     });
 };
 

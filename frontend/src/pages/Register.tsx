@@ -17,8 +17,7 @@ export default function Register() {
     setLoading(true)
 
     try {
-      const res = await register({ username, email, password })
-      console.log('REGISTER SUCCESS:', res)
+      await register({ username, email, password })
       navigate('/login')
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.')

@@ -1,5 +1,6 @@
 import pool from "../db.js";
 import { processApproval, processPostApproval } from "./approval.services.js";
+import 'dotenv/config';
 
 /**
  * PURPOSE:
@@ -15,7 +16,7 @@ import { processApproval, processPostApproval } from "./approval.services.js";
  * USED BY:
  * vote.controller.js → handleVote
  */
-const APPROVAL_THRESHOLD = 5;
+const APPROVAL_THRESHOLD = process.env.VOTE_APPROVAL_THRESHOLD;
 
 const determinePostStatus = (voteCount) => {
   if (voteCount >= APPROVAL_THRESHOLD) return "approved";

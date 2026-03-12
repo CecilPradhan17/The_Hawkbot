@@ -48,15 +48,8 @@ export const handleChatQuery = async (userMessage) => {
   const topMatch = result.rows[0];
   const similarity = topMatch ? parseFloat(topMatch.similarity).toFixed(4) : null;
 
-  // Log for debugging
-  console.log(`[chatbot] query="${userMessage}" | top_similarity=${similarity} | threshold=${SIMILARITY_THRESHOLD}`);
-  result.rows.forEach((row, i) => {
-    console.log(`[chatbot] match ${i + 1}: similarity=${parseFloat(row.similarity).toFixed(4)} | "${row.cleaned_content.substring(0, 60)}..."`);
-  });
-
   // Step 3a: Best match below threshold — return fallback
   if (!topMatch || topMatch.similarity < SIMILARITY_THRESHOLD) {
-    console.log(`[chatbot] No match — returning fallback`);
     return { response: FALLBACK_MESSAGE, matched: false };
   }
 
@@ -67,8 +60,6 @@ export const handleChatQuery = async (userMessage) => {
     .filter(row => row.similarity >= SIMILARITY_THRESHOLD)
     .map(row => row.cleaned_content)
     .join("\n\n");
-
-  console.log(`[chatbot] ${result.rows.filter(r => r.similarity >= SIMILARITY_THRESHOLD).length} match(es) above threshold — polishing`);
 
   const polished = await polishResponse(userMessage, combinedKnowledge);
 

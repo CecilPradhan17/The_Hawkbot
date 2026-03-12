@@ -50,7 +50,6 @@ const ProtectedRoute = () => {
     const decoded: any = jwtDecode(token)
     const currentTime = Date.now() / 1000
     if (decoded.exp < currentTime) {
-      console.log('[ProtectedRoute] Token expired, redirecting to login')
       return <Navigate to="/login" replace />
     }
   } catch (error) {

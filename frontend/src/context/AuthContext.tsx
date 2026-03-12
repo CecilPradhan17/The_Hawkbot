@@ -112,14 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const checkAndLogout = () => {
       if (isTokenExpired(token)) {
-        console.log('[AuthContext] Token expired, logging out')
         logout()
         window.location.href = '/login' 
       }
     }
 
     // Check immediately on mount
-    console.log('[AuthContext] Checking token expiration')
     checkAndLogout()
 
     // Then check frequently (every 1 second) to catch expiration quickly
