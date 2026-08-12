@@ -8,7 +8,7 @@ type HttpMethod = 'GET' | 'POST' | 'DELETE'
 
 // Cold start timeout — if a request takes longer than this (ms),
 // we assume the server is waking up from sleep and show the modal.
-const COLD_START_TIMEOUT_MS = 3000
+const COLD_START_TIMEOUT_MS = 10000
 
 // Retry interval — how often to retry while server is waking (ms)
 const RETRY_INTERVAL_MS = 3000
