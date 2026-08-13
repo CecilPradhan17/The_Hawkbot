@@ -47,7 +47,26 @@ Frontend (Vercel), backend (Render), and DB (Neon) all exist as real deployed en
 
 Four workstreams, in this deliberate order — don't reshuffle without discussion:
 
-1. **PWA conversion** — make the frontend installable via `vite-plugin-pwa`. Scope is installable + fast cold load + a graceful offline fallback screen, *not* full offline-first: the app is fundamentally auth-gated and live (feed, chat, votes), so there's no meaningful offline mode to build for those.
+1. **PWA conversion** — make the frontend installable via `vite-plugin-pwa`. Scope is installable + fast cold load, *not* full offline-first: the app is fundamentally auth-gated and live (feed, chat, votes), so there's no meaningful offline mode to build for those. See "PWA conversion scope" below for the detailed decisions.
+
+### PWA conversion scope
+
+**Approach:** `vite-plugin-pwa` using the `generateSW` strategy — Workbox generates the service worker; no hand-rolled SW logic for this scope.
+
+**Manifest:** web app manifest with app name, and icons at 192px, 512px, and a maskable variant.
+
+**Runtime caching:**
+- Static hashed JS/CSS assets → cache-first.
+- HTML app shell → stale-while-revalidate.
+- `/api/*` routes → explicitly excluded from caching. They serve live authenticated data (feed, votes, chat) and must never be served stale.
+
+**Update handling:** `registerType: 'autoUpdate'`, with `skipWaiting` and `clientsClaim` enabled. Add a small React hook using `needsRefresh` / `updateServiceWorker` (from `virtual:pwa-register/react`) to prompt users to refresh when a new version is available — browsers check for service worker updates conservatively, so without this, fixes wouldn't apply promptly.
+
+**Install prompt:** custom install UI — capture `beforeinstallprompt` for Android/Chrome, plus a manual "Add to Home Screen" instructional UI for iOS Safari, since iOS doesn't fire a native install banner.
+
+**Out of scope for this pass:**
+- Offline fallback page / offline data caching — a plain network error state in existing components is considered sufficient for now.
+- Push notifications — flagged as a larger, separate future feature due to iOS limitations.
 
 2. **Evaluation harness** — built *before* touching the RAG pipeline, so changes have a real before/after baseline instead of vibes. RAGAS is Python; the backend is Node, so this is a standalone script (not part of the Express app) that pulls a golden question set + `approved_knowledge` from Postgres via `DATABASE_URL` and computes faithfulness, answer relevancy, context precision, and context recall. Also add lightweight in-app instrumentation: thumbs up/down on chatbot answers, and logging similarity score + latency per query (already computed in `chatbot.services.js`, just needs to be persisted).
 
