@@ -39,6 +39,7 @@ import Landing from '@/pages/Landing'
 import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
 import ServerWakeModal from '@/components/ServerWakeModal'
 import PwaUpdatePrompt from '@/components/PwaUpdatePrompt'
+import InstallPrompt from '@/components/InstallPrompt'
 import { Analytics } from '@vercel/analytics/react'
 
 function AppInner() {
@@ -62,6 +63,7 @@ function AppInner() {
       {/* Global cold start modal — renders on top of any page */}
       <ServerWakeModal isWaking={isWaking} />
       <PwaUpdatePrompt />
+      <InstallPrompt />
     </>
   )
 }
