@@ -15,6 +15,7 @@ export default function Landing() {
     <div className="min-h-screen bg-[#FAF3E1] flex flex-col overflow-x-hidden">
       <Nav onLogin={() => navigate('/login')} onRegister={() => navigate('/register')} />
       <Hero />
+      <DownloadSection />
       <VideoSection />
       <HowItWorks />
       <GetStarted onRegister={() => navigate('/register')} />
@@ -153,8 +154,6 @@ function Hero() {
           Everybody's knowledge, collected as one.
         </p>
 
-        <DownloadHawkbotButton />
-
         {/* Decorative dots */}
         <div className="absolute right-8 top-16 opacity-20 pointer-events-none hidden sm:block">
           <DotGrid cols={4} rows={4} />
@@ -164,6 +163,23 @@ function Hero() {
         </div>
       </section>
     </HeroHighlight>
+  )
+}
+
+function DownloadSection() {
+  return (
+    <>
+      <SectionDivider />
+      <section className="relative flex flex-col items-center text-center px-6 py-12 sm:py-16 overflow-hidden">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
+          Take Hawkbot With You
+        </h2>
+        <p className="mt-2 text-sm sm:text-base text-slate-500 max-w-sm">
+          Install the app for quick, one-tap access from your home screen.
+        </p>
+        <DownloadHawkbotButton />
+      </section>
+    </>
   )
 }
 
