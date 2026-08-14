@@ -166,9 +166,9 @@ function Hero() {
   )
 }
 
-function PhoneFrame() {
+function PhoneFrame({ className = '' }: { className?: string }) {
   return (
-    <div className="hidden md:flex relative w-28 lg:w-32 aspect-[9/19] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0">
+    <div className={`relative aspect-[9/19] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0 ${className}`}>
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-4 bg-slate-800 rounded-b-lg z-10" />
       <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
         Phone
@@ -192,10 +192,26 @@ function DownloadSection() {
   return (
     <>
       <SectionDivider />
-      <section className="relative flex flex-col items-center text-center px-6 py-12 sm:py-16 overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 lg:gap-12 w-full max-w-5xl">
+      <section className="relative flex flex-col items-center px-6 py-12 sm:py-16 overflow-hidden">
+        {/* Mobile: text left-indented, phone sharing the row on the right */}
+        <div className="flex md:hidden items-center justify-between gap-4 w-full max-w-sm mx-auto text-left">
+          <div className="flex flex-col items-start">
+            <h2 className="text-xl font-bold text-slate-800 leading-tight">
+              Take Hawkbot With You
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Install the app for quick, one-tap access from your home screen.
+            </p>
+            <DownloadHawkbotButton />
+          </div>
+
+          <PhoneFrame className="w-20 shrink-0" />
+        </div>
+
+        {/* Tablet/desktop: phone left, text centered, iPad right */}
+        <div className="hidden md:grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 lg:gap-12 w-full max-w-5xl text-center">
           <div className="justify-self-end">
-            <PhoneFrame />
+            <PhoneFrame className="w-28 lg:w-32" />
           </div>
 
           <div className="flex flex-col items-center">
