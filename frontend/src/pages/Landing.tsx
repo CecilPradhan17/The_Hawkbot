@@ -213,7 +213,7 @@ function DownloadSection() {
           </div>
 
           <div className="flex flex-col items-center">
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-relaxed">
               Add it to your<br />
               homescreen
             </h2>
