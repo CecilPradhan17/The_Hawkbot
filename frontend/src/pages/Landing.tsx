@@ -203,7 +203,7 @@ function DownloadSection() {
             <DownloadHawkbotButton label="Add" />
           </div>
 
-          <PhoneFrame className="w-36 shrink-0 ml-auto" />
+          <PhoneFrame className="w-32 shrink-0 ml-auto" />
         </div>
 
         {/* Tablet/desktop: phone left, text centered, iPad right */}
