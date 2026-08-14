@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import IosInstallModal from '@/components/IosInstallModal'
+import MessageModal from '@/components/MessageModal'
 
 const ALREADY_INSTALLED_MESSAGE = "Already have it? Check your home screen."
 const MACOS_SAFARI_MESSAGE = 'Open the File menu and click "Add to Dock".'
@@ -50,7 +51,7 @@ export default function DownloadHawkbotButton({ label = 'Download Hawkbot' }: { 
         {label}
       </button>
       {message && (
-        <p className="mt-3 text-sm text-slate-500">{message}</p>
+        <MessageModal message={message} onClose={() => setMessage(null)} />
       )}
       {showIosModal && (
         <IosInstallModal onClose={() => setShowIosModal(false)} />
