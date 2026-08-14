@@ -195,9 +195,11 @@ function DownloadSection() {
       <section className="relative flex flex-col items-center px-6 py-12 sm:py-16 overflow-hidden">
         {/* Mobile: text left-indented, phone sharing the row on the right */}
         <div className="flex md:hidden items-center justify-between gap-4 w-full max-w-sm mx-auto text-left">
-          <div className="flex flex-col items-start">
+          <div className="flex flex-col items-center text-center">
             <h2 className="text-xl font-bold text-slate-800 leading-tight">
-              Add it on your homescreen
+              Add it<br />
+              to your<br />
+              homescreen
             </h2>
             <DownloadHawkbotButton label="Add" />
           </div>
