@@ -4,7 +4,7 @@ import IosInstallModal from '@/components/IosInstallModal'
 
 const ALREADY_INSTALLED_MESSAGE = "Already have it? Check your home screen."
 
-export default function DownloadHawkbotButton() {
+export default function DownloadHawkbotButton({ label = 'Download Hawkbot' }: { label?: string }) {
   const { installed, installCase, promptInstall } = useInstallPrompt()
   const [message, setMessage] = useState<string | null>(null)
   const [showIosModal, setShowIosModal] = useState(false)
@@ -38,7 +38,7 @@ export default function DownloadHawkbotButton() {
                    shadow-black-400/30 hover:shadow-xl hover:shadow-black-500/40
                    hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
       >
-        Download Hawkbot
+        {label}
       </button>
       {message && (
         <p className="mt-3 text-sm text-slate-500">{message}</p>

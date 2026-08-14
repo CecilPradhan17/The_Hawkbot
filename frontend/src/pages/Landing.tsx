@@ -197,15 +197,12 @@ function DownloadSection() {
         <div className="flex md:hidden items-center justify-between gap-4 w-full max-w-sm mx-auto text-left">
           <div className="flex flex-col items-start">
             <h2 className="text-xl font-bold text-slate-800 leading-tight">
-              Take Hawkbot With You
+              Add it on your homescreen
             </h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Install the app for quick, one-tap access from your home screen.
-            </p>
-            <DownloadHawkbotButton />
+            <DownloadHawkbotButton label="Add" />
           </div>
 
-          <PhoneFrame className="w-20 shrink-0" />
+          <PhoneFrame className="w-28 shrink-0" />
         </div>
 
         {/* Tablet/desktop: phone left, text centered, iPad right */}
