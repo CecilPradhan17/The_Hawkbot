@@ -166,18 +166,48 @@ function Hero() {
   )
 }
 
+function PhoneFrame() {
+  return (
+    <div className="hidden md:flex relative w-28 lg:w-32 aspect-[9/19] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-4 bg-slate-800 rounded-b-lg z-10" />
+      <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+        Phone
+      </div>
+    </div>
+  )
+}
+
+function TabletFrame() {
+  return (
+    <div className="hidden md:flex relative w-56 lg:w-64 aspect-[4/3] rounded-[1.5rem] border-[8px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0">
+      <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-800 z-10" />
+      <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+        iPad
+      </div>
+    </div>
+  )
+}
+
 function DownloadSection() {
   return (
     <>
       <SectionDivider />
       <section className="relative flex flex-col items-center text-center px-6 py-12 sm:py-16 overflow-hidden">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
-          Take Hawkbot With You
-        </h2>
-        <p className="mt-2 text-sm sm:text-base text-slate-500 max-w-sm">
-          Install the app for quick, one-tap access from your home screen.
-        </p>
-        <DownloadHawkbotButton />
+        <div className="flex flex-row items-center justify-center gap-6 lg:gap-12">
+          <PhoneFrame />
+
+          <div className="flex flex-col items-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
+              Take Hawkbot With You
+            </h2>
+            <p className="mt-2 text-sm sm:text-base text-slate-500 max-w-sm">
+              Install the app for quick, one-tap access from your home screen.
+            </p>
+            <DownloadHawkbotButton />
+          </div>
+
+          <TabletFrame />
+        </div>
       </section>
     </>
   )
