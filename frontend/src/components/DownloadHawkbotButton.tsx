@@ -3,29 +3,38 @@ import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import IosInstallModal from '@/components/IosInstallModal'
 
 const ALREADY_INSTALLED_MESSAGE = "Already have it? Check your home screen."
+const MACOS_SAFARI_MESSAGE = 'Open the File menu and click "Add to Dock".'
+const IOS_CHROME_MESSAGE = "Chrome on iOS can't install apps — open this page in Safari instead."
+const UNSUPPORTED_MESSAGE = "Installing needs Chrome, Edge, or Safari — try opening this page in one of those."
 
 export default function DownloadHawkbotButton({ label = 'Download Hawkbot' }: { label?: string }) {
   const { installed, installCase, promptInstall } = useInstallPrompt()
   const [message, setMessage] = useState<string | null>(null)
   const [showIosModal, setShowIosModal] = useState(false)
 
-  const handleClick = () => {
+  const handleClick = async () => {
     if (installed) {
       setMessage(ALREADY_INSTALLED_MESSAGE)
       return
     }
 
     switch (installCase) {
-      case 'chromium':
-        promptInstall()
+      case 'chromium': {
+        const prompted = await promptInstall()
+        if (!prompted) setMessage(ALREADY_INSTALLED_MESSAGE)
         break
+      }
       case 'ios-safari':
         setShowIosModal(true)
         break
       case 'macos-safari':
+        setMessage(MACOS_SAFARI_MESSAGE)
+        break
       case 'ios-chrome':
+        setMessage(IOS_CHROME_MESSAGE)
+        break
       case 'unsupported':
-        // TODO: per-case instructional prompt, built out in later chunks
+        setMessage(UNSUPPORTED_MESSAGE)
         break
     }
   }

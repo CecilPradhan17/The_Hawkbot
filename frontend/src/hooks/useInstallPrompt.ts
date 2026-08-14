@@ -68,11 +68,16 @@ export function useInstallPrompt() {
     }
   }, [])
 
-  const promptInstall = async () => {
-    if (!deferredPrompt) return
+  // Returns false when there was nothing to prompt — most often because
+  // it's already installed, since Chrome won't fire beforeinstallprompt
+  // again once it is. Callers use this to fall back to messaging instead
+  // of leaving the click looking like it did nothing.
+  const promptInstall = async (): Promise<boolean> => {
+    if (!deferredPrompt) return false
     await deferredPrompt.prompt()
     await deferredPrompt.userChoice
     setDeferredPrompt(null)
+    return true
   }
 
   return {
