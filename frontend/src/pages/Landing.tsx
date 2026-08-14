@@ -168,7 +168,7 @@ function Hero() {
 
 function PhoneFrame({ className = '' }: { className?: string }) {
   return (
-    <div className={`relative aspect-[9/19] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0 ${className}`}>
+    <div className={`relative aspect-[9/17] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0 ${className}`}>
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-4 bg-slate-800 rounded-b-lg z-10" />
       <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
         Phone
@@ -194,16 +194,16 @@ function DownloadSection() {
       <SectionDivider />
       <section className="relative flex flex-col items-center px-6 py-12 sm:py-16 overflow-hidden">
         {/* Mobile: text left-indented, phone sharing the row on the right */}
-        <div className="flex md:hidden items-center justify-between gap-4 w-full max-w-sm mx-auto text-left">
+        <div className="flex md:hidden items-center gap-6 pl-6 w-full max-w-sm mx-auto text-left">
           <div className="flex flex-col items-center text-center">
-            <h2 className="text-2xl font-bold text-slate-800 leading-tight">
+            <h2 className="text-3xl font-bold text-slate-800 leading-tight">
               Add it to your<br />
               homescreen
             </h2>
             <DownloadHawkbotButton label="Add" />
           </div>
 
-          <PhoneFrame className="w-36 shrink-0" />
+          <PhoneFrame className="w-36 shrink-0 ml-auto" />
         </div>
 
         {/* Tablet/desktop: phone left, text centered, iPad right */}
