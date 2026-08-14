@@ -32,10 +32,9 @@ export default function IosInstallModal({ onClose, videoSrc }: IosInstallModalPr
           <h2 className="text-xl font-bold text-[#8A244B] mb-1">
             Add Hawkbot to your Home Screen
           </h2>
-          <p className="text-slate-500 text-sm">Takes about 10 seconds 🦅</p>
         </div>
 
-        <div className="rounded-xl overflow-hidden border border-[#8A244B]/15 shadow-sm mb-5 aspect-[9/16] bg-slate-200">
+        <div className="rounded-xl overflow-hidden border border-[#8A244B]/15 shadow-sm mb-5 aspect-[3/4] bg-slate-200">
           {videoSrc ? (
             <video
               src={videoSrc}
