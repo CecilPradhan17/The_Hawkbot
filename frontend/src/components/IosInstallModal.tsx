@@ -16,7 +16,7 @@ export default function IosInstallModal({ onClose, videoSrc }: IosInstallModalPr
       onClick={onClose}
     >
       <div
-        className="bg-[#FAF3E1] rounded-2xl p-6 max-w-sm w-full shadow-2xl relative"
+        className="bg-[#FAF3E1] rounded-2xl p-6 max-w-sm w-full max-h-[85vh] overflow-y-auto shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
       >
         <button
