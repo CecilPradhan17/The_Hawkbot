@@ -193,8 +193,10 @@ function DownloadSection() {
     <>
       <SectionDivider />
       <section className="relative flex flex-col items-center text-center px-6 py-12 sm:py-16 overflow-hidden">
-        <div className="flex flex-row items-center justify-center gap-6 lg:gap-12">
-          <PhoneFrame />
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 lg:gap-12 w-full max-w-5xl">
+          <div className="justify-self-end">
+            <PhoneFrame />
+          </div>
 
           <div className="flex flex-col items-center">
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-tight">
@@ -206,7 +208,9 @@ function DownloadSection() {
             <DownloadHawkbotButton />
           </div>
 
-          <TabletFrame />
+          <div className="justify-self-start">
+            <TabletFrame />
+          </div>
         </div>
       </section>
     </>
