@@ -196,15 +196,14 @@ function DownloadSection() {
         {/* Mobile: text left-indented, phone sharing the row on the right */}
         <div className="flex md:hidden items-center justify-between gap-4 w-full max-w-sm mx-auto text-left">
           <div className="flex flex-col items-center text-center">
-            <h2 className="text-xl font-bold text-slate-800 leading-tight">
-              Add it<br />
-              to your<br />
+            <h2 className="text-2xl font-bold text-slate-800 leading-tight">
+              Add it to your<br />
               homescreen
             </h2>
             <DownloadHawkbotButton label="Add" />
           </div>
 
-          <PhoneFrame className="w-28 shrink-0" />
+          <PhoneFrame className="w-36 shrink-0" />
         </div>
 
         {/* Tablet/desktop: phone left, text centered, iPad right */}
