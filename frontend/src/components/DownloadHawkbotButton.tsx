@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
+import IosInstallModal from '@/components/IosInstallModal'
 
 const ALREADY_INSTALLED_MESSAGE = "Already have it? Check your home screen."
 
 export default function DownloadHawkbotButton() {
   const { installed, installCase, promptInstall } = useInstallPrompt()
   const [message, setMessage] = useState<string | null>(null)
+  const [showIosModal, setShowIosModal] = useState(false)
 
   const handleClick = () => {
     if (installed) {
@@ -18,6 +20,8 @@ export default function DownloadHawkbotButton() {
         promptInstall()
         break
       case 'ios-safari':
+        setShowIosModal(true)
+        break
       case 'macos-safari':
       case 'ios-chrome':
       case 'unsupported':
@@ -38,6 +42,9 @@ export default function DownloadHawkbotButton() {
       </button>
       {message && (
         <p className="mt-3 text-sm text-slate-500">{message}</p>
+      )}
+      {showIosModal && (
+        <IosInstallModal onClose={() => setShowIosModal(false)} />
       )}
     </div>
   )
