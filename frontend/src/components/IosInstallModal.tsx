@@ -6,7 +6,7 @@ interface IosInstallModalProps {
 }
 
 const STEPS = [
-  'Tap the Share icon',
+  'Tap the Share icon on the bottom right',
   'Scroll down and tap "Add to Home Screen"',
   'Tap "Add" in the top right',
 ]
@@ -86,7 +86,7 @@ export default function IosInstallModal({ onClose, videoSrc }: IosInstallModalPr
               <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#8A244B] text-white flex items-center justify-center text-xs font-semibold">
                 {i + 1}
               </span>
-              <span className="pt-0.5">{step}</span>
+              <span className="pt-0.5 flex-1 min-w-0 text-left">{step}</span>
             </li>
           ))}
         </ol>

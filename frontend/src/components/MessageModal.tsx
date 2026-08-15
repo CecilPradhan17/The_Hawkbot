@@ -22,7 +22,7 @@ export default function MessageModal({ message, onClose }: MessageModalProps) {
           ✕
         </button>
 
-        <p className="text-slate-700 text-base mt-2 mb-5">{message}</p>
+        <p className="text-slate-700 text-base mt-8 mb-5">{message}</p>
 
         <button
           onClick={onClose}
