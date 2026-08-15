@@ -122,11 +122,14 @@ function DemoModeOverlay({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[999] bg-[#FAF3E1] flex flex-col items-center justify-center cursor-pointer"
+      className="fixed inset-0 z-[999] bg-[#FAF3E1] flex items-center justify-center pb-24 cursor-pointer"
       onClick={onClose}
     >
-      <HawkbotLogo height={140} className="w-auto max-w-[60vw] sm:max-w-[420px]" />
-      <p className="mt-8 text-xs text-slate-400">Click anywhere (or press Esc) to exit</p>
+      <img
+        src="/icon-512.png"
+        alt="Hawkbot"
+        className="w-40 h-40 sm:w-56 sm:h-56 rounded-3xl shadow-xl"
+      />
     </div>
   )
 }
