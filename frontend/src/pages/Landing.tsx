@@ -10,6 +10,7 @@ const HAWKBOT_PATH = "M 31.6 98 Q 43 98 52.55 94.05 Q 62.1 90.1 69.55 83.4 Q 77 
 
 export default function Landing() {
   const navigate = useNavigate()
+  const [demoMode, setDemoMode] = useState(false)
 
   return (
     <div className="min-h-screen bg-[#FAF3E1] flex flex-col overflow-x-hidden">
@@ -19,6 +20,17 @@ export default function Landing() {
       <VideoSection />
       <HowItWorks />
       <GetStarted onRegister={() => navigate('/register')} />
+
+      {/* TEMPORARY: recording aid, remove after demo footage is captured. */}
+      <button
+        onClick={() => setDemoMode(true)}
+        className="fixed bottom-4 right-4 z-40 px-3 py-1.5 text-xs font-medium text-[#8A244B]
+                   bg-white/80 backdrop-blur border border-[#8A244B]/30 rounded-full shadow-md
+                   hover:bg-white transition-colors"
+      >
+        Demo Mode
+      </button>
+      {demoMode && <DemoModeOverlay onClose={() => setDemoMode(false)} />}
     </div>
   )
 }
@@ -47,7 +59,7 @@ function Nav({ onLogin, onRegister }: { onLogin: () => void; onRegister: () => v
   )
 }
 
-function HawkbotLogo() {
+function HawkbotLogo({ height = 36, className = 'w-auto max-w-[140px] sm:max-w-[180px]' }: { height?: number; className?: string }) {
   const pathRef = useRef<SVGPathElement>(null)
   const [pathLength, setPathLength] = useState<number | null>(null)
 
@@ -78,8 +90,8 @@ function HawkbotLogo() {
       )}
       <svg
         viewBox="0 0 356 98"
-        height="36"
-        className="w-auto max-w-[140px] sm:max-w-[180px]"
+        height={height}
+        className={className}
         aria-label="Hawkbot"
       >
         <path
@@ -95,6 +107,27 @@ function HawkbotLogo() {
         />
       </svg>
     </>
+  )
+}
+
+// TEMPORARY: recording aid, remove after demo footage is captured.
+function DemoModeOverlay({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[999] bg-[#FAF3E1] flex flex-col items-center justify-center cursor-pointer"
+      onClick={onClose}
+    >
+      <HawkbotLogo height={140} className="w-auto max-w-[60vw] sm:max-w-[420px]" />
+      <p className="mt-8 text-xs text-slate-400">Click anywhere (or press Esc) to exit</p>
+    </div>
   )
 }
 
