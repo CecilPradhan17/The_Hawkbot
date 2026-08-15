@@ -10,7 +10,6 @@ const HAWKBOT_PATH = "M 31.6 98 Q 43 98 52.55 94.05 Q 62.1 90.1 69.55 83.4 Q 77 
 
 export default function Landing() {
   const navigate = useNavigate()
-  const [demoMode, setDemoMode] = useState(false)
 
   return (
     <div className="min-h-screen bg-[#FAF3E1] flex flex-col overflow-x-hidden">
@@ -20,17 +19,6 @@ export default function Landing() {
       <VideoSection />
       <HowItWorks />
       <GetStarted onRegister={() => navigate('/register')} />
-
-      {/* TEMPORARY: recording aid, remove after demo footage is captured. */}
-      <button
-        onClick={() => setDemoMode(true)}
-        className="fixed bottom-4 right-4 z-40 px-3 py-1.5 text-xs font-medium text-[#8A244B]
-                   bg-white/80 backdrop-blur border border-[#8A244B]/30 rounded-full shadow-md
-                   hover:bg-white transition-colors"
-      >
-        Demo Mode
-      </button>
-      {demoMode && <DemoModeOverlay onClose={() => setDemoMode(false)} />}
     </div>
   )
 }
@@ -107,30 +95,6 @@ function HawkbotLogo({ height = 36, className = 'w-auto max-w-[140px] sm:max-w-[
         />
       </svg>
     </>
-  )
-}
-
-// TEMPORARY: recording aid, remove after demo footage is captured.
-function DemoModeOverlay({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  return (
-    <div
-      className="fixed inset-0 z-[999] bg-[#FAF3E1] flex items-center justify-center pb-24 cursor-pointer"
-      onClick={onClose}
-    >
-      <img
-        src="/icon-512.png"
-        alt="Hawkbot"
-        className="w-40 h-40 sm:w-56 sm:h-56 rounded-3xl shadow-xl"
-      />
-    </div>
   )
 }
 
@@ -279,7 +243,7 @@ function DownloadSection() {
         <div className="flex md:hidden items-center gap-6 px-6 w-full max-w-sm mx-auto text-left">
           <div className="flex flex-col items-center text-center">
             <h2 className="text-3xl font-bold text-slate-800 leading-tight">
-              Add it to your<br />
+              Add to your<br />
               home screen
             </h2>
             <DownloadHawkbotButton label="Add" />
@@ -300,7 +264,7 @@ function DownloadSection() {
 
           <div className="flex flex-col items-center">
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 leading-relaxed whitespace-nowrap">
-              Add it to your homescreen
+              Add to your homescreen
             </h2>
             <DownloadHawkbotButton label="Add" />
           </div>
