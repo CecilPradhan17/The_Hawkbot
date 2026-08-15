@@ -171,7 +171,7 @@ function PhoneFrame({ className = '' }: { className?: string }) {
     <div className={`relative aspect-[9/17] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0 ${className}`}>
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-4 bg-slate-800 rounded-b-lg z-10" />
       <video
-        src="/hawkbot_app%20loop_phone.mp4"
+        src="/hawkbot_app_loop_phone.mp4"
         autoPlay
         loop
         muted
