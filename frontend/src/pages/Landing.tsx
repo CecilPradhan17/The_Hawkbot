@@ -166,34 +166,75 @@ function Hero() {
   )
 }
 
-function PhoneFrame({ className = '' }: { className?: string }) {
+function PhoneFrame({ className = '', active, onFinish }: { className?: string; active?: boolean; onFinish?: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const turnBased = active !== undefined
+
+  useEffect(() => {
+    if (!turnBased) return
+    const v = videoRef.current
+    if (!v) return
+    if (active) {
+      v.currentTime = 0
+      v.play()
+    } else {
+      v.pause()
+    }
+  }, [active, turnBased])
+
   return (
     <div className={`relative aspect-[9/17] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0 ${className}`}>
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-4 bg-slate-800 rounded-b-lg z-10" />
       <video
+        ref={videoRef}
         src="/hawkbot_app_loop_phone.mp4"
-        autoPlay
-        loop
+        autoPlay={!turnBased}
+        loop={!turnBased}
         muted
         playsInline
+        onEnded={turnBased ? onFinish : undefined}
         className="w-full h-full object-cover"
       />
     </div>
   )
 }
 
-function TabletFrame() {
+function TabletFrame({ active, onFinish }: { active?: boolean; onFinish?: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const turnBased = active !== undefined
+
+  useEffect(() => {
+    if (!turnBased) return
+    const v = videoRef.current
+    if (!v) return
+    if (active) {
+      v.currentTime = 0
+      v.play()
+    } else {
+      v.pause()
+    }
+  }, [active, turnBased])
+
   return (
     <div className="hidden md:flex relative w-56 lg:w-64 aspect-[4/3] rounded-[1.5rem] border-[8px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0">
       <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-800 z-10" />
-      <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
-        iPad
-      </div>
+      <video
+        ref={videoRef}
+        src="/hawkbot_app_loop_ipad.mp4"
+        autoPlay={!turnBased}
+        loop={!turnBased}
+        muted
+        playsInline
+        onEnded={turnBased ? onFinish : undefined}
+        className="w-full h-full object-cover"
+      />
     </div>
   )
 }
 
 function DownloadSection() {
+  const [activeDevice, setActiveDevice] = useState<'phone' | 'ipad'>('phone')
+
   return (
     <>
       <SectionDivider />
@@ -214,7 +255,11 @@ function DownloadSection() {
         {/* Tablet/desktop: phone left, text centered, iPad right */}
         <div className="hidden md:grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-10 lg:gap-20 w-full max-w-6xl text-center">
           <div className="justify-self-end">
-            <PhoneFrame className="w-28 lg:w-32" />
+            <PhoneFrame
+              className="w-28 lg:w-32"
+              active={activeDevice === 'phone'}
+              onFinish={() => setActiveDevice('ipad')}
+            />
           </div>
 
           <div className="flex flex-col items-center">
@@ -225,7 +270,10 @@ function DownloadSection() {
           </div>
 
           <div className="justify-self-start">
-            <TabletFrame />
+            <TabletFrame
+              active={activeDevice === 'ipad'}
+              onFinish={() => setActiveDevice('phone')}
+            />
           </div>
         </div>
       </section>
