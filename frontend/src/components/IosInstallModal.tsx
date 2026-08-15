@@ -41,7 +41,7 @@ export default function IosInstallModal({ onClose, videoSrc }: IosInstallModalPr
           ✕
         </button>
 
-        <div className="text-center mb-5">
+        <div className="text-center mb-5 px-8">
           <h2 className="text-xl font-bold text-[#8A244B] mb-1">
             Add Hawkbot to your Home Screen
           </h2>
