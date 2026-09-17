@@ -1,29 +1,13 @@
 import pool from "../db.js";
 import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
+import { tryHandleHoursQuery } from "./hours-chat.services.js";
 
 /**
- * PURPOSE:
- * Orchestrates the full RAG flow for chatbot queries.
- *
- * FLOW:
- * 1. Generate a QUERY embedding for the user's message (asymmetric search)
- * 2. Retrieve top 3 matches by cosine similarity from approved_knowledge
- * 3a. If best match >= threshold: send all matches to LLM to synthesize answer
- * 3b. If no match: return fallback message
- *
- * CHANGES FROM V1:
- * - Now uses generateQueryEmbedding instead of generateEmbedding
- *   for better asymmetric retrieval (query vs document embedding types)
- * - Retrieves top 3 instead of top 1, letting the LLM pick the best answer
- *   from multiple candidates — handles cases where the best match is #2 or #3
- *
- * CONSTRAINTS:
- * - LLM is never asked to generate new campus information
- * - Only approved, human-voted knowledge is used
- * - Fallback is returned honestly when no match is found
+ * Orchestrates deterministic structured answers before the existing RAG flow.
+ * A confident hours match returns immediately without an embedding or LLM call.
+ * Uncertain and non-hours questions preserve the original RAG behavior.
  */
-
 const SIMILARITY_THRESHOLD = 0.50;
 
 const FALLBACK_MESSAGE =
@@ -31,12 +15,19 @@ const FALLBACK_MESSAGE =
   "Try asking a question on the feed — if the community answers and votes it up, " +
   "I'll be able to help with that in the future!";
 
-export const handleChatQuery = async (userMessage) => {
-  // Step 1: Embed the user's query using query-optimized embedding
-  const queryEmbedding = await generateQueryEmbedding(userMessage);
+export const handleChatQuery = async (userMessage, dependencies = {}) => {
+  const hoursHandler = dependencies.hoursHandler || tryHandleHoursQuery;
+  const embedding = dependencies.embedding || generateQueryEmbedding;
+  const database = dependencies.database || pool;
+  const polisher = dependencies.polisher || polishResponse;
 
-  // Step 2: Retrieve top 3 matches by cosine similarity
-  const result = await pool.query(
+  // Structured campus hours are authoritative for recognized hours questions.
+  // An uncovered date returns an explicit unverified response rather than stale RAG data.
+  const hoursResult = await hoursHandler(userMessage);
+  if (hoursResult) return hoursResult;
+
+  const queryEmbedding = await embedding(userMessage);
+  const result = await database.query(
     `SELECT cleaned_content,
             1 - (embedding <=> $1::vector) AS similarity
      FROM approved_knowledge
@@ -47,25 +38,14 @@ export const handleChatQuery = async (userMessage) => {
 
   const topMatch = result.rows[0];
   const similarity = topMatch ? parseFloat(topMatch.similarity).toFixed(4) : null;
-
-  // Step 3a: Best match below threshold — return fallback
   if (!topMatch || topMatch.similarity < SIMILARITY_THRESHOLD) {
-    return { response: FALLBACK_MESSAGE, matched: false };
+    return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
   }
 
-  // Step 3b: Combine top matches into context and polish with LLM
-  // Sending all 3 lets the LLM synthesize a better answer when
-  // the question spans multiple entries (e.g. "what are the AC weekend hours?")
   const combinedKnowledge = result.rows
     .filter(row => row.similarity >= SIMILARITY_THRESHOLD)
     .map(row => row.cleaned_content)
     .join("\n\n");
-
-  const polished = await polishResponse(userMessage, combinedKnowledge);
-
-  return {
-    response: polished,
-    matched: true,
-    similarity,
-  };
+  const polished = await polisher(userMessage, combinedKnowledge);
+  return { response: polished, matched: true, similarity, sourceType: "rag" };
 };
