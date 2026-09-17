@@ -139,7 +139,13 @@ export default function Chatbot() {
         {/* min-h-0 is required for flex children to scroll correctly */}
         <div className="flex-1 space-y-4 overflow-y-auto mb-4 min-h-0">
           {messages.length === 0 && !loading && (
-            <div className="h-full flex items-center justify-center px-4 text-center">
+            <div className="h-full flex flex-col items-center justify-center gap-3 px-4 text-center">
+              <img
+                src="/icon-192.png"
+                alt=""
+                aria-hidden="true"
+                className="h-9 w-9 rounded-lg"
+              />
               <h1 className="text-2xl sm:text-3xl font-semibold text-[#8A244B]">
                 {greeting(username || 'there')}
               </h1>
