@@ -11,7 +11,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const emptyWeek = (): DayRule[] => DAYS.map((_, index) => ({ weekday: index + 1, status: 'unverified', intervals: [] }))
 const emptyInterval = (): HoursInterval => ({ opensAt: '08:00', closesAt: '17:00', closesNextDay: false })
 
-function DayEditor({ day, onChange }: { day: DayRule; onChange: (day: DayRule) => void }) {
+function DayEditor({ day, onChange, label }: { day: DayRule; onChange: (day: DayRule) => void; label?: string }) {
   const setStatus = (status: HoursStatus) => onChange({
     ...day,
     status,
@@ -25,7 +25,7 @@ function DayEditor({ day, onChange }: { day: DayRule; onChange: (day: DayRule) =
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="w-24 font-semibold text-slate-700">{DAYS[day.weekday - 1]}</span>
+        <span className="w-24 font-semibold text-slate-700">{label ?? DAYS[day.weekday - 1]}</span>
         <select value={day.status} onChange={event => setStatus(event.target.value as HoursStatus)} className="rounded-lg border px-2 py-1.5">
           <option value="open">Open</option><option value="closed">Closed</option><option value="unverified">Unverified</option>
         </select>
@@ -49,7 +49,7 @@ function DayEditor({ day, onChange }: { day: DayRule; onChange: (day: DayRule) =
 }
 
 function WeekEditor({ days, onChange }: { days: DayRule[]; onChange: (days: DayRule[]) => void }) {
-  return <div className="space-y-2">{days.sort((a, b) => a.weekday - b.weekday).map(day => (
+  return <div className="space-y-2">{[...days].sort((a, b) => a.weekday - b.weekday).map(day => (
     <DayEditor key={day.weekday} day={day} onChange={next => onChange(days.map(item => item.weekday === next.weekday ? next : item))} />
   ))}</div>
 }
@@ -77,7 +77,14 @@ export default function HoursAdmin() {
   }
 
   useEffect(() => {
-    checkHoursAccess().then(() => { setAuthorized(true); return refreshFacilities() }).catch(() => setAuthorized(false))
+    checkHoursAccess()
+      .then(async () => {
+        setAuthorized(true)
+        const data = await getFacilities()
+        setFacilities(data)
+        if (data[0]) setFacilityId(data[0].id)
+      })
+      .catch(() => setAuthorized(false))
   }, [])
 
   useEffect(() => () => { if (documentUrl) URL.revokeObjectURL(documentUrl) }, [documentUrl])
@@ -180,7 +187,7 @@ export default function HoursAdmin() {
             <div><div className="mb-2 flex justify-between"><h2 className="text-xl font-bold">Date exceptions</h2><button onClick={addException} className="font-semibold text-[#8A244B]">+ Add</button></div>
               {schedule.exceptions.map((exception: DateException, index) => <div key={index} className="mb-2 rounded-xl border bg-white p-3">
                 <div className="flex flex-wrap gap-2"><input type="date" value={exception.date} onChange={e => setSchedule({ ...schedule, exceptions: schedule.exceptions.map((x, i) => i === index ? { ...x, date: e.target.value } : x) })} className="rounded-lg border px-2" /><input placeholder="Name" value={exception.name} onChange={e => setSchedule({ ...schedule, exceptions: schedule.exceptions.map((x, i) => i === index ? { ...x, name: e.target.value } : x) })} className="rounded-lg border px-2" /><select value={exception.status} onChange={e => setSchedule({ ...schedule, exceptions: schedule.exceptions.map((x, i) => i === index ? { ...x, status: e.target.value as HoursStatus, intervals: e.target.value === 'open' ? [emptyInterval()] : [] } : x) })} className="rounded-lg border px-2"><option value="closed">Closed</option><option value="open">Open</option><option value="unverified">Unverified</option></select><button onClick={() => setSchedule({ ...schedule, exceptions: schedule.exceptions.filter((_, i) => i !== index) })} className="text-red-600">Remove</button></div>
-                {exception.status === 'open' && <DayEditor day={{ weekday: 1, status: exception.status, intervals: exception.intervals }} onChange={day => setSchedule({ ...schedule, exceptions: schedule.exceptions.map((x, i) => i === index ? { ...x, intervals: day.intervals } : x) })} />}
+                {exception.status === 'open' && <DayEditor label="Hours" day={{ weekday: 1, status: exception.status, intervals: exception.intervals }} onChange={day => setSchedule({ ...schedule, exceptions: schedule.exceptions.map((x, i) => i === index ? { ...x, intervals: day.intervals } : x) })} />}
               </div>)}</div>
 
             {(schedule.warnings?.length || errors.length > 0) && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm"><h3 className="font-bold">Review findings</h3><ul className="list-disc pl-5">{schedule.warnings?.map((x, i) => <li key={`w${i}`}>{x}</li>)}{errors.map((x, i) => <li key={`e${i}`} className="text-red-700">{x}</li>)}</ul></div>}
