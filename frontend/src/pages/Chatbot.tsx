@@ -13,12 +13,13 @@ interface Message {
 
 const DAILY_LIMIT = 7
 const MAX_MESSAGE_LENGTH = 250
+const withName = (name: string | null) => name ? `, ${name}` : ''
 const GREETINGS = [
-  (name: string) => `What's on your mind, ${name}?`,
-  (name: string) => `How can I help, ${name}?`,
-  (name: string) => `What are we figuring out today, ${name}?`,
-  (name: string) => `Where should we start, ${name}?`,
-  (name: string) => `What can I help you find, ${name}?`,
+  (name: string | null) => `What's on your mind${withName(name)}?`,
+  (name: string | null) => `How can I help${withName(name)}?`,
+  (name: string | null) => `What are we figuring out today${withName(name)}?`,
+  (name: string | null) => `Where should we start${withName(name)}?`,
+  (name: string | null) => `What can I help you find${withName(name)}?`,
 ]
 
 function getTodayKey() {
@@ -144,10 +145,10 @@ export default function Chatbot() {
                 src="/icon-192.png"
                 alt=""
                 aria-hidden="true"
-                className="h-9 w-9 rounded-lg"
+                className="h-16 w-16 rounded-xl"
               />
               <h1 className="text-2xl sm:text-3xl font-semibold text-[#8A244B]">
-                {greeting(username || 'there')}
+                {greeting(username)}
               </h1>
             </div>
           )}
