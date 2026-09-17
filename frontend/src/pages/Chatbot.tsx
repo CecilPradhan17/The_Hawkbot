@@ -180,7 +180,7 @@ export default function Chatbot() {
             </div>
           )}
 
-          <div ref={bottomRef} />
+          {(messages.length > 0 || loading) && <div ref={bottomRef} />}
         </div>
 
         {/* Usage bar */}
