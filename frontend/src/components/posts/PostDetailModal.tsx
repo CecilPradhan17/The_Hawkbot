@@ -74,7 +74,16 @@ export default function PostDetailModal({
             <div className="mb-6">
               <p className="text-xs text-slate-400 uppercase font-medium mb-2">In response to</p>
               {parentLoading ? (
-                <p className="text-sm text-slate-400 italic">Loading question...</p>
+                <div
+                  className="bg-[#1B5E8A]/5 border border-[#1B5E8A]/10 rounded-lg px-4 py-3 animate-pulse motion-reduce:animate-none"
+                  role="status"
+                  aria-label="Loading question"
+                >
+                  <div className="h-3.5 w-full rounded-full bg-slate-200 mb-2" />
+                  <div className="h-3.5 w-3/4 rounded-full bg-slate-200 mb-3" />
+                  <div className="h-2.5 w-16 rounded-full bg-slate-200" />
+                  <span className="sr-only">Loading question...</span>
+                </div>
               ) : parentQuestion ? (
                 <div className="bg-[#1B5E8A]/5 border border-[#1B5E8A]/20 rounded-lg px-4 py-3">
                   <p className="text-sm text-[#1B5E8A] font-medium">{parentQuestion.post.content}</p>

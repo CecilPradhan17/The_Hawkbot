@@ -7,6 +7,7 @@ import CreatePostModal from '@/components/posts/CreatePostModal'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
 import AnswerQuestionModal from '@/components/posts/AnswerQuestionModal'
 import PostList from '@/components/posts/PostList'
+import PostListSkeleton from '@/components/posts/PostListSkeleton'
 import PostDetailModal from '@/components/posts/PostDetailModal'
 
 export default function Posts() {
@@ -238,9 +239,7 @@ export default function Posts() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {loading && (
-          <div className="text-center py-12">
-            <p className="text-slate-600">Loading posts...</p>
-          </div>
+          <PostListSkeleton />
         )}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
