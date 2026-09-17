@@ -13,12 +13,14 @@
  * - app.js (mounted under /api)
  *
  * Routes exposed:
- * - /api/posts  -> handled by posts.routes.js 
+ * - /api/posts  -> handled by posts.routes.js
  * - /api/delete/:id -> handled by delete.routes.js
  * - /api/display -> handled by display.routes.js
  * - /api/displayPost/:id -> handled by displayPost.routes.js
  * - /api/register -> handled by register.routes.js
- * - /api/login -> handled by register.routes.js
+ * - /api/login -> handled by login.routes.js
+ * - /api/chat -> handled by chatbot.routes.js
+ * - /api/hours -> handled by hours.routes.js
  *
  * Notes:
  * - Keeps route registration centralized and readable
@@ -34,6 +36,7 @@ import displayPostRoutes from './displayPost.routes.js';
 import registerRoutes from './register.routes.js';
 import loginRoutes from './login.routes.js';
 import chatbotRoutes from './chatbot.routes.js';
+import hoursRoutes from './hours.routes.js';
 
 const router = express.Router();
 
@@ -44,6 +47,6 @@ router.use("/displayPost", displayPostRoutes);
 router.use("/register", registerRoutes);
 router.use("/login", loginRoutes);
 router.use("/chat", chatbotRoutes);
+router.use("/hours", hoursRoutes);
 
 export default router;
-
