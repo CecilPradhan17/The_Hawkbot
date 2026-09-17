@@ -37,7 +37,9 @@ question + answer → `cleanContent` (LLM) → `generateEmbedding` → insert in
 
 ## Environment variables (backend/.env, gitignored)
 
-`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `VOTE_APPROVAL_THRESHOLD`, `OPENAI_API_KEY`, `FRONTEND_URL`, `NODE_ENV`. Never print `.env` contents or commit secrets.
+`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `VOTE_APPROVAL_THRESHOLD`, `OPENAI_API_KEY`, `HOURS_ADMIN_EMAIL`, `FRONTEND_URL`, `NODE_ENV`. Never print `.env` contents or commit secrets.
+
+`HOURS_ADMIN_EMAIL` is the single account allowed to use the campus-hours administration API and `/hours/admin` UI. Campus-hours setup and publishing instructions live in `HOURS_SYSTEM.md`.
 
 ## Deployment reality check
 

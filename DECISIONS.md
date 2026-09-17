@@ -22,6 +22,38 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-09-16 — Structured campus hours before general RAG
+
+**Context:** Facility schedules are date-sensitive, include holidays and semester
+periods, and change more often than general campus knowledge. Embedding schedule text
+would make precedence difficult to guarantee and would spend model calls on answers
+that can be computed exactly.
+
+**Decision:** Store one normalized current schedule per facility and resolve recognized
+hours questions deterministically before the existing RAG path. Exact-date exceptions
+override special periods, which override regular weekly hours. One configured owner
+uploads a PDF or image, OpenAI extracts it once, and the owner reviews and validates
+the structured result before atomic publication. The uploaded document stays only in
+memory and publication replaces the previous schedule instead of retaining history.
+The campus timezone is fixed to `America/Chicago`. Only anonymous daily counters are
+stored for hours routing; question text and user identity are not logged.
+
+**Alternatives considered:** Put schedule documents directly into RAG (simpler, but
+unable to guarantee holiday precedence or reliable open-now calculations); store
+drafts, source files, and publication history (more auditable, but unnecessary for a
+single-owner workflow); allow community uploads and role-based review (more flexible,
+but outside the current product need).
+
+**Trade-offs:** There is no built-in rollback or document archive, so the owner must
+re-upload and publish a prior schedule to restore it. Extraction still incurs one
+OpenAI request per upload, and adding another campus timezone would require a product
+change rather than facility-level configuration.
+
+**Resume/interview angle:** Built a hybrid retrieval architecture that routes
+date-sensitive questions to deterministic structured data while preserving RAG for
+uncertain questions, reducing avoidable embedding and LLM calls and making schedule
+precedence testable.
+
 ## 2026-08-13 — PWA conversion: installable shell, not offline-first
 
 **Context:** Hawkbot is a bookmark-and-forget web app for students — no install
