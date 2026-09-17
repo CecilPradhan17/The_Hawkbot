@@ -60,6 +60,7 @@ import { jwtDecode } from "jwt-decode"
 interface AuthContextType {
   token: string | null
   userId: number | null
+  username: string | null
   isLoading: boolean
   isAuthenticated: boolean
   login: (data: LoginRequest) => Promise<void>
@@ -81,19 +82,23 @@ const isTokenExpired = (token: string): boolean => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null)
   const [userId, setUserId] = useState<number | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const logout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("userId")
+    localStorage.removeItem("username")
     setToken(null)
     setUserId(null)
+    setUsername(null)
   }
 
   // Check token validity on mount
   useEffect(() => {
     const storedToken = localStorage.getItem("token")
     const storedUserId = localStorage.getItem("userId")
+    const storedUsername = localStorage.getItem("username")
 
     if (storedToken && storedUserId) {
       if (isTokenExpired(storedToken)) {
@@ -101,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setToken(storedToken)
         setUserId(JSON.parse(storedUserId))
+        setUsername(storedUsername)
       }
     }
     
@@ -130,12 +136,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await loginRequest(data)
     const receivedToken = res.token
     const receivedUserId = res.id
+    const receivedUsername = res.username
 
     localStorage.setItem("token", receivedToken)
     localStorage.setItem("userId", JSON.stringify(receivedUserId))
+    localStorage.setItem("username", receivedUsername)
     
     setToken(receivedToken)
     setUserId(receivedUserId)
+    setUsername(receivedUsername)
   }
 
   return (
@@ -143,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         token,
         userId,
+        username,
         isAuthenticated: !!token,
         isLoading,
         login,

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { sendChatMessage } from '@/api/chat.api'
 import Header from '@/components/Header'
+import { useAuth } from '@/context/AuthContext'
 
 interface Message {
   id: number
@@ -12,6 +13,13 @@ interface Message {
 
 const DAILY_LIMIT = 7
 const MAX_MESSAGE_LENGTH = 250
+const GREETINGS = [
+  (name: string) => `What's on your mind, ${name}?`,
+  (name: string) => `How can I help, ${name}?`,
+  (name: string) => `What are we figuring out today, ${name}?`,
+  (name: string) => `Where should we start, ${name}?`,
+  (name: string) => `What can I help you find, ${name}?`,
+]
 
 function getTodayKey() {
   return `hawkbot_usage_${new Date().toISOString().split('T')[0]}`
@@ -27,13 +35,9 @@ function saveUsage(count: number) {
 }
 
 export default function Chatbot() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 0,
-      role: 'bot',
-      content: "Hi! I'm Hawkbot 🦅 Ask me anything about campus — I'll do my best to help based on verified student knowledge.",
-    },
-  ])
+  const { username } = useAuth()
+  const [messages, setMessages] = useState<Message[]>([])
+  const [greeting] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
@@ -134,6 +138,13 @@ export default function Chatbot() {
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-4 flex flex-col min-h-0">
         {/* min-h-0 is required for flex children to scroll correctly */}
         <div className="flex-1 space-y-4 overflow-y-auto mb-4 min-h-0">
+          {messages.length === 0 && !loading && (
+            <div className="h-full flex items-center justify-center px-4 text-center">
+              <h1 className="text-2xl sm:text-3xl font-semibold text-[#8A244B]">
+                {greeting(username || 'there')}
+              </h1>
+            </div>
+          )}
           {messages.map(message => (
             <div
               key={message.id}
