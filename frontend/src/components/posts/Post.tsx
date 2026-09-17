@@ -28,8 +28,11 @@ export default function Post({
   const handleToggleReplies = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setRepliesLoading(true)
-    await onToggleReplies(post.id)
-    setRepliesLoading(false)
+    try {
+      await onToggleReplies(post.id)
+    } finally {
+      setRepliesLoading(false)
+    }
   }
 
   const replyCountDisplay = repliesOpen ? replies.length : post.reply_count
@@ -87,7 +90,10 @@ export default function Post({
       </div>
 
       {/* Replies list */}
-      {repliesOpen && (
+      {repliesLoading && !repliesOpen && (
+        <ReplySkeletons />
+      )}
+      {repliesOpen && !repliesLoading && (
         <div className="mt-4 space-y-3">
           {replies.length === 0 ? (
             <p className="text-slate-400 text-sm italic">No answers yet. Be the first!</p>
@@ -121,6 +127,35 @@ export default function Post({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function ReplySkeletons() {
+  return (
+    <div
+      className="mt-4 space-y-3 animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading replies"
+    >
+      {[0, 1].map(index => (
+        <div key={index} className="bg-slate-50 rounded-lg px-4 py-3 border border-slate-200" aria-hidden="true">
+          <div className="flex justify-between mb-3">
+            <div className="h-2.5 w-16 rounded-full bg-slate-200" />
+            <div className="h-2.5 w-14 rounded-full bg-slate-200" />
+          </div>
+          <div className="space-y-2 mb-3">
+            <div className="h-3 w-full rounded-full bg-slate-200" />
+            <div className={`h-3 rounded-full bg-slate-200 ${index === 0 ? 'w-3/4' : 'w-1/2'}`} />
+          </div>
+          <div className="flex gap-3 pt-2 border-t border-slate-200">
+            <div className="h-5 w-16 rounded bg-slate-200" />
+            <div className="h-5 w-5 rounded bg-slate-200" />
+            <div className="h-5 w-16 rounded bg-slate-200" />
+          </div>
+        </div>
+      ))}
+      <span className="sr-only">Loading replies...</span>
     </div>
   )
 }

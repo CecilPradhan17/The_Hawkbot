@@ -168,6 +168,7 @@ function Hero() {
 
 function PhoneFrame({ className = '', active, onFinish }: { className?: string; active?: boolean; onFinish?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoLoaded, setVideoLoaded] = useState(false)
   const turnBased = active !== undefined
 
   useEffect(() => {
@@ -185,6 +186,7 @@ function PhoneFrame({ className = '', active, onFinish }: { className?: string; 
   return (
     <div className={`relative aspect-[9/17] rounded-[2rem] border-[6px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0 ${className}`}>
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-4 bg-slate-800 rounded-b-lg z-10" />
+      {!videoLoaded && <DeviceSkeleton />}
       <video
         ref={videoRef}
         src="/hawkbot_app_loop_phone.mp4"
@@ -192,8 +194,9 @@ function PhoneFrame({ className = '', active, onFinish }: { className?: string; 
         loop={!turnBased}
         muted
         playsInline
+        onLoadedData={() => setVideoLoaded(true)}
         onEnded={turnBased ? onFinish : undefined}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
   )
@@ -201,6 +204,7 @@ function PhoneFrame({ className = '', active, onFinish }: { className?: string; 
 
 function TabletFrame({ active, onFinish }: { active?: boolean; onFinish?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoLoaded, setVideoLoaded] = useState(false)
   const turnBased = active !== undefined
 
   useEffect(() => {
@@ -218,6 +222,7 @@ function TabletFrame({ active, onFinish }: { active?: boolean; onFinish?: () => 
   return (
     <div className="hidden md:flex relative w-56 lg:w-64 aspect-[4/3] rounded-[1.5rem] border-[8px] border-slate-800 bg-slate-100 shadow-xl overflow-hidden shrink-0">
       <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-800 z-10" />
+      {!videoLoaded && <DeviceSkeleton />}
       <video
         ref={videoRef}
         src="/hawkbot_app_loop_ipad.mp4"
@@ -225,9 +230,26 @@ function TabletFrame({ active, onFinish }: { active?: boolean; onFinish?: () => 
         loop={!turnBased}
         muted
         playsInline
+        onLoadedData={() => setVideoLoaded(true)}
         onEnded={turnBased ? onFinish : undefined}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
       />
+    </div>
+  )
+}
+
+function DeviceSkeleton() {
+  return (
+    <div
+      className="absolute inset-0 z-[1] flex flex-col gap-3 bg-slate-100 p-4 pt-7 animate-pulse motion-reduce:animate-none"
+      role="status"
+      aria-label="Loading app preview"
+    >
+      <div className="h-3 w-2/5 rounded-full bg-slate-300" />
+      <div className="h-16 w-full rounded-lg bg-slate-200" />
+      <div className="h-3 w-full rounded-full bg-slate-300" />
+      <div className="h-3 w-3/4 rounded-full bg-slate-300" />
+      <span className="sr-only">Loading app preview...</span>
     </div>
   )
 }
@@ -395,6 +417,7 @@ function VideoSection() {
   const [muted, setMuted] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [showControls, setShowControls] = useState(false)
+  const [videoLoaded, setVideoLoaded] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -511,7 +534,7 @@ function VideoSection() {
 
       <div
         ref={videoContainerRef}
-        className="w-full sm:max-w-7.5xl rounded-2xl overflow-hidden shadow-2xl border border-[#8A244B]/15 relative"
+        className="w-full sm:max-w-7.5xl aspect-video rounded-2xl overflow-hidden shadow-2xl border border-[#8A244B]/15 relative bg-slate-100"
         onMouseEnter={() => {
           if (!isMobile) showControlsWithTimeout()
         }}
@@ -522,14 +545,31 @@ function VideoSection() {
           if (isMobile) showControlsWithTimeout()
         }}
       >
+        {!videoLoaded && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col justify-between bg-slate-100 p-5 sm:p-8 animate-pulse motion-reduce:animate-none"
+            role="status"
+            aria-label="Loading video demo"
+          >
+            <div className="flex gap-2">
+              <div className="h-3 w-16 rounded-full bg-slate-300" />
+              <div className="h-3 w-10 rounded-full bg-slate-200" />
+            </div>
+            <div className="self-center h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-slate-300" />
+            <div className="h-2 w-full rounded-full bg-slate-300" />
+            <span className="sr-only">Loading video demo...</span>
+          </div>
+        )}
         <video
           ref={videoRef}
           src={isMobile ? mobileDemoSrc : demoSrc}
           muted
           loop
           playsInline
+          onLoadStart={() => setVideoLoaded(false)}
+          onLoadedData={() => setVideoLoaded(true)}
           onEnded={() => setPlaying(false)}
-          className="w-full block"
+          className={`w-full h-full object-cover transition-opacity duration-300 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
         />
 
         {/* Overlay controls inside the video (glassmorphism) */}

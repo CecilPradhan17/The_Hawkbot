@@ -127,10 +127,18 @@ export default function ServerWakeModal({ isWaking }: ServerWakeModalProps) {
             {/* Joke card */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 mb-4 min-h-[100px]">
               {jokeLoading ? (
-                <div className="flex gap-1 justify-center items-center h-16">
-                  <span className="w-2 h-2 bg-[#8A244B] rounded-full animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 bg-[#8A244B] rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 bg-[#8A244B] rounded-full animate-bounce [animation-delay:300ms]" />
+                <div
+                  className="space-y-3 py-1 animate-pulse motion-reduce:animate-none"
+                  role="status"
+                  aria-label="Loading joke"
+                >
+                  <div className="h-3.5 w-full rounded-full bg-slate-200" />
+                  <div className="h-3.5 w-4/5 rounded-full bg-slate-200" />
+                  <div className="pt-1 space-y-2">
+                    <div className="h-3.5 w-11/12 rounded-full bg-[#8A244B]/15" />
+                    <div className="h-3.5 w-2/3 rounded-full bg-[#8A244B]/15" />
+                  </div>
+                  <span className="sr-only">Loading joke...</span>
                 </div>
               ) : joke ? (
                 <>

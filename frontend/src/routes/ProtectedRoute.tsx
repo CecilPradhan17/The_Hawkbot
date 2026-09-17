@@ -29,16 +29,17 @@
  * - Works seamlessly with nested and layout routes
  */
 
-import { Navigate, Outlet } from "react-router-dom"
+import { Navigate, Outlet, useLocation } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
 import { jwtDecode } from "jwt-decode"
+import PostListSkeleton from "@/components/posts/PostListSkeleton"
 
 const ProtectedRoute = () => {
-  
+  const location = useLocation()
   const { token, isLoading } = useAuth()
   
   if (isLoading) {
-    return <div>Loading...</div>
+    return <ProtectedRouteSkeleton showChat={location.pathname === '/chat'} />
   }
 
   if (!token) {
@@ -57,6 +58,31 @@ const ProtectedRoute = () => {
   }
 
   return <Outlet />
+}
+
+function ProtectedRouteSkeleton({ showChat }: { showChat: boolean }) {
+  return (
+    <div className="min-h-screen bg-[#FAF3E1]" role="status" aria-label="Loading your account">
+      <div className="h-[68px] sm:h-[76px] bg-[#8A244B] border-b border-[#6d1c3a] px-4 sm:px-6 flex items-center justify-between">
+        <div className="h-9 w-20 rounded-xl bg-white/15 animate-pulse motion-reduce:animate-none" />
+        <div className="h-7 w-28 rounded-full bg-white/20 animate-pulse motion-reduce:animate-none" />
+        <div className="h-9 w-20 rounded-lg bg-white/15 animate-pulse motion-reduce:animate-none" />
+      </div>
+
+      {showChat ? (
+        <div className="h-[calc(100vh-76px)] max-w-3xl mx-auto px-4 flex flex-col items-center justify-center gap-4 animate-pulse motion-reduce:animate-none">
+          <div className="h-16 w-16 rounded-xl bg-slate-200" />
+          <div className="h-7 w-64 max-w-full rounded-full bg-slate-200" />
+          <div className="absolute bottom-6 h-14 w-[calc(100%-2rem)] max-w-3xl rounded-2xl bg-white border border-slate-200" />
+        </div>
+      ) : (
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <PostListSkeleton />
+        </main>
+      )}
+      <span className="sr-only">Loading your account...</span>
+    </div>
+  )
 }
 
 export default ProtectedRoute
