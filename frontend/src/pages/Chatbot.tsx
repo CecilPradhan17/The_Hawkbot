@@ -178,7 +178,7 @@ export default function Chatbot() {
                   <img
                     src="/icon-192.png"
                     alt="Hawkbot"
-                    className="h-6 w-6 rounded-md mt-2 ml-1"
+                    className="block h-9 w-9 rounded-lg mt-2 ml-1 shadow-sm ring-1 ring-[#8A244B]/15"
                   />
                 )}
               </div>
