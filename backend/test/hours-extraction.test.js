@@ -35,6 +35,13 @@ test("sends a PDF as an ephemeral base64 input_file", async () => {
   assert.equal(inputFile.type, "input_file");
   assert.match(inputFile.file_data, /^data:application\/pdf;base64,/);
   assert.equal(request.text.format.type, "json_schema");
+  assert.equal(request.text.format.schema.properties.weekly.minItems, 7);
+  assert.equal(request.text.format.schema.properties.weekly.maxItems, 7);
+  assert.equal(request.text.format.schema.properties.specialPeriods.items.properties.days.minItems, 7);
+  const prompt = request.input[0].content[0].text;
+  assert.match(prompt, /Expand grouped weekday labels and ranges/);
+  assert.match(prompt, /Monday-Friday.*Monday, Tuesday, Wednesday, Thursday, and Friday/s);
+  assert.match(prompt, /earliest and latest explicit calendar dates/);
   assert.deepEqual(result, proposal);
 });
 

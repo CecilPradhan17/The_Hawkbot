@@ -31,7 +31,7 @@ const scheduleSchema = {
     sourceLabel: { type: "string" },
     coverageStart: { type: "string", description: "YYYY-MM-DD, or empty when not explicit" },
     coverageEnd: { type: "string", description: "YYYY-MM-DD, or empty when not explicit" },
-    weekly: { type: "array", items: daySchema },
+    weekly: { type: "array", minItems: 7, maxItems: 7, items: daySchema },
     specialPeriods: {
       type: "array",
       items: {
@@ -42,7 +42,7 @@ const scheduleSchema = {
           name: { type: "string" },
           startDate: { type: "string" },
           endDate: { type: "string" },
-          days: { type: "array", items: daySchema },
+          days: { type: "array", minItems: 7, maxItems: 7, items: daySchema },
         },
       },
     },
@@ -66,7 +66,11 @@ const scheduleSchema = {
 
 const EXTRACTION_PROMPT = `Extract this ULM facility-hours document into the supplied schema.
 Use ISO dates (YYYY-MM-DD), ISO weekdays (Monday=1), and 24-hour times.
-Regular weekly hours and each special period must contain all seven weekdays.
+Regular weekly hours and each special period must contain exactly seven entries, one for each weekday.
+Expand grouped weekday labels and ranges into separate weekday entries with the same hours: for example, "Monday-Friday" becomes Monday, Tuesday, Wednesday, Thursday, and Friday; "Mondays-Thursdays" becomes four entries. Never collapse a weekday range into only its final day.
+Use unverified entries for weekdays not covered by a special period row; do not omit them.
+Set coverageStart and coverageEnd to include the earliest and latest explicit calendar dates anywhere in the document, even when an exception extends beyond the regular-hours heading.
+Rows for individual calendar dates are exceptions even when grouped under a named heading; use a special period when the document defines a weekday pattern across a date range.
 Use closed with no intervals only when the document explicitly says closed.
 Use unverified with no intervals for anything missing or unclear.
 Put named ranges such as finals week or spring break in specialPeriods.
