@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Header from '@/components/Header'
+import FacilityManager from '@/components/FacilityManager'
 import {
   checkHoursAccess, createFacility, extractSchedule, getCurrentSchedule, getFacilities,
   previewSchedule, publishSchedule, validateSchedule,
@@ -123,6 +124,22 @@ export default function HoursAdmin() {
     finally { setBusy(false) }
   }
 
+  const handleFacilityUpdated = async () => {
+    await refreshFacilities()
+  }
+
+  const handleFacilityDeleted = async () => {
+    if (documentUrl) URL.revokeObjectURL(documentUrl)
+    setDocumentUrl(null)
+    setDocumentType('')
+    setSchedule(null)
+    setErrors([])
+    setPreview('')
+    const data = await getFacilities()
+    setFacilities(data)
+    setFacilityId(data[0]?.id ?? null)
+  }
+
   const addSpecialPeriod = () => setSchedule(current => current ? ({ ...current, specialPeriods: [...current.specialPeriods, { name: '', startDate: '', endDate: '', days: emptyWeek() }] }) : current)
   const addException = () => setSchedule(current => current ? ({ ...current, exceptions: [...current.exceptions, { date: '', name: '', status: 'closed', intervals: [] }] }) : current)
 
@@ -154,6 +171,7 @@ export default function HoursAdmin() {
           </select>
           {selectedFacility?.schedule && <button className="ml-3 text-sm font-semibold text-[#8A244B]" onClick={async () => setSchedule(await getCurrentSchedule(selectedFacility.id))}>Load current schedule</button>}
           <div className="mt-4"><input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" disabled={!facilityId || busy} onChange={e => handleUpload(e.target.files?.[0])} /></div>
+          {selectedFacility && <FacilityManager key={selectedFacility.id} facility={selectedFacility} onUpdated={handleFacilityUpdated} onDeleted={handleFacilityDeleted} onMessage={setMessage} />}
         </section>
 
         {message && <p className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-700">{message}</p>}

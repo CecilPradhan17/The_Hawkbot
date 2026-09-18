@@ -4,7 +4,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4005/api'
 const SERVER_URL = BASE_URL.replace(/\/api$/, '')
 const HEALTH_CHECK_TIMEOUT_MS = 2000
 
-type HttpMethod = 'GET' | 'POST' | 'DELETE'
+type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
 
 // Cold start timeout — if a request takes longer than this (ms),
 // we assume the server is waking up from sleep and show the modal.

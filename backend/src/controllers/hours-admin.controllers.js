@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { listFacilities } from "../services/hours-admin.services.js";
-import { createFacility, publishSchedule } from "../services/hours-publication.services.js";
+import { createFacility, deleteFacility, publishSchedule, updateFacility } from "../services/hours-publication.services.js";
 import { getPublishedSchedule } from "../services/hours-repository.services.js";
 import { answerHoursQuestion } from "../services/hours-resolution.services.js";
 import { CAMPUS_TIME_ZONE, validateSchedule } from "../services/hours-validation.services.js";
@@ -15,6 +15,18 @@ export async function getFacilities(req, res, next) {
 export async function addFacility(req, res, next) {
   try { res.status(201).json(await createFacility(req.body)); }
   catch (error) { next(error); }
+}
+
+export async function editFacility(req, res, next) {
+  try { res.json(await updateFacility(Number(req.params.facilityId), req.body)); }
+  catch (error) { next(error); }
+}
+
+export async function removeFacility(req, res, next) {
+  try {
+    await deleteFacility(Number(req.params.facilityId));
+    res.status(204).end();
+  } catch (error) { next(error); }
 }
 
 export async function getCurrentSchedule(req, res, next) {

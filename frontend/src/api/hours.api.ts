@@ -27,6 +27,9 @@ export interface ValidationResult { valid: boolean; errors: string[]; warnings: 
 export const checkHoursAccess = () => api.get<{ authorized: boolean }>('/hours/access')
 export const getFacilities = () => api.get<Facility[]>('/hours/facilities')
 export const createFacility = (data: { name: string; aliases: string[] }) => api.post<Facility>('/hours/facilities', data)
+export const updateFacility = (facilityId: number, data: { name: string; aliases: string[] }) =>
+  api.patch<Facility>(`/hours/facilities/${facilityId}`, data)
+export const deleteFacility = (facilityId: number) => api.delete<void>(`/hours/facilities/${facilityId}`)
 export const getCurrentSchedule = (facilityId: number) => api.get<HoursSchedule>(`/hours/facilities/${facilityId}/schedule`)
 export const validateSchedule = (schedule: HoursSchedule) => api.post<ValidationResult>('/hours/validate', schedule)
 export const previewSchedule = (schedule: HoursSchedule, facilityName: string, date: string) =>
@@ -48,4 +51,3 @@ export async function extractSchedule(document: File): Promise<Omit<HoursSchedul
   if (!response.ok) throw new Error(body?.message || 'Schedule extraction failed')
   return body
 }
-

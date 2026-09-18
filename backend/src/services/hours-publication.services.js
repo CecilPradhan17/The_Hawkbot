@@ -73,6 +73,45 @@ export async function createFacility(input, database = pool) {
   }
 }
 
+export async function updateFacility(facilityId, input, database = pool) {
+  if (!Number.isInteger(facilityId) || facilityId <= 0) throw httpError("Facility not found", 404);
+  const facility = cleanFacilityInput(input);
+  const client = await database.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      "UPDATE facilities SET name = $1, updated_at = NOW() WHERE id = $2 AND active = TRUE RETURNING id, name, active",
+      [facility.name, facilityId]
+    );
+    if (result.rowCount === 0) throw httpError("Facility not found", 404);
+    await client.query("DELETE FROM facility_aliases WHERE facility_id = $1", [facilityId]);
+    for (const alias of facility.aliases) {
+      await client.query(
+        `INSERT INTO facility_aliases (facility_id, alias, normalized_alias)
+         VALUES ($1, $2, $3)`,
+        [facilityId, alias.display, alias.normalized]
+      );
+    }
+    await client.query("COMMIT");
+    return { ...result.rows[0], aliases: facility.aliases.map(alias => alias.display) };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if (error.code === "23505") throw httpError("That facility already exists", 409);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteFacility(facilityId, database = pool) {
+  if (!Number.isInteger(facilityId) || facilityId <= 0) throw httpError("Facility not found", 404);
+  const result = await database.query(
+    "DELETE FROM facilities WHERE id = $1 AND active = TRUE RETURNING id",
+    [facilityId]
+  );
+  if (result.rowCount === 0) throw httpError("Facility not found", 404);
+}
+
 export async function publishSchedule(schedule, database = pool) {
   const validation = validateSchedule(schedule);
   if (!validation.valid) throw httpError("Schedule validation failed", 400, validation);
