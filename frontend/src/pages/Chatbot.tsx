@@ -157,20 +157,29 @@ export default function Chatbot() {
               key={message.id}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div
-                className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed
-                  ${message.role === 'user'
-                    ? 'bg-[#8A244B] text-white rounded-br-sm'
-                    : message.isError
-                      ? 'bg-red-50 text-red-700 border border-red-200 rounded-bl-sm'
-                      : 'bg-white text-slate-700 shadow-sm border border-slate-200 rounded-bl-sm'
-                  }`}
-              >
-                {message.content}
-                {message.role === 'bot' && message.matched === false && !message.isError && (
-                  <p className="text-xs mt-2 text-slate-400 italic">
-                    No verified match found
-                  </p>
+              <div className={`max-w-[75%] flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div
+                  className={`w-fit px-4 py-3 rounded-2xl text-sm leading-relaxed
+                    ${message.role === 'user'
+                      ? 'bg-[#8A244B] text-white rounded-br-sm'
+                      : message.isError
+                        ? 'bg-red-50 text-red-700 border border-red-200 rounded-bl-sm'
+                        : 'bg-white text-slate-700 shadow-sm border border-slate-200 rounded-bl-sm'
+                    }`}
+                >
+                  {message.content}
+                  {message.role === 'bot' && message.matched === false && !message.isError && (
+                    <p className="text-xs mt-2 text-slate-400 italic">
+                      No verified match found
+                    </p>
+                  )}
+                </div>
+                {message.role === 'bot' && !message.isError && (
+                  <img
+                    src="/icon-192.png"
+                    alt="Hawkbot"
+                    className="h-6 w-6 rounded-md mt-2 ml-1"
+                  />
                 )}
               </div>
             </div>
