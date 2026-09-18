@@ -61,6 +61,7 @@ interface AuthContextType {
   token: string | null
   userId: number | null
   username: string | null
+  isAdmin: boolean
   isLoading: boolean
   isAuthenticated: boolean
   login: (data: LoginRequest) => Promise<void>
@@ -83,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null)
   const [userId, setUserId] = useState<number | null>(null)
   const [username, setUsername] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   const logout = () => {
@@ -92,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(null)
     setUserId(null)
     setUsername(null)
+    setIsAdmin(false)
   }
 
   // Check token validity on mount
@@ -107,6 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setToken(storedToken)
         setUserId(JSON.parse(storedUserId))
         setUsername(storedUsername)
+        const decoded = jwtDecode<{ isAdmin?: boolean }>(storedToken)
+        setIsAdmin(decoded.isAdmin === true)
       }
     }
     
@@ -137,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const receivedToken = res.token
     const receivedUserId = res.id
     const receivedUsername = res.username
+    const receivedIsAdmin = res.isAdmin
 
     localStorage.setItem("token", receivedToken)
     localStorage.setItem("userId", JSON.stringify(receivedUserId))
@@ -145,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setToken(receivedToken)
     setUserId(receivedUserId)
     setUsername(receivedUsername)
+    setIsAdmin(receivedIsAdmin)
   }
 
   return (
@@ -153,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         userId,
         username,
+        isAdmin,
         isAuthenticated: !!token,
         isLoading,
         login,

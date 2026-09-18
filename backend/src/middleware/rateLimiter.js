@@ -1,4 +1,7 @@
 import rateLimit from 'express-rate-limit'
+import { isAdminEmail } from '../utils/admin.js'
+
+export const shouldSkipChatLimit = (req) => isAdminEmail(req.user?.email)
 
 export const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
@@ -37,6 +40,8 @@ export const chatLimiter = rateLimit({
   max: 7,
   standardHeaders: true,
   legacyHeaders: false,
+  // The configured admin account is exempt; identity comes from the verified JWT.
+  skip: shouldSkipChatLimit,
   // Key by user ID instead of IP
   keyGenerator: (req) => `chatbot_user_${req.user.id}`,
   handler: (req, res, next) => {

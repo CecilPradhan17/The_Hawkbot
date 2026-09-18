@@ -36,14 +36,14 @@ function saveUsage(count: number) {
 }
 
 export default function Chatbot() {
-  const { username } = useAuth()
+  const { username, isAdmin } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [greeting] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
   const [messagesUsed, setMessagesUsed] = useState(() => getStoredUsage())
-  const [rateLimited, setRateLimited] = useState(() => getStoredUsage() >= DAILY_LIMIT)
+  const [rateLimited, setRateLimited] = useState(() => !isAdmin && getStoredUsage() >= DAILY_LIMIT)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -79,12 +79,14 @@ export default function Chatbot() {
     try {
       const data = await sendChatMessage({ message: trimmed })
 
-      setMessagesUsed(prev => {
-        const next = prev + 1
-        saveUsage(next)
-        if (next >= DAILY_LIMIT) setRateLimited(true)
-        return next
-      })
+      if (!isAdmin) {
+        setMessagesUsed(prev => {
+          const next = prev + 1
+          saveUsage(next)
+          if (next >= DAILY_LIMIT) setRateLimited(true)
+          return next
+        })
+      }
 
       setMessages(prev => [
         ...prev,
@@ -125,7 +127,7 @@ export default function Chatbot() {
     if (e.key === 'Enter') handleSend()
   }
 
-  const isInputDisabled = loading || rateLimited
+  const isInputDisabled = loading || (!isAdmin && rateLimited)
 
   return (
     /*
@@ -200,7 +202,7 @@ export default function Chatbot() {
         </div>
 
         {/* Usage bar */}
-        <div className="mb-3 bg-white/35 backdrop-blur-md border border-white/50 rounded-2xl px-3 py-2.5 shadow-sm ring-1 ring-black/5">
+        {!isAdmin && <div className="mb-3 bg-white/35 backdrop-blur-md border border-white/50 rounded-2xl px-3 py-2.5 shadow-sm ring-1 ring-black/5">
           <p className={`text-xs font-medium mb-1.5 ${rateLimited ? 'text-[#8A244B]' : 'text-slate-500'}`}>
             {rateLimited
               ? 'Daily limit reached — see you tomorrow!'
@@ -215,7 +217,7 @@ export default function Chatbot() {
               />
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Input bar */}
         <div className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors flex-shrink-0

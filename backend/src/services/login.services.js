@@ -46,6 +46,7 @@
 import pool from "../db.js";
 import bcrypt from "bcrypt";
 import { signToken } from "../utils/jwt.js";
+import { isAdminEmail } from "../utils/admin.js";
 
 export const loginUserInDB = async ({email, password}) => {
         const res = await pool.query(`SELECT id, email, username, password_hash FROM users 
@@ -68,15 +69,18 @@ export const loginUserInDB = async ({email, password}) => {
         throw error;
         }
 
+        const isAdmin = isAdminEmail(user.email);
         const token = signToken({
             id: user.id,
-            email: user.email
+            email: user.email,
+            isAdmin
         });
 
         return {
             token,
             id: user.id,
             email: user.email,
-            username: user.username
+            username: user.username,
+            isAdmin
         };
 };

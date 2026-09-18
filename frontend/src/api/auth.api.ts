@@ -57,6 +57,7 @@ export interface AuthUser {
   id: number
   email: string
   username: string
+  isAdmin: boolean
   token: string
 }
 
@@ -70,6 +71,7 @@ export interface LoginResponse {
   id: number
   email: string
   username: string
+  isAdmin: boolean
 }
 
 export interface RegisterRequest {
