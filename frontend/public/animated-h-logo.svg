@@ -33,13 +33,12 @@
     .h-stroke {
       stroke-dasharray: 1;
       stroke-dashoffset: 1;
-      animation: write-h 3.2s cubic-bezier(.65, 0, .35, 1) infinite;
+      animation: write-h 1.8s cubic-bezier(.65, 0, .35, 1) infinite alternate;
     }
 
     @keyframes write-h {
-      0%, 8% { stroke-dashoffset: 1; }
-      42%, 58% { stroke-dashoffset: 0; }
-      92%, 100% { stroke-dashoffset: 1; }
+      0%, 10% { stroke-dashoffset: 1; }
+      85%, 100% { stroke-dashoffset: 0; }
     }
 
     @media (prefers-reduced-motion: reduce) {
