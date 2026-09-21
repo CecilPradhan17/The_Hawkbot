@@ -61,7 +61,8 @@ const namedHoursAnswer = (schedule, classification, common) => {
       cursor = cursor.plus({ days: 1 });
     }
   } else {
-    label = entries.length === 1 ? entries[0].name : "the requested special dates";
+    const names = new Map(entries.map(entry => [entry.name.trim().toLowerCase(), entry.name.trim()]));
+    label = names.size === 1 ? names.values().next().value : "the requested special dates";
     records = entries
       .map(entry => ({
         date: DateTime.fromISO(entry.date, { zone: CAMPUS_TIME_ZONE }).startOf("day"),

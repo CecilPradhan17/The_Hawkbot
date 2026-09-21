@@ -68,3 +68,21 @@ test("routes named closures but leaves unrelated event questions for RAG", async
   });
   assert.equal(unrelated, null);
 });
+
+test("preserves a shared event name across multiple dated exceptions", async () => {
+  const fallBreakSchedule = async () => {
+    const value = await schedule();
+    value.exceptions = [
+      { date: "2026-10-08", name: "Fall Break", status: "open", intervals: [{ opensAt: "06:00", closesAt: "19:00", closesNextDay: false }] },
+      { date: "2026-10-09", name: "Fall Break", status: "closed", intervals: [] },
+      { date: "2026-10-10", name: "Fall Break", status: "closed", intervals: [] },
+      { date: "2026-10-11", name: "Fall Break", status: "closed", intervals: [] },
+    ];
+    return value;
+  };
+  const result = await tryHandleHoursQuery("Is the AC open during Fall Break?", {
+    dictionary, scheduleReader: fallBreakSchedule, now, metrics: async () => {},
+  });
+  assert.match(result.response, /scheduled hours for Fall Break/);
+  assert.doesNotMatch(result.response, /requested special dates/);
+});
