@@ -182,16 +182,15 @@ export default function Chatbot() {
                 >
                   {message.content}
                   {message.role === 'bot' && message.matched === false && !message.isError && (
-                    <div className="mt-3 border-t border-slate-100 pt-3">
-                      <p className="text-xs text-slate-400 italic">No verified match found</p>
+                    <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
                       {message.postedToHawkwall ? (
-                        <p className="mt-2 text-xs font-semibold text-emerald-700">✓ Posted to Hawkwall</p>
+                        <p className="text-xs font-semibold text-emerald-700">✓ Posted to Hawkwall</p>
                       ) : (
                         <button
                           onClick={() => message.draftQuestion && setQuestionDraft({ messageId: message.id, content: message.draftQuestion })}
-                          className="mt-2 rounded-lg bg-[#1B5E8A] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#164d72] active:scale-95"
+                          className="rounded-lg bg-[#1B5E8A] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#164d72] active:scale-95"
                         >
-                          Post this question to Hawkwall
+                          Post Question on HawkWall
                         </button>
                       )}
                     </div>
