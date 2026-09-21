@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-const WAKE_SECONDS = 60
+const RELOAD_OPTION_DELAY_MS = 60_000
 
 interface ServerWakeModalProps {
   isWaking: boolean
@@ -12,22 +12,23 @@ interface Joke {
 }
 
 const FALLBACK_JOKES: Joke[] = [
-  { setup: "Why did the server go to sleep?", punchline: "Because it was on Render's free tier! 😴" },
-  { setup: "Why do programmers prefer dark mode?", punchline: "Because light attracts bugs!" },
-  { setup: "Why did the developer go broke?", punchline: "Because they used too many free tiers!" },
+  { setup: 'Why do programmers prefer dark mode?', punchline: 'Because light attracts bugs!' },
+  { setup: 'Why was the computer cold?', punchline: 'It left its Windows open!' },
+  { setup: 'What is a computer’s favorite snack?', punchline: 'Microchips!' },
 ]
 
 export default function ServerWakeModal({ isWaking }: ServerWakeModalProps) {
-  const [seconds, setSeconds] = useState(WAKE_SECONDS)
   const [timedOut, setTimedOut] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
   const [joke, setJoke] = useState<Joke | null>(null)
   const [jokeLoading, setJokeLoading] = useState(true)
 
   const fetchJoke = useCallback(async () => {
     setJokeLoading(true)
     try {
-      const res = await fetch('https://official-joke-api.appspot.com/random_joke')
-      const data = await res.json()
+      const response = await fetch('https://official-joke-api.appspot.com/random_joke')
+      if (!response.ok) throw new Error('Joke request failed')
+      const data = await response.json()
       setJoke({ setup: data.setup, punchline: data.punchline })
     } catch {
       const fallback = FALLBACK_JOKES[Math.floor(Math.random() * FALLBACK_JOKES.length)]
@@ -39,132 +40,88 @@ export default function ServerWakeModal({ isWaking }: ServerWakeModalProps) {
 
   useEffect(() => {
     if (!isWaking) {
-      setSeconds(WAKE_SECONDS)
       setTimedOut(false)
+      setDismissed(false)
       setJoke(null)
       setJokeLoading(true)
       return
     }
 
     fetchJoke()
-
-    setSeconds(WAKE_SECONDS)
     setTimedOut(false)
-
-    const interval = setInterval(() => {
-      setSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          setTimedOut(true)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
+    const timeout = window.setTimeout(() => setTimedOut(true), RELOAD_OPTION_DELAY_MS)
+    return () => window.clearTimeout(timeout)
   }, [isWaking, fetchJoke])
 
-  if (!isWaking) return null
-
-  const progress = ((WAKE_SECONDS - seconds) / WAKE_SECONDS) * 100
+  if (!isWaking || dismissed) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#FAF3E1] rounded-2xl p-8 max-w-md w-full shadow-2xl">
-
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-[#8A244B] mb-3">
-            Cecil is broke!
-          </h2>
-          <p className="text-slate-600 text-sm leading-relaxed">
-            Since I can't afford the premium plan for the server, it goes to sleep after
-            inactivity and needs ~60 secs to wake up again. However here are some cool
-            jokes to pass the time:
-          </p>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={() => setDismissed(true)}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="server-wake-title"
+        className="w-full max-w-md rounded-2xl bg-[#FAF3E1] p-6 shadow-2xl sm:p-8"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#8A244B]/20 border-t-[#8A244B] motion-reduce:animate-pulse" />
+          <h2 id="server-wake-title" className="text-2xl font-bold text-[#8A244B]">The server is waking up</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">This can take a moment. Here are some cool jokes to pass the time.</p>
         </div>
 
-        {/* Progress bar + counter */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-slate-400">Waking up...</span>
-            <span className={`text-sm font-bold tabular-nums ${
-              timedOut ? 'text-red-500' : seconds <= 10 ? 'text-yellow-600' : 'text-[#8A244B]'
-            }`}>
-              {timedOut ? 'Taking longer than expected...' : `${seconds}s`}
-            </span>
-          </div>
-          <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-            <div
-              className={`h-2 rounded-full transition-all duration-1000 ease-linear ${
-                timedOut ? 'bg-red-400' : 'bg-[#8A244B]'
-              }`}
-              style={{ width: `${timedOut ? 100 : progress}%` }}
-            />
-          </div>
+        <div className="mt-6 min-h-[112px] rounded-xl border border-slate-200 bg-white p-5">
+          {jokeLoading ? (
+            <div className="space-y-3 py-1 animate-pulse motion-reduce:animate-none" role="status" aria-label="Loading joke">
+              <div className="h-3.5 w-full rounded-full bg-slate-200" />
+              <div className="h-3.5 w-4/5 rounded-full bg-slate-200" />
+              <div className="pt-1 space-y-2">
+                <div className="h-3.5 w-11/12 rounded-full bg-[#8A244B]/15" />
+                <div className="h-3.5 w-2/3 rounded-full bg-[#8A244B]/15" />
+              </div>
+              <span className="sr-only">Loading joke…</span>
+            </div>
+          ) : joke ? (
+            <>
+              <p className="font-medium text-slate-700">{joke.setup}</p>
+              <p className="mt-3 font-semibold text-[#8A244B]">{joke.punchline}</p>
+            </>
+          ) : null}
         </div>
 
-        {/* Timed out error state */}
-        {timedOut ? (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center">
-            <p className="text-red-700 font-medium mb-1">
-              This is taking longer than expected.
-            </p>
-            <p className="text-red-500 text-sm mb-4">
-              There might be a separate issue — it's not just the server sleeping.
-            </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button
+            onClick={fetchJoke}
+            disabled={jokeLoading}
+            className="min-h-11 rounded-lg border-2 border-[#8A244B] bg-white px-4 py-2 text-sm font-bold text-[#8A244B] transition hover:bg-[#8A244B]/5 active:scale-[0.98] disabled:opacity-50"
+          >
+            {jokeLoading ? 'Loading…' : 'Another joke'}
+          </button>
+          <button
+            onClick={() => setDismissed(true)}
+            className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98]"
+          >
+            Dismiss
+          </button>
+        </div>
+
+        {timedOut && (
+          <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-center">
+            <p className="text-sm font-semibold text-amber-900">The server is taking longer than expected.</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-red-500 text-white rounded-lg
-                         hover:scale-105 active:scale-95 transition-all text-sm font-medium"
+              className="mt-3 min-h-11 rounded-lg bg-slate-800 px-5 py-2 text-sm font-bold text-white transition hover:bg-slate-700 active:scale-[0.98]"
             >
-              Reload the page
+              Reload page
             </button>
           </div>
-        ) : (
-          <>
-            {/* Joke card */}
-            <div className="bg-white rounded-xl p-5 border border-slate-200 mb-4 min-h-[100px]">
-              {jokeLoading ? (
-                <div
-                  className="space-y-3 py-1 animate-pulse motion-reduce:animate-none"
-                  role="status"
-                  aria-label="Loading joke"
-                >
-                  <div className="h-3.5 w-full rounded-full bg-slate-200" />
-                  <div className="h-3.5 w-4/5 rounded-full bg-slate-200" />
-                  <div className="pt-1 space-y-2">
-                    <div className="h-3.5 w-11/12 rounded-full bg-[#8A244B]/15" />
-                    <div className="h-3.5 w-2/3 rounded-full bg-[#8A244B]/15" />
-                  </div>
-                  <span className="sr-only">Loading joke...</span>
-                </div>
-              ) : joke ? (
-                <>
-                  <p className="text-slate-700 font-medium mb-3">{joke.setup}</p>
-                  <p className="text-[#8A244B] font-semibold">{joke.punchline}</p>
-                </>
-              ) : null}
-            </div>
-
-            {/* New joke button */}
-            <button
-              onClick={fetchJoke}
-              disabled={jokeLoading}
-              className="w-full px-4 py-2 bg-[#8A244B] text-white rounded-lg
-                         hover:scale-105 active:scale-95 disabled:opacity-50
-                         disabled:hover:scale-100 transition-all text-sm font-medium"
-            >
-              {jokeLoading ? 'Loading...' : 'New Joke 🎤'}
-            </button>
-
-            {/* Auto dismiss note */}
-            <p className="text-center text-xs text-slate-400 mt-4">
-              This will dismiss automatically once the server is ready 🦅
-            </p>
-          </>
         )}
+
+        <p className="mt-4 text-center text-xs text-slate-400">You can also click outside this window to dismiss it.</p>
       </div>
     </div>
   )
