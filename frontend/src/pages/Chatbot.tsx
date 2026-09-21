@@ -154,7 +154,7 @@ export default function Chatbot() {
               </h1>
             </div>
           )}
-          {messages.map(message => (
+          {messages.map((message, index) => (
             <div
               key={message.id}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -176,7 +176,7 @@ export default function Chatbot() {
                     </p>
                   )}
                 </div>
-                {message.role === 'bot' && !message.isError && (
+                {message.role === 'bot' && !message.isError && index === messages.length - 1 && (
                   <img
                     src="/icon-192.png"
                     alt="Hawkbot"
