@@ -1,7 +1,9 @@
 import { DateTime } from "luxon";
 import { CAMPUS_TIME_ZONE, DAY_NAMES } from "./hours-validation.services.js";
 
-const formatTime = value => DateTime.fromFormat(value, "HH:mm").toFormat("h:mm a");
+const formatTime = value => value === "00:00"
+  ? "midnight (12:00 AM)"
+  : DateTime.fromFormat(value, "HH:mm").toFormat("h:mm a");
 const formatDate = value => value.toFormat("cccc, LLLL d, yyyy");
 const intervalText = interval => `${formatTime(interval.opensAt)}–${formatTime(interval.closesAt)}${interval.closesNextDay ? " the next day" : ""}`;
 
@@ -100,10 +102,9 @@ export function answerHoursQuestion(schedule, classification, now = DateTime.now
   const last = rule.intervals.at(-1);
   const opening = classification.intent === "opening_time";
   const time = formatTime(opening ? first.opensAt : last.closesAt);
-  const nextDay = !opening && last.closesNextDay ? " the next day" : "";
+  const eventDate = !opening && last.closesNextDay ? date.plus({ days: 1 }) : date;
   return {
     ...common,
-    response: `${classification.facilityName} is scheduled to ${opening ? "open" : "close"} at ${time}${nextDay} on ${formatDate(date)}.${sourceSuffix(schedule)}`,
+    response: `${classification.facilityName} is scheduled to ${opening ? "open" : "close"} at ${time} on ${formatDate(eventDate)}.${sourceSuffix(schedule)}`,
   };
 }
-

@@ -52,6 +52,21 @@ test("recognizes the previous regular day's overnight interval", () => {
   assert.match(result.response, /until 2:00 AM/);
 });
 
+test("describes a next-day midnight closing with its actual date", () => {
+  const schedule = publishedSchedule();
+  schedule.weekly[0] = { weekday: 1, status: "open", intervals: [{ opensAt: "07:30", closesAt: "00:00", closesNextDay: true }] };
+  const monday = date("2026-09-21");
+  const result = answerHoursQuestion(schedule, classification("closing_time", monday), monday);
+  assert.match(result.response, /close at midnight \(12:00 AM\) on Tuesday, September 22, 2026/);
+  assert.doesNotMatch(result.response, /the next day on Monday/);
+});
+
+test("keeps ordinary closing-time wording unchanged", () => {
+  const monday = date("2026-09-21");
+  const result = answerHoursQuestion(publishedSchedule(), classification("closing_time", monday), monday);
+  assert.match(result.response, /close at 5:00 PM on Monday, September 21, 2026/);
+});
+
 test("an exact-date closure blocks the previous overnight interval", () => {
   const schedule = publishedSchedule();
   schedule.weekly[4] = { weekday: 5, status: "open", intervals: [{ opensAt: "20:00", closesAt: "02:00", closesNextDay: true }] };
@@ -65,4 +80,3 @@ test("uses the campus timezone across a daylight-saving transition", () => {
   assert.equal(local.zoneName, "America/Chicago");
   assert.doesNotThrow(() => answerHoursQuestion(publishedSchedule(), classification("open_now"), local));
 });
-
