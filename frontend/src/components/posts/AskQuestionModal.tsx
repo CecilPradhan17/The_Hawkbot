@@ -5,12 +5,14 @@ import type { PostResponse } from '@/api/posts.api'
 interface AskQuestionModalProps {
   onClose: () => void
   onPostCreated: (newPost: PostResponse) => void
+  initialContent?: string
+  fromChatbot?: boolean
 }
 
 const MAX_QUESTION_LENGTH = 250
 
-export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestionModalProps) {
-  const [content, setContent] = useState('')
+export default function AskQuestionModal({ onClose, onPostCreated, initialContent = '', fromChatbot = false }: AskQuestionModalProps) {
+  const [content, setContent] = useState(initialContent)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -49,8 +51,11 @@ export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestion
         className="bg-white rounded-2xl p-6 w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-[#1B5E8A]">Ask a Question</h2>
+        <div className="flex justify-between items-start gap-4 mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-[#1B5E8A]">{fromChatbot ? 'Ask the Hawkwall' : 'Ask a Question'}</h2>
+            {fromChatbot && <p className="mt-1 text-sm text-slate-500">Hawkbot couldn't verify an answer. Review the draft, then post it for other students.</p>}
+          </div>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 active:scale-95 transition-all text-2xl"
@@ -96,7 +101,7 @@ export default function AskQuestionModal({ onClose, onPostCreated }: AskQuestion
                          hover:scale-105 active:scale-95 disabled:opacity-50
                          disabled:hover:scale-100 disabled:cursor-not-allowed transition-all"
             >
-              {loading ? 'Submitting...' : 'Ask'}
+              {loading ? 'Posting...' : fromChatbot ? 'Post to Hawkwall' : 'Ask'}
             </button>
           </div>
         </form>

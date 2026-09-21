@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { sendChatMessage } from '@/api/chat.api'
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
+import AskQuestionModal from '@/components/posts/AskQuestionModal'
 
 interface Message {
   id: number
@@ -9,6 +10,13 @@ interface Message {
   content: string
   matched?: boolean
   isError?: boolean
+  draftQuestion?: string
+  postedToHawkwall?: boolean
+}
+
+interface QuestionDraft {
+  messageId: number
+  content: string
 }
 
 const DAILY_LIMIT = 7
@@ -44,6 +52,7 @@ export default function Chatbot() {
   const [inputError, setInputError] = useState<string | null>(null)
   const [messagesUsed, setMessagesUsed] = useState(() => getStoredUsage())
   const [rateLimited, setRateLimited] = useState(() => !isAdmin && getStoredUsage() >= DAILY_LIMIT)
+  const [questionDraft, setQuestionDraft] = useState<QuestionDraft | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -88,15 +97,18 @@ export default function Chatbot() {
         })
       }
 
+      const botMessageId = Date.now() + 1
       setMessages(prev => [
         ...prev,
         {
-          id: Date.now() + 1,
+          id: botMessageId,
           role: 'bot',
           content: data.response,
           matched: data.matched,
+          draftQuestion: data.matched ? undefined : trimmed,
         },
       ])
+      if (!data.matched) setQuestionDraft({ messageId: botMessageId, content: trimmed })
     } catch (err: unknown) {
       const isRateLimit = err instanceof Error && err.message.includes('daily limit')
 
@@ -171,9 +183,19 @@ export default function Chatbot() {
                 >
                   {message.content}
                   {message.role === 'bot' && message.matched === false && !message.isError && (
-                    <p className="text-xs mt-2 text-slate-400 italic">
-                      No verified match found
-                    </p>
+                    <div className="mt-3 border-t border-slate-100 pt-3">
+                      <p className="text-xs text-slate-400 italic">No verified match found</p>
+                      {message.postedToHawkwall ? (
+                        <p className="mt-2 text-xs font-semibold text-emerald-700">✓ Posted to Hawkwall</p>
+                      ) : (
+                        <button
+                          onClick={() => message.draftQuestion && setQuestionDraft({ messageId: message.id, content: message.draftQuestion })}
+                          className="mt-2 rounded-lg bg-[#1B5E8A] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#164d72] active:scale-95"
+                        >
+                          Post this question to Hawkwall
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
                 {message.role === 'bot' && !message.isError && index === messages.length - 1 && (
@@ -271,6 +293,21 @@ export default function Chatbot() {
           </p>
         )}
       </main>
+
+      {questionDraft && (
+        <AskQuestionModal
+          initialContent={questionDraft.content}
+          fromChatbot
+          onClose={() => setQuestionDraft(null)}
+          onPostCreated={() => {
+            setMessages(previous => previous.map(message =>
+              message.id === questionDraft.messageId
+                ? { ...message, postedToHawkwall: true }
+                : message
+            ))
+          }}
+        />
+      )}
     </div>
   )
 }
