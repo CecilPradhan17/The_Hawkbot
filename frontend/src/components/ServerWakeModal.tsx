@@ -70,8 +70,8 @@ export default function ServerWakeModal({ isWaking }: ServerWakeModalProps) {
       >
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#8A244B]/20 border-t-[#8A244B] motion-reduce:animate-pulse" />
-          <h2 id="server-wake-title" className="text-2xl font-bold text-[#8A244B]">The server is waking up</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">This can take a moment. Here are some cool jokes to pass the time.</p>
+          <h2 id="server-wake-title" className="text-2xl font-bold text-[#8A244B]">While you wait..</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">Here are some cool jokes to pass the time.</p>
         </div>
 
         <div className="mt-6 min-h-[112px] rounded-xl border border-slate-200 bg-white p-5">
@@ -120,8 +120,6 @@ export default function ServerWakeModal({ isWaking }: ServerWakeModalProps) {
             </button>
           </div>
         )}
-
-        <p className="mt-4 text-center text-xs text-slate-400">You can also click outside this window to dismiss it.</p>
       </div>
     </div>
   )

@@ -38,8 +38,8 @@
 
     @keyframes write-h {
       0%, 8% { stroke-dashoffset: 1; }
-      76%, 90% { stroke-dashoffset: 0; }
-      100% { stroke-dashoffset: -1; }
+      42%, 58% { stroke-dashoffset: 0; }
+      92%, 100% { stroke-dashoffset: 1; }
     }
 
     @media (prefers-reduced-motion: reduce) {
