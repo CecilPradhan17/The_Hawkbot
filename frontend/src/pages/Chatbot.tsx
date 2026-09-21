@@ -3,6 +3,7 @@ import { sendChatMessage } from '@/api/chat.api'
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
+import { useNavigate } from 'react-router-dom'
 
 interface Message {
   id: number
@@ -44,6 +45,7 @@ function saveUsage(count: number) {
 }
 
 export default function Chatbot() {
+  const navigate = useNavigate()
   const { username, isAdmin } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [greeting] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)])
@@ -303,6 +305,7 @@ export default function Chatbot() {
                 ? { ...message, postedToHawkwall: true }
                 : message
             ))
+            navigate('/posts')
           }}
         />
       )}
