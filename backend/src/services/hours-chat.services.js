@@ -2,7 +2,7 @@ import { DateTime } from "luxon";
 import { CAMPUS_TIME_ZONE } from "./hours-validation.services.js";
 import { classifyHoursQuestion, matchNamedHoursEntries } from "./hours-query.services.js";
 import { answerHoursQuestion } from "./hours-resolution.services.js";
-import { getFacilityDictionary, getPublishedSchedule, incrementHoursMetrics } from "./hours-repository.services.js";
+import { getFacilityDictionary, getNamedHoursDictionary, getPublishedSchedule, incrementHoursMetrics } from "./hours-repository.services.js";
 
 const record = (columns, metrics) => metrics(columns).catch(error => {
   console.error("Hours metrics failed:", error.message);
@@ -11,6 +11,7 @@ const record = (columns, metrics) => metrics(columns).catch(error => {
 export async function tryHandleHoursQuery(message, dependencies = {}) {
   const dictionary = dependencies.dictionary || getFacilityDictionary;
   const scheduleReader = dependencies.scheduleReader || getPublishedSchedule;
+  const namedHoursDictionary = dependencies.namedHoursDictionary || getNamedHoursDictionary;
   const metrics = dependencies.metrics || incrementHoursMetrics;
   const now = dependencies.now || DateTime.now().setZone(CAMPUS_TIME_ZONE);
 
@@ -36,6 +37,18 @@ export async function tryHandleHoursQuery(message, dependencies = {}) {
 
   const schedule = await scheduleReader(classification.facilityId);
   const namedHours = matchNamedHoursEntries(message, schedule);
+  if (!namedHours && classification.intent === "weekly_hours") {
+    const explicitlyContextual = /\b(?:during|over|for)\b/i.test(message);
+    const knownNames = explicitlyContextual ? [] : await namedHoursDictionary();
+    const namesAnotherScheduleRecognizes = matchNamedHoursEntries(message, {
+      specialPeriods: knownNames,
+      exceptions: [],
+    });
+    if (explicitlyContextual || namesAnotherScheduleRecognizes) {
+      record(["rag_fallbacks"], metrics);
+      return null;
+    }
+  }
   const resolvedClassification = namedHours
     ? { ...classification, intent: "named_hours", namedHours }
     : classification;

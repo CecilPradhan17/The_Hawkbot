@@ -86,3 +86,27 @@ test("preserves a shared event name across multiple dated exceptions", async () 
   assert.match(result.response, /scheduled hours for Fall Break/);
   assert.doesNotMatch(result.response, /requested special dates/);
 });
+
+test("falls through to RAG instead of substituting regular hours for an unknown facility period", async () => {
+  const recorded = [];
+  const result = await tryHandleHoursQuery("Is the AC open during Fall Break?", {
+    dictionary,
+    scheduleReader: schedule,
+    namedHoursDictionary: async () => [{ name: "Fall Break" }],
+    now,
+    metrics: async columns => recorded.push(columns),
+  });
+  assert.equal(result, null);
+  assert.deepEqual(recorded[0], ["rag_fallbacks"]);
+});
+
+test("uses the global special-name catalog when wording omits during or for", async () => {
+  const result = await tryHandleHoursQuery("What are the AC Fall Break hours?", {
+    dictionary,
+    scheduleReader: schedule,
+    namedHoursDictionary: async () => [{ name: "Fall Break" }],
+    now,
+    metrics: async () => {},
+  });
+  assert.equal(result, null);
+});

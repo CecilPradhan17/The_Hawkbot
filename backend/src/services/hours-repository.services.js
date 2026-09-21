@@ -31,6 +31,26 @@ export async function getFacilityDictionary(database = pool) {
   return result.rows;
 }
 
+export async function getNamedHoursDictionary(database = pool) {
+  const result = await database.query(
+    `SELECT DISTINCT name
+     FROM (
+       SELECT p.name
+       FROM special_periods p
+       JOIN facility_schedules s ON s.id = p.schedule_id
+       JOIN facilities f ON f.id = s.facility_id
+       WHERE f.active = TRUE
+       UNION
+       SELECT e.name
+       FROM date_exceptions e
+       JOIN facility_schedules s ON s.id = e.schedule_id
+       JOIN facilities f ON f.id = s.facility_id
+       WHERE f.active = TRUE
+     ) named_hours`
+  );
+  return result.rows;
+}
+
 /**
  * Reconstructs one immutable published schedule inside a repeatable-read
  * transaction. A concurrent replacement therefore cannot mix old and new rows.
@@ -119,4 +139,3 @@ export async function incrementHoursMetrics(columns, database = pool) {
      ON CONFLICT (usage_date) DO UPDATE SET ${updates}`
   );
 }
-
