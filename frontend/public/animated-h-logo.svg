@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Animated handwritten H logo</title>
+  <desc id="desc">A white handwritten H draws itself in one continuous line over a burgundy background.</desc>
+  <rect width="512" height="512" rx="0" fill="#922b2d"/>
+
+  <path
+    class="h-stroke"
+    d="M70 253
+       C38 239 19 210 27 179
+       C38 135 83 99 128 85
+       C171 72 207 78 226 105
+       C250 139 249 195 248 247
+       C247 312 239 380 218 425
+       C205 453 185 461 173 446
+       C157 426 170 388 191 356
+       C221 309 261 284 293 258
+       C321 235 346 214 364 186
+       C384 155 390 115 378 82
+       C369 58 351 57 344 82
+       C334 119 333 177 328 234
+       L310 393
+       C306 428 321 438 342 408
+       C363 378 381 326 401 281"
+    fill="none"
+    stroke="#fff"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    pathLength="1"
+  />
+
+  <style>
+    .h-stroke {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: write-h 3.2s cubic-bezier(.65, 0, .35, 1) infinite;
+    }
+
+    @keyframes write-h {
+      0%, 8% { stroke-dashoffset: 1; }
+      76%, 90% { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: -1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .h-stroke { animation: none; stroke-dashoffset: 0; }
+    }
+  </style>
+</svg>
