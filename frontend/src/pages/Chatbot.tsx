@@ -97,8 +97,8 @@ export default function Chatbot() {
           matched: data.matched,
         },
       ])
-    } catch (err: any) {
-      const isRateLimit = err?.message?.includes('daily limit')
+    } catch (err: unknown) {
+      const isRateLimit = err instanceof Error && err.message.includes('daily limit')
 
       if (isRateLimit) {
         setRateLimited(true)
@@ -189,7 +189,12 @@ export default function Chatbot() {
 
           {/* Typing indicator */}
           {loading && (
-            <div className="flex justify-start">
+            <div className="flex items-end justify-start gap-2">
+              <img
+                src="/icon-192.png"
+                alt="Hawkbot is thinking"
+                className="h-9 w-9 rounded-lg shadow-sm ring-1 ring-[#8A244B]/15 animate-spin [animation-duration:1.4s] motion-reduce:animate-pulse"
+              />
               <div className="bg-white border border-slate-200 shadow-sm px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1">
                 <span className="w-2 h-2 bg-[#8A244B] rounded-full animate-bounce [animation-delay:0ms]" />
                 <span className="w-2 h-2 bg-[#8A244B] rounded-full animate-bounce [animation-delay:150ms]" />
