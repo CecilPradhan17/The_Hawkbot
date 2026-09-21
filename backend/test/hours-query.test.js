@@ -18,6 +18,15 @@ test("classifies facility aliases and hours intents", () => {
   assert.equal(classifyHoursQuestion("What are the HUB hours on Friday?", dictionary, now).intent, "hours_on_date");
   assert.equal(classifyHoursQuestion("When is the dining opening today?", dictionary, now).intent, "opening_time");
   assert.equal(classifyHoursQuestion("When is dining closing today?", dictionary, now).intent, "closing_time");
+  assert.equal(classifyHoursQuestion("When AC open?", dictionary, now).intent, "opening_time");
+  assert.equal(classifyHoursQuestion("When AC close?", dictionary, now).intent, "closing_time");
+  assert.equal(classifyHoursQuestion("What time AC close?", dictionary, now).intent, "closing_time");
+});
+
+test("requires a recognized facility for shortened hours questions", () => {
+  assert.equal(classifyHoursQuestion("When?", dictionary, now), null);
+  assert.equal(classifyHoursQuestion("When does it close?", dictionary, now), null);
+  assert.equal(classifyHoursQuestion("What time does it open?", dictionary, now), null);
 });
 
 test("does not confuse distance questions with closing-time intent", () => {
@@ -38,4 +47,3 @@ test("uses the next occurrence for month/day without a year", () => {
   assert.equal(parseTargetDate("hours 9/15", now).toISODate(), "2027-09-15");
   assert.equal(parseTargetDate("hours 10/2", now).toISODate(), "2026-10-02");
 });
-
