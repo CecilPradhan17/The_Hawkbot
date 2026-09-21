@@ -67,8 +67,8 @@ export function classifyHoursQuestion(message, dictionary, now = DateTime.now().
   const targetDate = parseTargetDate(message, now);
   let intent;
   if (/\bopen (?:right )?now\b|\bcurrently open\b/.test(normalized)) intent = "open_now";
-  else if (/\bwhen (?:does|will|is)\b.*\bopen\b|\bwhat time\b.*\bopen\b|\bopening time\b/.test(normalized)) intent = "opening_time";
-  else if (/\bwhen (?:does|will|is)\b.*\bclose\b|\bwhat time\b.*\bclose\b|\bclosing time\b/.test(normalized)) intent = "closing_time";
+  else if (/\bwhen (?:does|will|is)\b.*\b(?:open|opening)\b|\bwhat time\b.*\b(?:open|opening)\b|\bopening time\b/.test(normalized)) intent = "opening_time";
+  else if (/\bwhen (?:does|will|is)\b.*\b(?:close|closing)\b|\bwhat time\b.*\b(?:close|closing)\b|\bclosing time\b/.test(normalized)) intent = "closing_time";
   else if (/\bhours?\b|\bschedule\b|\bis\b.*\bopen\b/.test(normalized)) intent = targetDate ? "hours_on_date" : "weekly_hours";
   else return null;
 

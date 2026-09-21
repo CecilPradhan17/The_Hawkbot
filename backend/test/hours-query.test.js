@@ -8,6 +8,7 @@ const dictionary = [
   { id: 1, name: "Activity Center", normalized_alias: "ac" },
   { id: 2, name: "Library", normalized_alias: "library" },
   { id: 3, name: "HUB", normalized_alias: "hub" },
+  { id: 4, name: "Dining", normalized_alias: "dining" },
 ];
 const now = DateTime.fromISO("2026-09-16T10:00:00", { zone: "America/Chicago" });
 
@@ -15,6 +16,8 @@ test("classifies facility aliases and hours intents", () => {
   assert.equal(classifyHoursQuestion("Is the AC open right now?", dictionary, now).intent, "open_now");
   assert.equal(classifyHoursQuestion("When does the library close today?", dictionary, now).intent, "closing_time");
   assert.equal(classifyHoursQuestion("What are the HUB hours on Friday?", dictionary, now).intent, "hours_on_date");
+  assert.equal(classifyHoursQuestion("When is the dining opening today?", dictionary, now).intent, "opening_time");
+  assert.equal(classifyHoursQuestion("When is dining closing today?", dictionary, now).intent, "closing_time");
 });
 
 test("does not confuse distance questions with closing-time intent", () => {
