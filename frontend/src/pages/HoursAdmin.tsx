@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Header from '@/components/Header'
 import FacilityManager from '@/components/FacilityManager'
+import ScheduleReview from '@/components/ScheduleReview'
+import TimeField from '@/components/TimeField'
 import {
   checkHoursAccess, createFacility, extractSchedule, getCurrentSchedule, getFacilities,
-  previewSchedule, publishSchedule, validateSchedule,
   type DateException, type DayRule, type Facility, type HoursInterval,
   type HoursSchedule, type HoursStatus,
 } from '@/api/hours.api'
@@ -27,7 +28,7 @@ function DayEditor({ day, onChange, label }: { day: DayRule; onChange: (day: Day
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-3">
         <span className="w-24 font-semibold text-slate-700">{label ?? DAYS[day.weekday - 1]}</span>
-        <select value={day.status} onChange={event => setStatus(event.target.value as HoursStatus)} className="rounded-lg border px-2 py-1.5">
+        <span className="text-xs font-semibold text-slate-500">Status</span><select aria-label="Hours status" value={day.status} onChange={event => setStatus(event.target.value as HoursStatus)} className="rounded-lg border px-2 py-1.5">
           <option value="open">Open</option><option value="closed">Closed</option><option value="unverified">Unverified</option>
         </select>
       </div>
@@ -35,9 +36,9 @@ function DayEditor({ day, onChange, label }: { day: DayRule; onChange: (day: Day
         <div className="mt-3 space-y-2">
           {day.intervals.map((interval, index) => (
             <div key={index} className="flex flex-wrap items-center gap-2 text-sm">
-              <input type="time" value={interval.opensAt} onChange={e => updateInterval(index, { opensAt: e.target.value })} className="rounded-lg border px-2 py-1.5" />
+              <TimeField label="Opens" value={interval.opensAt} onChange={value => updateInterval(index, { opensAt: value })} />
               <span>to</span>
-              <input type="time" value={interval.closesAt} onChange={e => updateInterval(index, { closesAt: e.target.value })} className="rounded-lg border px-2 py-1.5" />
+              <TimeField label="Closes" value={interval.closesAt} onChange={value => updateInterval(index, { closesAt: value })} />
               <label className="flex items-center gap-1"><input type="checkbox" checked={interval.closesNextDay} onChange={e => updateInterval(index, { closesNextDay: e.target.checked })} /> next day</label>
               <button onClick={() => onChange({ ...day, intervals: day.intervals.filter((_, i) => i !== index) })} className="text-red-600">Remove</button>
             </div>
@@ -62,11 +63,9 @@ export default function HoursAdmin() {
   const [schedule, setSchedule] = useState<HoursSchedule | null>(null)
   const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   const [documentType, setDocumentType] = useState('')
-  const [errors, setErrors] = useState<string[]>([])
+  const [documentName, setDocumentName] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  const [previewDate, setPreviewDate] = useState('')
-  const [preview, setPreview] = useState('')
   const [newName, setNewName] = useState('')
   const [newAliases, setNewAliases] = useState('')
   const selectedFacility = useMemo(() => facilities.find(item => item.id === facilityId), [facilities, facilityId])
@@ -92,9 +91,9 @@ export default function HoursAdmin() {
 
   const handleUpload = async (file?: File) => {
     if (!file || !facilityId) return
-    setBusy(true); setErrors([]); setMessage('Extracting schedule…')
+    setBusy(true); setMessage('Extracting schedule…')
     if (documentUrl) URL.revokeObjectURL(documentUrl)
-    setDocumentUrl(URL.createObjectURL(file)); setDocumentType(file.type)
+    setDocumentUrl(URL.createObjectURL(file)); setDocumentType(file.type); setDocumentName(file.name)
     try {
       const extracted = await extractSchedule(file)
       setSchedule({ ...extracted, facilityId })
@@ -103,25 +102,21 @@ export default function HoursAdmin() {
     finally { setBusy(false) }
   }
 
-  const handleValidate = async () => {
-    if (!schedule) return
-    const result = await validateSchedule(schedule)
-    setErrors(result.errors); setMessage(result.valid ? 'Schedule is valid and ready to publish.' : 'Fix the listed validation errors.')
-  }
-
-  const handlePublish = async () => {
-    if (!schedule || !selectedFacility) return
-    const validation = await validateSchedule(schedule)
-    setErrors(validation.errors)
-    if (!validation.valid) return setMessage('Fix validation errors before publishing.')
-    if (selectedFacility.schedule && !window.confirm(`Replace the current ${selectedFacility.name} schedule? This cannot be undone.`)) return
+  const handleLoadCurrent = async () => {
+    if (!selectedFacility) return
     setBusy(true)
+    setMessage('Loading current schedule…')
     try {
-      await publishSchedule(schedule)
-      await refreshFacilities()
-      setMessage('Schedule published successfully.')
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Publication failed') }
-    finally { setBusy(false) }
+      setSchedule(await getCurrentSchedule(selectedFacility.id))
+      setDocumentUrl(null)
+      setDocumentType('')
+      setDocumentName('')
+      setMessage('Current schedule loaded. Review it before making changes.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not load schedule')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleFacilityUpdated = async () => {
@@ -132,9 +127,8 @@ export default function HoursAdmin() {
     if (documentUrl) URL.revokeObjectURL(documentUrl)
     setDocumentUrl(null)
     setDocumentType('')
+    setDocumentName('')
     setSchedule(null)
-    setErrors([])
-    setPreview('')
     const data = await getFacilities()
     setFacilities(data)
     setFacilityId(data[0]?.id ?? null)
@@ -150,10 +144,11 @@ export default function HoursAdmin() {
     <div className="min-h-screen bg-[#FAF3E1]"><Header />
       <main className="mx-auto max-w-7xl p-4 sm:p-8">
         <h1 className="text-3xl font-bold text-slate-800">Campus Hours Manager</h1>
-        <p className="mt-1 text-slate-500">Upload, review, preview, and publish one current schedule per facility.</p>
+        <p className="mt-1 text-slate-600">Follow the steps below to update the hours students receive from Hawkbot.</p>
 
-        <section className="mt-6 rounded-2xl border bg-white p-4 shadow-sm">
-          <h2 className="font-bold">Create facility</h2>
+        <details className="mt-6 rounded-2xl border bg-white p-4 shadow-sm">
+          <summary className="cursor-pointer font-bold text-[#8A244B]">+ Create a new facility</summary>
+          <p className="mt-2 text-sm text-slate-500">Only use this when the facility is not already listed below.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Facility name" className="rounded-lg border px-3 py-2" />
             <input value={newAliases} onChange={e => setNewAliases(e.target.value)} placeholder="Aliases, comma separated" className="min-w-72 rounded-lg border px-3 py-2" />
@@ -162,20 +157,45 @@ export default function HoursAdmin() {
               catch (error) { setMessage(error instanceof Error ? error.message : 'Could not create facility') }
             }}>Create</button>
           </div>
+        </details>
+
+        <section className="mt-4 rounded-2xl border bg-white p-4 shadow-sm sm:p-5">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-[#8A244B]">Step 1</p>
+            <h2 className="text-xl font-bold text-slate-800">Choose a facility</h2>
+            <p className="mt-1 text-sm text-slate-500">Select the place whose hours you want to manage.</p>
+          </div>
+          {facilities.length === 0 ? <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-800">No facilities yet. Create one using the option above.</p> : <>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select aria-label="Facility" value={facilityId ?? ''} onChange={event => { setFacilityId(Number(event.target.value)); setSchedule(null); setMessage('') }} className="min-h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 font-medium">
+                {facilities.map(facility => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
+              </select>
+              {selectedFacility?.schedule && <button disabled={busy} onClick={handleLoadCurrent} className="min-h-11 rounded-lg border-2 border-[#8A244B] bg-white px-4 py-2 font-bold text-[#8A244B] transition hover:bg-[#8A244B]/5 active:scale-[0.98] disabled:opacity-50">Edit published schedule</button>}
+            </div>
+
+            <div className="mt-5 border-t pt-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#8A244B]">Step 2</p>
+              <h2 className="text-lg font-bold text-slate-800">Upload a new schedule</h2>
+              <p className="mt-1 text-sm text-slate-500">PDF, PNG, JPEG, or WebP up to 10 MB. You will review everything before publishing.</p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label className="cursor-pointer rounded-lg bg-[#8A244B] px-5 py-2.5 font-bold text-white shadow-sm transition hover:bg-[#711d3e] active:scale-[0.98] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+                  {busy ? 'Processing…' : 'Choose schedule file'}
+                  <input className="sr-only" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" disabled={!facilityId || busy} onChange={event => handleUpload(event.target.files?.[0])} />
+                </label>
+                <span className="text-sm font-medium text-slate-600">{documentName || 'No new file selected'}</span>
+              </div>
+            </div>
+            {selectedFacility && <FacilityManager key={selectedFacility.id} facility={selectedFacility} onUpdated={handleFacilityUpdated} onDeleted={handleFacilityDeleted} onMessage={setMessage} />}
+          </>}
         </section>
 
-        <section className="mt-4 rounded-2xl border bg-white p-4 shadow-sm">
-          <label className="font-bold">Facility</label>
-          <select value={facilityId ?? ''} onChange={e => { setFacilityId(Number(e.target.value)); setSchedule(null) }} className="ml-3 rounded-lg border px-3 py-2">
-            {facilities.map(facility => <option key={facility.id} value={facility.id}>{facility.name}</option>)}
-          </select>
-          {selectedFacility?.schedule && <button className="ml-3 text-sm font-semibold text-[#8A244B]" onClick={async () => setSchedule(await getCurrentSchedule(selectedFacility.id))}>Load current schedule</button>}
-          <div className="mt-4"><input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" disabled={!facilityId || busy} onChange={e => handleUpload(e.target.files?.[0])} /></div>
-          {selectedFacility && <FacilityManager key={selectedFacility.id} facility={selectedFacility} onUpdated={handleFacilityUpdated} onDeleted={handleFacilityDeleted} onMessage={setMessage} />}
-        </section>
-
-        {message && <p className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-700">{message}</p>}
+        {message && <p role="status" className="mt-4 rounded-xl border border-slate-200 bg-white p-3 text-sm font-medium text-slate-700 shadow-sm">{message}</p>}
         {schedule && <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="lg:col-span-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-[#8A244B]">Step 3</p>
+            <h2 className="text-2xl font-bold text-slate-800">Review and correct the schedule</h2>
+            <p className="mt-1 text-sm text-slate-600">Compare every field with the source document. Changes here are not saved until you publish.</p>
+          </div>
           <section className="min-h-96 rounded-2xl border bg-white p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
             <h2 className="mb-3 text-xl font-bold">Original document</h2>
             {!documentUrl ? <p className="text-slate-500">The currently published schedule has no stored document.</p>
@@ -208,11 +228,7 @@ export default function HoursAdmin() {
                 {exception.status === 'open' && <DayEditor label="Hours" day={{ weekday: 1, status: exception.status, intervals: exception.intervals }} onChange={day => setSchedule({ ...schedule, exceptions: schedule.exceptions.map((x, i) => i === index ? { ...x, intervals: day.intervals } : x) })} />}
               </div>)}</div>
 
-            {(schedule.warnings?.length || errors.length > 0) && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm"><h3 className="font-bold">Review findings</h3><ul className="list-disc pl-5">{schedule.warnings?.map((x, i) => <li key={`w${i}`}>{x}</li>)}{errors.map((x, i) => <li key={`e${i}`} className="text-red-700">{x}</li>)}</ul></div>}
-
-            <div className="rounded-2xl border bg-white p-4"><h2 className="font-bold">Calendar preview</h2><div className="mt-2 flex gap-2"><input type="date" value={previewDate} onChange={e => setPreviewDate(e.target.value)} className="rounded-lg border px-3 py-2" /><button onClick={async () => selectedFacility && setPreview((await previewSchedule(schedule, selectedFacility.name, previewDate)).response)} className="rounded-lg border px-3 py-2">Preview</button></div>{preview && <p className="mt-3 text-sm">{preview}</p>}</div>
-
-            <div className="flex gap-3"><button onClick={handleValidate} className="rounded-xl border border-[#8A244B] px-5 py-2 font-semibold text-[#8A244B]">Validate</button><button disabled={busy} onClick={handlePublish} className="rounded-xl bg-[#8A244B] px-5 py-2 font-semibold text-white disabled:opacity-50">Publish schedule</button></div>
+            <ScheduleReview schedule={schedule} facility={selectedFacility!} onPublished={refreshFacilities} onMessage={setMessage} />
           </section>
         </div>}
       </main>
