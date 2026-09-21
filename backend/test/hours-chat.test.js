@@ -43,6 +43,12 @@ test("routes stored special-period names to their special hours", async () => {
   assert.match(result.response, /Thursday, October 8, 2026: 6:00 AM–7:00 PM/);
   assert.match(result.response, /Friday, October 9 through Sunday, October 11, 2026: closed/);
   assert.doesNotMatch(result.response, /scheduled regular hours/);
+
+  const closureQuestion = await tryHandleHoursQuery("Does the AC close during Fall Break?", {
+    dictionary, scheduleReader: specialSchedule, now, metrics: async () => {},
+  });
+  assert.match(closureQuestion.response, /scheduled hours for Fall Break/);
+  assert.match(closureQuestion.response, /Friday, October 9 through Sunday, October 11, 2026: closed/);
 });
 
 test("routes named closures but leaves unrelated event questions for RAG", async () => {
