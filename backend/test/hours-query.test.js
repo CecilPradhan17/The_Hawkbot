@@ -14,6 +14,7 @@ const now = DateTime.fromISO("2026-09-16T10:00:00", { zone: "America/Chicago" })
 
 test("classifies facility aliases and hours intents", () => {
   assert.equal(classifyHoursQuestion("Is the AC open right now?", dictionary, now).intent, "open_now");
+  assert.equal(classifyHoursQuestion("Is HUB open rn?", dictionary, now).intent, "open_now");
   assert.equal(classifyHoursQuestion("When does the library close today?", dictionary, now).intent, "closing_time");
   assert.equal(classifyHoursQuestion("What are the HUB hours on Friday?", dictionary, now).intent, "hours_on_date");
   assert.equal(classifyHoursQuestion("When is the dining opening today?", dictionary, now).intent, "opening_time");
@@ -21,6 +22,7 @@ test("classifies facility aliases and hours intents", () => {
   assert.equal(classifyHoursQuestion("When AC open?", dictionary, now).intent, "opening_time");
   assert.equal(classifyHoursQuestion("When AC close?", dictionary, now).intent, "closing_time");
   assert.equal(classifyHoursQuestion("What time AC close?", dictionary, now).intent, "closing_time");
+  assert.equal(classifyHoursQuestion("Is HUB open?", dictionary, now).intent, "weekly_hours");
 });
 
 test("requires a recognized facility for shortened hours questions", () => {
