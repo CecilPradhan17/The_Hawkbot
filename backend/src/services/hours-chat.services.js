@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { CAMPUS_TIME_ZONE } from "./hours-validation.services.js";
-import { classifyHoursQuestion } from "./hours-query.services.js";
+import { classifyHoursQuestion, matchNamedHoursEntries } from "./hours-query.services.js";
 import { answerHoursQuestion } from "./hours-resolution.services.js";
 import { getFacilityDictionary, getPublishedSchedule, incrementHoursMetrics } from "./hours-repository.services.js";
 
@@ -35,7 +35,11 @@ export async function tryHandleHoursQuery(message, dependencies = {}) {
   }
 
   const schedule = await scheduleReader(classification.facilityId);
-  const answer = answerHoursQuestion(schedule, classification, now);
+  const namedHours = matchNamedHoursEntries(message, schedule);
+  const resolvedClassification = namedHours
+    ? { ...classification, intent: "named_hours", namedHours }
+    : classification;
+  const answer = answerHoursQuestion(schedule, resolvedClassification, now);
   record([
     answer.unverified ? "unverified_answers" : "structured_hits",
     "embedding_calls_avoided",
@@ -43,4 +47,3 @@ export async function tryHandleHoursQuery(message, dependencies = {}) {
   ], metrics);
   return answer;
 }
-

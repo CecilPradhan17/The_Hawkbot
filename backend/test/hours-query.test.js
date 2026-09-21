@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DateTime } from "luxon";
-import { classifyHoursQuestion, parseTargetDate } from "../src/services/hours-query.services.js";
+import { classifyHoursQuestion, matchNamedHoursEntries, parseTargetDate } from "../src/services/hours-query.services.js";
 
 const dictionary = [
   { id: 1, name: "Activity Center", normalized_alias: "activity center" },
@@ -38,6 +38,22 @@ test("does not confuse distance questions with closing-time intent", () => {
 test("returns ambiguity instead of guessing when aliases identify two facilities", () => {
   const ambiguousDictionary = [...dictionary, { id: 4, name: "Academic Center", normalized_alias: "ac" }];
   assert.deepEqual(classifyHoursQuestion("What are the AC hours?", ambiguousDictionary, now), { ambiguous: true });
+});
+
+test("uses stored special-period and exception names as dynamic keywords", () => {
+  const schedule = {
+    specialPeriods: [{ name: "Fall Break" }, { name: "Finals Week/Commencement" }],
+    exceptions: [
+      { name: "Thanksgiving Break" },
+      { name: "ULM Football Games - Southeastern" },
+      { name: "ULM Football Games - Louisiana Tech" },
+    ],
+  };
+  assert.equal(matchNamedHoursEntries("Is the AC open during fall break?", schedule).entries[0].name, "Fall Break");
+  assert.equal(matchNamedHoursEntries("AC hours for finals", schedule).entries[0].name, "Finals Week/Commencement");
+  assert.equal(matchNamedHoursEntries("AC closed for Thanksgiving?", schedule).entries[0].name, "Thanksgiving Break");
+  assert.equal(matchNamedHoursEntries("AC hours for ULM football games", schedule).entries.length, 2);
+  assert.equal(matchNamedHoursEntries("What is happening at the AC?", schedule), null);
 });
 
 test("interprets bare weekdays as the next occurrence including today", () => {

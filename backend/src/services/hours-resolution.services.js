@@ -27,6 +27,54 @@ const ruleText = rule => {
   return rule.intervals.map(intervalText).join(" and ");
 };
 
+const shortDate = value => value.toFormat("cccc, LLLL d");
+const groupDatedRules = records => {
+  const groups = [];
+  for (const record of records) {
+    const previous = groups.at(-1);
+    if (previous && previous.text === record.text && previous.end.plus({ days: 1 }).hasSame(record.date, "day")) {
+      previous.end = record.date;
+    } else {
+      groups.push({ start: record.date, end: record.date, text: record.text });
+    }
+  }
+  return groups.map(group => {
+    const dates = group.start.hasSame(group.end, "day")
+      ? `${shortDate(group.start)}, ${group.start.year}`
+      : `${shortDate(group.start)} through ${shortDate(group.end)}, ${group.end.year}`;
+    return `${dates}: ${group.text}`;
+  }).join("; ");
+};
+
+const namedHoursAnswer = (schedule, classification, common) => {
+  const { kind, entries } = classification.namedHours;
+  let records;
+  let label;
+  if (kind === "period") {
+    const period = entries[0];
+    label = period.name;
+    records = [];
+    let cursor = DateTime.fromISO(period.startDate, { zone: CAMPUS_TIME_ZONE }).startOf("day");
+    const end = DateTime.fromISO(period.endDate, { zone: CAMPUS_TIME_ZONE }).startOf("day");
+    while (cursor <= end) {
+      records.push({ date: cursor, text: ruleText(ruleForDate(schedule, cursor)) });
+      cursor = cursor.plus({ days: 1 });
+    }
+  } else {
+    label = entries.length === 1 ? entries[0].name : "the requested special dates";
+    records = entries
+      .map(entry => ({
+        date: DateTime.fromISO(entry.date, { zone: CAMPUS_TIME_ZONE }).startOf("day"),
+        text: ruleText(entry),
+      }))
+      .sort((a, b) => a.date.toMillis() - b.date.toMillis());
+  }
+  return {
+    ...common,
+    response: `${classification.facilityName}'s scheduled hours for ${label} are ${groupDatedRules(records)}.${sourceSuffix(schedule)}`,
+  };
+};
+
 const sourceSuffix = schedule => {
   const published = DateTime.fromJSDate(new Date(schedule.publishedAt), { zone: CAMPUS_TIME_ZONE }).toFormat("LLL d, yyyy");
   return ` Source: ${schedule.sourceLabel}; last published ${published}.`;
@@ -61,6 +109,10 @@ export function answerHoursQuestion(schedule, classification, now = DateTime.now
     sourceLabel: schedule.sourceLabel,
     publishedAt: schedule.publishedAt,
   };
+
+  if (classification.intent === "named_hours") {
+    return namedHoursAnswer(schedule, classification, common);
+  }
 
   if (classification.intent === "weekly_hours") {
     const lines = schedule.weekly.map(day => `${DAY_NAMES[day.weekday - 1]}: ${ruleText(day)}`);
