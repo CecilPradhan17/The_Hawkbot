@@ -13,7 +13,8 @@ const rollForwardMissingYear = (date, now, yearWasSpecified) =>
 export function parseTargetDate(message, now = DateTime.now().setZone(CAMPUS_TIME_ZONE)) {
   const normalized = normalizeAlias(message);
   if (/\btoday\b/.test(normalized)) return now.startOf("day");
-  if (/\btomorrow\b/.test(normalized)) return now.plus({ days: 1 }).startOf("day");
+  if (/\bday after tomorrow\b/.test(normalized)) return now.plus({ days: 2 }).startOf("day");
+  if (/\b(?:tomorrow|tmrw)\b/.test(normalized)) return now.plus({ days: 1 }).startOf("day");
 
   const isoMatch = message.match(/\b(\d{4}-\d{2}-\d{2})\b/);
   if (isoMatch) {

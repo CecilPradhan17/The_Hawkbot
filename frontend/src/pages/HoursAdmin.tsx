@@ -12,6 +12,16 @@ import {
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const emptyWeek = (): DayRule[] => DAYS.map((_, index) => ({ weekday: index + 1, status: 'unverified', intervals: [] }))
 const emptyInterval = (): HoursInterval => ({ opensAt: '08:00', closesAt: '17:00', closesNextDay: false })
+const emptySchedule = (facility: Pick<Facility, 'id' | 'name'>): HoursSchedule => ({
+  facilityId: facility.id,
+  sourceLabel: `Manually entered hours for ${facility.name}`,
+  coverageStart: '',
+  coverageEnd: '',
+  weekly: emptyWeek(),
+  specialPeriods: [],
+  exceptions: [],
+  warnings: [],
+})
 
 function DayEditor({ day, onChange, label }: { day: DayRule; onChange: (day: DayRule) => void; label?: string }) {
   const setStatus = (status: HoursStatus) => onChange({
@@ -102,6 +112,36 @@ export default function HoursAdmin() {
     finally { setBusy(false) }
   }
 
+  const handleManualEntry = (facility: Pick<Facility, 'id' | 'name'>) => {
+    if (documentUrl) URL.revokeObjectURL(documentUrl)
+    setFacilityId(facility.id)
+    setDocumentUrl(null)
+    setDocumentType('')
+    setDocumentName('')
+    setSchedule(emptySchedule(facility))
+    setMessage(`Enter ${facility.name}'s hours below, then validate and publish the schedule.`)
+  }
+
+  const handleCreateFacility = async (startManualEntry: boolean) => {
+    setBusy(true)
+    try {
+      const facility = await createFacility({
+        name: newName,
+        aliases: newAliases.split(',').map(alias => alias.trim()).filter(Boolean),
+      })
+      setNewName('')
+      setNewAliases('')
+      await refreshFacilities()
+      setFacilityId(facility.id)
+      if (startManualEntry) handleManualEntry(facility)
+      else setMessage(`${facility.name} was created.`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not create facility')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleLoadCurrent = async () => {
     if (!selectedFacility) return
     setBusy(true)
@@ -152,10 +192,8 @@ export default function HoursAdmin() {
           <div className="mt-3 flex flex-wrap gap-2">
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Facility name" className="rounded-lg border px-3 py-2" />
             <input value={newAliases} onChange={e => setNewAliases(e.target.value)} placeholder="Aliases, comma separated" className="min-w-72 rounded-lg border px-3 py-2" />
-            <button className="rounded-lg bg-[#8A244B] px-4 py-2 text-white" onClick={async () => {
-              try { await createFacility({ name: newName, aliases: newAliases.split(',').map(x => x.trim()).filter(Boolean) }); setNewName(''); setNewAliases(''); await refreshFacilities() }
-              catch (error) { setMessage(error instanceof Error ? error.message : 'Could not create facility') }
-            }}>Create</button>
+            <button disabled={busy || !newName.trim()} className="rounded-lg border border-[#8A244B] px-4 py-2 font-semibold text-[#8A244B] disabled:opacity-50" onClick={() => handleCreateFacility(false)}>Create only</button>
+            <button disabled={busy || !newName.trim()} className="rounded-lg bg-[#8A244B] px-4 py-2 font-semibold text-white disabled:opacity-50" onClick={() => handleCreateFacility(true)}>Create &amp; enter hours</button>
           </div>
         </details>
 
@@ -183,6 +221,14 @@ export default function HoursAdmin() {
                   <input className="sr-only" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" disabled={!facilityId || busy} onChange={event => handleUpload(event.target.files?.[0])} />
                 </label>
                 <span className="text-sm font-medium text-slate-600">{documentName || 'No new file selected'}</span>
+                <span className="text-sm text-slate-400">or</span>
+                <button
+                  disabled={!selectedFacility || busy}
+                  onClick={() => selectedFacility && handleManualEntry(selectedFacility)}
+                  className="rounded-lg border-2 border-[#8A244B] bg-white px-5 py-2 font-bold text-[#8A244B] transition hover:bg-[#8A244B]/5 active:scale-[0.98] disabled:opacity-50"
+                >
+                  Enter hours manually
+                </button>
               </div>
             </div>
             {selectedFacility && <FacilityManager key={selectedFacility.id} facility={selectedFacility} onUpdated={handleFacilityUpdated} onDeleted={handleFacilityDeleted} onMessage={setMessage} />}
@@ -198,7 +244,7 @@ export default function HoursAdmin() {
           </div>
           <section className="min-h-96 rounded-2xl border bg-white p-4 shadow-sm lg:sticky lg:top-4 lg:self-start">
             <h2 className="mb-3 text-xl font-bold">Original document</h2>
-            {!documentUrl ? <p className="text-slate-500">The currently published schedule has no stored document.</p>
+            {!documentUrl ? <p className="text-slate-500">No source document is attached. Complete the schedule fields manually, then validate before publishing.</p>
               : documentType === 'application/pdf' ? <iframe src={documentUrl} title="Uploaded schedule" className="h-[70vh] w-full rounded-xl border" />
               : <img src={documentUrl} alt="Uploaded schedule" className="max-h-[70vh] w-full rounded-xl object-contain" />}
           </section>
