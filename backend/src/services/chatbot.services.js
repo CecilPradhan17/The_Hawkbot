@@ -12,9 +12,7 @@ import { tryHandleSmalltalk } from "./smalltalk.services.js";
 const SIMILARITY_THRESHOLD = 0.50;
 
 const FALLBACK_MESSAGE =
-  "I don't have verified information about that yet. " +
-  "Try asking a question on the feed — if the community answers and votes it up, " +
-  "I'll be able to help with that in the future!";
+  "I don't have the answer to that yet. Try posting this question on the HawkWall and another student can answer you!";
 
 export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;

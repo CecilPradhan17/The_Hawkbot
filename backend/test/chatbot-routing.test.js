@@ -38,4 +38,8 @@ test("the original honest fallback remains when RAG has no confident match", asy
   });
   assert.equal(result.matched, false);
   assert.equal(result.sourceType, "fallback");
+  assert.equal(
+    result.response,
+    "I don't have the answer to that yet. Try posting this question on the HawkWall and another student can answer you!",
+  );
 });

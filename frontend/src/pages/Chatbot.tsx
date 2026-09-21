@@ -108,7 +108,6 @@ export default function Chatbot() {
           draftQuestion: data.matched ? undefined : trimmed,
         },
       ])
-      if (!data.matched) setQuestionDraft({ messageId: botMessageId, content: trimmed })
     } catch (err: unknown) {
       const isRateLimit = err instanceof Error && err.message.includes('daily limit')
 
