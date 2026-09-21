@@ -2,6 +2,7 @@ import pool from "../db.js";
 import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
 import { tryHandleHoursQuery } from "./hours-chat.services.js";
+import { tryHandleSmalltalk } from "./smalltalk.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -16,10 +17,14 @@ const FALLBACK_MESSAGE =
   "I'll be able to help with that in the future!";
 
 export const handleChatQuery = async (userMessage, dependencies = {}) => {
+  const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;
   const hoursHandler = dependencies.hoursHandler || tryHandleHoursQuery;
   const embedding = dependencies.embedding || generateQueryEmbedding;
   const database = dependencies.database || pool;
   const polisher = dependencies.polisher || polishResponse;
+
+  const smalltalkResult = await smalltalkHandler(userMessage);
+  if (smalltalkResult) return smalltalkResult;
 
   // Structured campus hours are authoritative for recognized hours questions.
   // An uncovered date returns an explicit unverified response rather than stale RAG data.
