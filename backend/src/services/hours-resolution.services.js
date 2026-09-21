@@ -78,11 +78,11 @@ const namedHoursAnswer = (schedule, classification, common) => {
 
 const sourceSuffix = schedule => {
   const published = DateTime.fromJSDate(new Date(schedule.publishedAt), { zone: CAMPUS_TIME_ZONE }).toFormat("LLL d, yyyy");
-  return ` Source: ${schedule.sourceLabel}; last published ${published}.`;
+  return `\n\nSource: ${schedule.sourceLabel}; last published ${published}.`;
 };
 
 const unverifiedAnswer = (schedule, classification, date) => ({
-  response: `I don't have verified scheduled hours for ${classification.facilityName}${date ? ` on ${formatDate(date)}` : ""}.`,
+  response: `I don't have verified scheduled hours for ${classification.facilityName}${date ? ` on ${formatDate(date)}` : ""}.${schedule ? sourceSuffix(schedule) : ""}`,
   matched: false,
   sourceType: "hours",
   facilityId: classification.facilityId,
@@ -116,8 +116,11 @@ export function answerHoursQuestion(schedule, classification, now = DateTime.now
   }
 
   if (classification.intent === "weekly_hours") {
-    const lines = schedule.weekly.map(day => `${DAY_NAMES[day.weekday - 1]}: ${ruleText(day)}`);
-    return { ...common, response: `${classification.facilityName}'s scheduled regular hours are ${lines.join("; ")}.${sourceSuffix(schedule)}` };
+    const lines = schedule.weekly.map(day => `• ${DAY_NAMES[day.weekday - 1]}: ${ruleText(day)}`);
+    return {
+      ...common,
+      response: `${classification.facilityName}'s scheduled regular hours:\n\n${lines.join("\n")}${sourceSuffix(schedule)}`,
+    };
   }
 
   if (classification.intent === "open_now") {

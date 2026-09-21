@@ -44,6 +44,21 @@ function saveUsage(count: number) {
   localStorage.setItem(getTodayKey(), String(count))
 }
 
+function BotMessageContent({ content }: { content: string }) {
+  const marker = '\n\nSource:'
+  const sourceIndex = content.lastIndexOf(marker)
+  if (sourceIndex === -1) return <>{content}</>
+
+  return (
+    <>
+      {content.slice(0, sourceIndex)}
+      <p className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-500">
+        Source:{content.slice(sourceIndex + marker.length)}
+      </p>
+    </>
+  )
+}
+
 export default function Chatbot() {
   const navigate = useNavigate()
   const { username, isAdmin } = useAuth()
@@ -174,7 +189,7 @@ export default function Chatbot() {
             >
               <div className={`max-w-[75%] flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`w-fit px-4 py-3 rounded-2xl text-sm leading-relaxed
+                  className={`w-fit whitespace-pre-wrap px-4 py-3 rounded-2xl text-sm leading-relaxed
                     ${message.role === 'user'
                       ? 'bg-[#8A244B] text-white rounded-br-sm'
                       : message.isError
@@ -182,7 +197,7 @@ export default function Chatbot() {
                         : 'bg-white text-slate-700 shadow-sm border border-slate-200 rounded-bl-sm'
                     }`}
                 >
-                  {message.content}
+                  {message.role === 'bot' ? <BotMessageContent content={message.content} /> : message.content}
                   {message.role === 'bot' && message.matched === false && !message.isError && (
                     <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
                       {message.postedToHawkwall ? (

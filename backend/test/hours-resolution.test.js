@@ -31,6 +31,16 @@ test("returns an unverified answer outside semester coverage", () => {
   const result = answerHoursQuestion(publishedSchedule(), classification("hours_on_date", target), target);
   assert.equal(result.unverified, true);
   assert.equal(result.matched, false);
+  assert.match(result.response, /\n\nSource: Fall 2026 schedule/);
+});
+
+test("formats weekly hours with one weekday per line", () => {
+  const result = answerHoursQuestion(publishedSchedule(), classification("weekly_hours"));
+  assert.match(result.response, /scheduled regular hours:\n\n• Monday:/);
+  assert.match(result.response, /\n• Tuesday:/);
+  assert.match(result.response, /\n• Sunday:/);
+  assert.match(result.response, /\n\nSource: Fall 2026 schedule/);
+  assert.doesNotMatch(result.response, /; Tuesday:/);
 });
 
 test("answers from an exact-date holiday closure", () => {
@@ -39,7 +49,7 @@ test("answers from an exact-date holiday closure", () => {
   const target = date("2026-11-26");
   const result = answerHoursQuestion(schedule, classification("hours_on_date", target), target);
   assert.match(result.response, /scheduled to be closed/);
-  assert.match(result.response, /Source: Fall 2026 schedule/);
+  assert.match(result.response, /\n\nSource: Fall 2026 schedule/);
 });
 
 test("recognizes the previous regular day's overnight interval", () => {
