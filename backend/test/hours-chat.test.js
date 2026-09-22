@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DateTime } from "luxon";
-import { tryHandleHoursQuery } from "../src/services/hours-chat.services.js";
+import { getHoursToolContext, resolveHoursToolLookup, tryHandleHoursQuery } from "../src/services/hours-chat.services.js";
 import { validSchedule } from "./helpers/hours-fixtures.js";
 
 const now = DateTime.fromISO("2026-09-16T10:00:00", { zone: "America/Chicago" });
@@ -109,4 +109,34 @@ test("uses the global special-name catalog when wording omits during or for", as
     metrics: async () => {},
   });
   assert.equal(result, null);
+});
+
+test("builds tool context only for one recognized facility", async () => {
+  assert.deepEqual(
+    await getHoursToolContext("Could I use the AC later?", { dictionary }),
+    { facilityId: 1, facilityName: "Activity Center" },
+  );
+  assert.equal(await getHoursToolContext("Could I go somewhere later?", { dictionary }), null);
+});
+
+test("resolves a validated AI tool request through the deterministic hours engine", async () => {
+  const recorded = [];
+  const result = await resolveHoursToolLookup(
+    { facilityId: 1, facilityName: "Activity Center" },
+    { intent: "hours_on_date", date: "2026-09-16", specialEvent: null },
+    { scheduleReader: schedule, now, metrics: async columns => recorded.push(columns) },
+  );
+  assert.equal(result.sourceType, "hours");
+  assert.match(result.response, /Wednesday/);
+  assert.deepEqual(recorded[0], ["structured_hits"]);
+});
+
+test("rejects invalid or unavailable hours tool requests", async () => {
+  const context = { facilityId: 1, facilityName: "Activity Center" };
+  assert.equal(await resolveHoursToolLookup(context, {
+    intent: "hours_on_date", date: "not-a-date", specialEvent: null,
+  }, { scheduleReader: schedule, now }), null);
+  assert.equal(await resolveHoursToolLookup(context, {
+    intent: "weekly_hours", date: null, specialEvent: "Unknown Break",
+  }, { scheduleReader: schedule, now }), null);
 });

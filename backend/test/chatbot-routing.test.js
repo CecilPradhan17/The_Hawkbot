@@ -21,6 +21,7 @@ test("an uncertain question falls through to the existing RAG flow", async () =>
     hoursHandler: async () => null,
     embedding: async () => { embedded = true; return [0.1, 0.2]; },
     database: { query: async () => ({ rows: [{ cleaned_content: "Verified fact", similarity: 0.9 }] }) },
+    hoursToolContext: async () => null,
     polisher: async () => { polished = true; return { answerable: true, response: "Helpful answer" }; },
   });
   assert.equal(embedded, true);
@@ -34,6 +35,7 @@ test("an unanswerable retrieved match uses the HawkWall fallback", async () => {
     hoursHandler: async () => null,
     embedding: async () => [0.1],
     database: { query: async () => ({ rows: [{ cleaned_content: "Dining serves lunch daily", similarity: 0.9 }] }) },
+    hoursToolContext: async () => null,
     polisher: async () => ({ answerable: false, response: "" }),
   });
   assert.deepEqual(result, {
@@ -48,6 +50,7 @@ test("the original honest fallback remains when RAG has no confident match", asy
     hoursHandler: async () => null,
     embedding: async () => [0.1],
     database: { query: async () => ({ rows: [] }) },
+    hoursToolContext: async () => null,
     polisher: async () => { throw new Error("Polisher should not run"); },
   });
   assert.equal(result.matched, false);
@@ -56,4 +59,43 @@ test("the original honest fallback remains when RAG has no confident match", asy
     result.response,
     "I don't have the answer to that yet. Try posting this question on the HawkWall and another student can answer you!",
   );
+});
+
+test("the existing RAG model call can recover a missed structured-hours question", async () => {
+  const facility = { facilityId: 4, facilityName: "Dining" };
+  const expected = { response: "Dining is open until 8:00 PM.", matched: true, sourceType: "hours" };
+  let resolverArguments;
+  const result = await handleChatQuery("Can I use Dining right now?", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    database: { query: async () => ({ rows: [] }) },
+    hoursToolContext: async () => facility,
+    polisher: async (_query, _knowledge, options) => {
+      assert.equal(options.facility, facility);
+      return { answerable: false, response: "", hoursLookup: { intent: "open_now", date: null, specialEvent: null } };
+    },
+    hoursToolResolver: async (...args) => { resolverArguments = args; return expected; },
+  });
+  assert.equal(result, expected);
+  assert.deepEqual(resolverArguments, [facility, { intent: "open_now", date: null, specialEvent: null }]);
+});
+
+test("a failed hours tool lookup resumes grounded RAG answering", async () => {
+  let calls = 0;
+  const result = await handleChatQuery("Dining during an unknown event", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    database: { query: async () => ({ rows: [{ cleaned_content: "Verified dining fact", similarity: 0.9 }] }) },
+    hoursToolContext: async () => ({ facilityId: 4, facilityName: "Dining" }),
+    polisher: async (_query, _knowledge, options) => {
+      calls += 1;
+      return options.allowHoursTool
+        ? { answerable: false, response: "", hoursLookup: { intent: "weekly_hours", date: null, specialEvent: "Unknown Event" } }
+        : { answerable: true, response: "Grounded RAG answer" };
+    },
+    hoursToolResolver: async () => null,
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.response, "Grounded RAG answer");
+  assert.equal(result.sourceType, "rag");
 });

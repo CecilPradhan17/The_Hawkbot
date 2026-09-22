@@ -107,7 +107,10 @@ Answer: "${answer}"`;
  * @param {string} knowledge - the cleaned_content retrieved from approved_knowledge
  * @returns {Promise<{answerable: boolean, response: string}>} grounded answerability result
  */
-export const polishResponse = async (userQuery, knowledge) => {
+export const polishResponse = async (userQuery, knowledge, options = {}) => {
+  const facility = options.facility || null;
+  const allowHoursTool = options.allowHoursTool !== false && facility;
+  const currentDate = options.currentDate || new Date().toISOString().slice(0, 10);
   const prompt = `You are a helpful university campus assistant chatbot.
 A student asked: "${userQuery}"
 
@@ -117,13 +120,38 @@ When answerable is true, respond conversationally and helpfully in 1-2 sentences
 Do not add any information that is not in the knowledge provided.
 When answerable is false, return an empty response. Do not write an apology or suggest another source.
 
+${allowHoursTool ? `You can request lookup_hours for ${facility.facilityName} when the question asks about its schedule, opening, closing, or availability. Use the tool instead of guessing from campus knowledge. Resolve relative dates using the campus date ${currentDate}.` : "No hours lookup tool is available for this request."}
+
 Knowledge: "${knowledge}"`;
+
+  const tools = allowHoursTool ? [{
+    type: "function",
+    function: {
+      name: "lookup_hours",
+      description: `Look up authoritative structured hours for ${facility.facilityName}.`,
+      strict: true,
+      parameters: {
+        type: "object",
+        properties: {
+          intent: {
+            type: "string",
+            enum: ["open_now", "opening_time", "closing_time", "hours_on_date", "weekly_hours"],
+          },
+          date: { type: ["string", "null"], description: "Campus date in YYYY-MM-DD, or null when not applicable." },
+          specialEvent: { type: ["string", "null"], description: "Named period or event such as Fall Break, or null." },
+        },
+        required: ["intent", "date", "specialEvent"],
+        additionalProperties: false,
+      },
+    },
+  }] : [];
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.4,
     max_tokens: 150,
+    ...(tools.length ? { tools, tool_choice: "auto" } : {}),
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -141,6 +169,15 @@ Knowledge: "${knowledge}"`;
       },
     },
   });
+
+  const toolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "lookup_hours");
+  if (toolCall) {
+    try {
+      return { answerable: false, response: "", hoursLookup: JSON.parse(toolCall.function.arguments) };
+    } catch {
+      return { answerable: false, response: "" };
+    }
+  }
 
   try {
     const result = JSON.parse(response.choices[0].message.content);
