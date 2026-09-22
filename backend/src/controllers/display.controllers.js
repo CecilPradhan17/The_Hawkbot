@@ -31,10 +31,13 @@ const MAX_PAGE_SIZE = 50;
 
 export const displayAllPosts = async (req, res, next) => {
   try {
+    const isPaginatedRequest = req.query.limit !== undefined;
     const requestedLimit = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isInteger(requestedLimit)
-      ? Math.min(Math.max(requestedLimit, 1), MAX_PAGE_SIZE)
-      : DEFAULT_PAGE_SIZE;
+    const limit = isPaginatedRequest
+      ? (Number.isInteger(requestedLimit)
+          ? Math.min(Math.max(requestedLimit, 1), MAX_PAGE_SIZE)
+          : DEFAULT_PAGE_SIZE)
+      : null;
     const before = typeof req.query.before === 'string' ? req.query.before : null;
     const beforeId = Number.parseInt(req.query.beforeId, 10);
 
@@ -50,7 +53,10 @@ export const displayAllPosts = async (req, res, next) => {
       before,
       beforeId: before ? beforeId : null,
     });
-    res.status(200).json(page);
+
+    // Older cached/PWA clients expect the original array response. New clients
+    // opt into cursor pagination by including the limit query parameter.
+    res.status(200).json(isPaginatedRequest ? page : page.posts);
   } catch (error) {
     next(error);
   }

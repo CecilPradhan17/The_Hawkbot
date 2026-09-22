@@ -25,6 +25,7 @@
 import pool from "../db.js";
 
 export const displayPostsPageFromDB = async (userId, { limit, before, beforeId }) => {
+  const queryLimit = limit === null ? null : limit + 1;
   const res = await pool.query(
     `SELECT p.*,
             pv.vote AS user_vote
@@ -40,10 +41,10 @@ export const displayPostsPageFromDB = async (userId, { limit, before, beforeId }
        )
      ORDER BY p.created_at DESC, p.id DESC
      LIMIT $4`,
-    [userId, before, beforeId, limit + 1]
+    [userId, before, beforeId, queryLimit]
   );
 
-  const hasMore = res.rows.length > limit;
+  const hasMore = limit !== null && res.rows.length > limit;
   const posts = hasMore ? res.rows.slice(0, limit) : res.rows;
   const lastPost = posts.at(-1);
 
