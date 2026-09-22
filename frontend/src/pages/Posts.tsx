@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { getAllPosts, deletePost, votePost, getOnePost } from '@/api/posts.api'
-import type { PostResponse } from '@/api/posts.api'
+import { getPostsPage, deletePost, votePost, getOnePost } from '@/api/posts.api'
+import type { PostResponse, PostsCursor } from '@/api/posts.api'
 import Header from '@/components/Header'
 import CreatePostModal from '@/components/posts/CreatePostModal'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
@@ -19,16 +19,28 @@ export default function Posts() {
   const [answeringQuestion, setAnsweringQuestion] = useState<PostResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nextCursor, setNextCursor] = useState<PostsCursor | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const initialLoadStarted = useRef(false)
+  const pageRequestInFlight = useRef(false)
 
   const [repliesMap, setRepliesMap] = useState<Record<number, PostResponse[]>>({})
   const [repliesOpenMap, setRepliesOpenMap] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
+    if (initialLoadStarted.current) return
+    initialLoadStarted.current = true
+
     async function fetchPosts() {
       try {
-        const data = await getAllPosts()
-        setPosts(data)
-      } catch (err) {
+        const data = await getPostsPage()
+        setPosts(data.posts)
+        setNextCursor(data.nextCursor)
+        setHasMore(data.hasMore)
+      } catch {
         setError('Failed to load posts')
       } finally {
         setLoading(false)
@@ -36,6 +48,42 @@ export default function Posts() {
     }
     fetchPosts()
   }, [])
+
+  const loadMorePosts = useCallback(async () => {
+    if (!hasMore || !nextCursor || pageRequestInFlight.current) return
+
+    pageRequestInFlight.current = true
+    setLoadingMore(true)
+    setLoadMoreError(null)
+    try {
+      const data = await getPostsPage(nextCursor)
+      setPosts(previous => {
+        const existingIds = new Set(previous.map(post => post.id))
+        return [...previous, ...data.posts.filter(post => !existingIds.has(post.id))]
+      })
+      setNextCursor(data.nextCursor)
+      setHasMore(data.hasMore)
+    } catch {
+      setLoadMoreError('Could not load more posts.')
+    } finally {
+      pageRequestInFlight.current = false
+      setLoadingMore(false)
+    }
+  }, [hasMore, nextCursor])
+
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!target || loading || !hasMore || loadMoreError) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting) loadMorePosts()
+      },
+      { rootMargin: '300px 0px' }
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [hasMore, loadMoreError, loadMorePosts, loading])
 
   const handleToggleReplies = async (questionId: number) => {
     const isOpen = repliesOpenMap[questionId] ?? false
@@ -247,16 +295,35 @@ export default function Posts() {
           </div>
         )}
         {!loading && !error && (
-          <PostList
-            posts={posts}
-            repliesMap={repliesMap}
-            repliesOpenMap={repliesOpenMap}
-            onViewPost={handleViewPost}
-            onVote={handleVote}
-            onAnswerQuestion={setAnsweringQuestion}
-            onToggleReplies={handleToggleReplies}
-            currentUserId={userId}
-          />
+          <>
+            <PostList
+              posts={posts}
+              repliesMap={repliesMap}
+              repliesOpenMap={repliesOpenMap}
+              onViewPost={handleViewPost}
+              onVote={handleVote}
+              onAnswerQuestion={setAnsweringQuestion}
+              onToggleReplies={handleToggleReplies}
+              currentUserId={userId}
+            />
+            <div ref={loadMoreRef} className="py-6 text-center" aria-live="polite">
+              {loadingMore && <p className="text-sm text-slate-500">Loading more posts...</p>}
+              {loadMoreError && (
+                <div>
+                  <p className="mb-2 text-sm text-red-700">{loadMoreError}</p>
+                  <button
+                    onClick={loadMorePosts}
+                    className="rounded-lg bg-[#1B5E8A] px-4 py-2 text-sm text-white"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              {!hasMore && posts.length > 0 && (
+                <p className="text-sm text-slate-400">You've reached the end.</p>
+              )}
+            </div>
+          </>
         )}
       </main>
 

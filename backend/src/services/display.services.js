@@ -6,16 +6,15 @@
  * - Isolates raw SQL queries from controllers
  *
  * Responsibilities:
- * - Executes a SELECT query to fetch all posts from the `posts` table that have status pending
- * - Returns the results to the controller for HTTP response
+ * - Executes a cursor-paginated query for pending, top-level posts
+ * - Returns one feed page and its next cursor to the controller
  *
  * Used by:
  * - display.controllers.js
  *
  * Function:
- * - displayAllPostsFromDB()
- *   - Fetches all posts from the database
- *   - Returns an array of post objects
+ * - displayPostsPageFromDB()
+ *   - Fetches one stable, newest-first page from the database
  *
  * Notes:
  * - No HTTP logic or request/response handling should occur here
@@ -25,7 +24,7 @@
 
 import pool from "../db.js";
 
-export const displayAllPostsFromDB = async (userId) => {
+export const displayPostsPageFromDB = async (userId, { limit, before, beforeId }) => {
   const res = await pool.query(
     `SELECT p.*,
             pv.vote AS user_vote
@@ -34,8 +33,25 @@ export const displayAllPostsFromDB = async (userId) => {
        ON pv.post_id = p.id AND pv.user_id = $1
      WHERE p.status = 'pending'
        AND p.type <> 'answer'
-     ORDER BY p.created_at DESC`,
-    [userId]
+       AND (
+         $2::timestamptz IS NULL
+         OR p.created_at < $2::timestamptz
+         OR (p.created_at = $2::timestamptz AND p.id < $3::integer)
+       )
+     ORDER BY p.created_at DESC, p.id DESC
+     LIMIT $4`,
+    [userId, before, beforeId, limit + 1]
   );
-  return res.rows;
+
+  const hasMore = res.rows.length > limit;
+  const posts = hasMore ? res.rows.slice(0, limit) : res.rows;
+  const lastPost = posts.at(-1);
+
+  return {
+    posts,
+    hasMore,
+    nextCursor: hasMore && lastPost
+      ? { before: lastPost.created_at, beforeId: lastPost.id }
+      : null,
+  };
 };

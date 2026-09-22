@@ -21,6 +21,17 @@ export interface PostDetailResponse {
   answers: PostResponse[] | null
 }
 
+export interface PostsCursor {
+  before: string
+  beforeId: number
+}
+
+export interface PostsPageResponse {
+  posts: PostResponse[]
+  nextCursor: PostsCursor | null
+  hasMore: boolean
+}
+
 export interface CreatePostRequest {
  content: string
   type: 'post' | 'question' | 'answer'
@@ -39,8 +50,13 @@ export function createPost(data: CreatePostRequest): Promise<PostResponse> {
     return api.post<PostResponse>('/posts', data)
 }
 
-export function getAllPosts():Promise<PostResponse[]> {
-    return api.get<PostResponse[]>('/display')
+export function getPostsPage(cursor?: PostsCursor): Promise<PostsPageResponse> {
+  const params = new URLSearchParams({ limit: '10' })
+  if (cursor) {
+    params.set('before', cursor.before)
+    params.set('beforeId', String(cursor.beforeId))
+  }
+  return api.get<PostsPageResponse>(`/display?${params.toString()}`)
 }
 
 export function getOnePost(data: number):Promise<PostDetailResponse> {

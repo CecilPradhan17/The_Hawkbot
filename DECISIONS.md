@@ -131,3 +131,27 @@ completeness for correctness — a deliberate response to LLM hallucination risk
 domain where wrong answers (financial aid deadlines, housing policy, etc.) have real
 consequences for users. Good talking point for "how do you keep an LLM from making
 things up" style interview questions.
+
+## 2026-09-21 — Keyset pagination for the Hawkwall feed
+
+**Context:** Hawkwall loaded every top-level post in a single database query and
+rendered the entire result immediately. Feed cost therefore grew with the complete
+history, even though users initially see only the newest few posts.
+
+**Decision:** Fetch 10 posts at a time and automatically fetch the next batch as a
+viewport sentinel approaches. Pages use the compound `(created_at, id)` cursor so
+ordering remains deterministic when timestamps tie. A matching partial index covers
+only pending, non-answer feed rows in descending cursor order.
+
+**Alternatives considered:** Offset pagination was simpler but can skip or duplicate
+posts as new content is inserted and gets progressively more expensive on deep pages.
+A manual “Load more” button uses the same backend design but adds friction to browsing;
+it remains as the retry path if an automatic request fails.
+
+**Trade-offs:** Infinite scroll does not expose numbered pages or direct page links,
+and the client retains already-loaded posts for the duration of the session. Keyset
+pagination also cannot jump to an arbitrary page, which is not needed for this feed.
+
+**Resume/interview angle:** Replaced an unbounded feed query with indexed keyset
+pagination and incremental rendering, keeping query cost stable as post history grows
+while preserving deterministic ordering during concurrent inserts.
