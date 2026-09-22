@@ -50,5 +50,8 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
     .map(row => row.cleaned_content)
     .join("\n\n");
   const polished = await polisher(userMessage, combinedKnowledge);
-  return { response: polished, matched: true, similarity, sourceType: "rag" };
+  if (!polished?.answerable || !polished.response?.trim()) {
+    return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
+  }
+  return { response: polished.response.trim(), matched: true, similarity, sourceType: "rag" };
 };

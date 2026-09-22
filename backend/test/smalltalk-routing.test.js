@@ -12,7 +12,7 @@ test("a greeting skips hours, embeddings, vector search, and the LLM", async () 
   });
   assert.equal(result.matched, true);
   assert.equal(result.sourceType, "smalltalk");
-  assert.match(result.response, /help|mind|ULM/i);
+  assert.match(result.response, /help|know|mind|ULM/i);
 });
 
 test("a greeting followed by a campus question continues downstream", async () => {

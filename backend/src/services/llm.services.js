@@ -105,15 +105,17 @@ Answer: "${answer}"`;
  *
  * @param {string} userQuery - the original user question
  * @param {string} knowledge - the cleaned_content retrieved from approved_knowledge
- * @returns {Promise<string>} polished conversational response
+ * @returns {Promise<{answerable: boolean, response: string}>} grounded answerability result
  */
 export const polishResponse = async (userQuery, knowledge) => {
   const prompt = `You are a helpful university campus assistant chatbot.
 A student asked: "${userQuery}"
 
-Using ONLY the following campus knowledge, respond conversationally and helpfully in 1-2 sentences.
+Decide whether the campus knowledge directly answers the student's question.
+Set answerable to false when the knowledge is merely related but does not contain the requested fact.
+When answerable is true, respond conversationally and helpfully in 1-2 sentences.
 Do not add any information that is not in the knowledge provided.
-If the knowledge does not fully answer the question, say so honestly.
+When answerable is false, return an empty response. Do not write an apology or suggest another source.
 
 Knowledge: "${knowledge}"`;
 
@@ -122,7 +124,31 @@ Knowledge: "${knowledge}"`;
     messages: [{ role: "user", content: prompt }],
     temperature: 0.4,
     max_tokens: 150,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "grounded_campus_answer",
+        strict: true,
+        schema: {
+          type: "object",
+          properties: {
+            answerable: { type: "boolean" },
+            response: { type: "string" },
+          },
+          required: ["answerable", "response"],
+          additionalProperties: false,
+        },
+      },
+    },
   });
 
-  return response.choices[0].message.content.trim();
+  try {
+    const result = JSON.parse(response.choices[0].message.content);
+    return {
+      answerable: result.answerable === true && typeof result.response === "string" && result.response.trim().length > 0,
+      response: typeof result.response === "string" ? result.response.trim() : "",
+    };
+  } catch {
+    return { answerable: false, response: "" };
+  }
 };

@@ -21,12 +21,26 @@ test("an uncertain question falls through to the existing RAG flow", async () =>
     hoursHandler: async () => null,
     embedding: async () => { embedded = true; return [0.1, 0.2]; },
     database: { query: async () => ({ rows: [{ cleaned_content: "Verified fact", similarity: 0.9 }] }) },
-    polisher: async () => { polished = true; return "Helpful answer"; },
+    polisher: async () => { polished = true; return { answerable: true, response: "Helpful answer" }; },
   });
   assert.equal(embedded, true);
   assert.equal(polished, true);
   assert.equal(result.sourceType, "rag");
   assert.equal(result.response, "Helpful answer");
+});
+
+test("an unanswerable retrieved match uses the HawkWall fallback", async () => {
+  const result = await handleChatQuery("Is dining open during Fall Break?", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    database: { query: async () => ({ rows: [{ cleaned_content: "Dining serves lunch daily", similarity: 0.9 }] }) },
+    polisher: async () => ({ answerable: false, response: "" }),
+  });
+  assert.deepEqual(result, {
+    response: "I don't have the answer to that yet. Try posting this question on the HawkWall and another student can answer you!",
+    matched: false,
+    sourceType: "fallback",
+  });
 });
 
 test("the original honest fallback remains when RAG has no confident match", async () => {
