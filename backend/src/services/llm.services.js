@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { normalizeGroundedResponse } from "./rag-grounding.services.js";
+import { normalizeKnowledgeChunks } from "./knowledge-curation.services.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -10,31 +11,10 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  * 2. polishResponse() - rewrites retrieved knowledge conversationally for the user.
  *
  * KEY DESIGN DECISIONS:
- * - All content stored as "Q: ...\nA: ..." format for better embedding recall
- * - Question phrasings include both full names AND abbreviations/short forms/nicknames
- * - Day-specific facts MUST have day-specific questions only — but ONLY when the fact
- *   actually mentions a specific day. Non-day facts get natural open-ended questions.
+ * - Approved content is split into self-contained atomic facts
+ * - Aliases are preserved only when the source explicitly provides them
  * - LLM is never asked to generate new campus information
  */
-
-const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-
-/**
- * Returns true if the text mentions a specific day of the week.
- */
-const mentionsDay = (text) =>
-  DAYS.some(day => text.toLowerCase().includes(day));
-
-const DAY_SPECIFIC_INSTRUCTION = `
-CRITICAL RULE: This fact is specific to a particular day.
-ALL 4-5 question phrasings MUST include that specific day name.
-NEVER write generic phrasings like "What are the hours?" or "What time does X open?" without the day name — these cause retrieval conflicts with other day-specific entries.
-Good example for a Saturday fact: "What time does the AC open on Saturdays?" / "When does the AC close on Saturdays?" / "Is the AC open on Saturdays?"
-Bad example: "What are the AC hours?" / "When does the AC open?" (missing the day = conflict)`;
-
-const GENERAL_INSTRUCTION = `
-Write varied, natural question phrasings covering different ways a student might ask about this topic.
-Do NOT force day names into questions if the fact is not about a specific day.`;
 
 /**
  * Transforms raw content into a retrieval-optimized Q+A format.
@@ -44,29 +24,28 @@ Do NOT force day names into questions if the fact is not about a specific day.`;
  * @param {string} [params.content] - raw fact/statement (for type='post')
  * @param {string} [params.question] - raw question (for type='question')
  * @param {string} [params.answer] - raw answer (for type='question')
- * @returns {Promise<string>} retrieval-optimized "Q: ...\nA: ..." string
+ * @returns {Promise<string>} first retrieval-optimized atomic fact
  */
 export const cleanContent = async ({ type, content, question, answer }) => {
-  let prompt;
+  const chunks = await curateKnowledge({ type, content, question, answer });
+  return chunks[0];
+};
 
-  // Determine if this fact is day-specific so we inject the right instruction
-  const textToCheck = type === "post" ? content : `${question} ${answer}`;
-  const dayInstruction = mentionsDay(textToCheck)
-    ? DAY_SPECIFIC_INSTRUCTION
-    : GENERAL_INSTRUCTION;
+/**
+ * Splits source material into self-contained, retrieval-optimized facts.
+ * A short, single-topic source still produces one chunk.
+ */
+export const curateKnowledge = async ({ type, content, question, answer }) => {
+  let prompt;
 
   if (type === "post") {
     prompt = `You are preparing campus knowledge for a university chatbot's knowledge base.
 
-Given the following campus fact, do two things:
-1. Write 4-5 natural question phrasings that students might ask to find this information.
-   - If the fact mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
-   ${dayInstruction}
-2. Write a clean, clear answer based strictly on the fact provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
-
-Return in this exact format:
-Q: <question 1> | <question 2> | <question 3> | <question 4> | <question 5>
-A: <clean answer>
+Break the campus information into the smallest self-contained facts that can answer a student independently.
+Keep related details together when separating them would make the answer incomplete, but split unrelated topics, services, rules, dates, or procedures.
+For each fact:
+Write one concise, self-contained statement. Include necessary subject names, dates, and qualifiers so it makes sense without the other facts.
+Preserve abbreviations, alternate names, or nicknames only when they appear in the source. Do not invent aliases.
 
 Do not add any information not present in the fact. Do not add any preamble or explanation.
 
@@ -74,15 +53,11 @@ Fact: "${content}"`;
   } else {
     prompt = `You are preparing campus knowledge for a university chatbot's knowledge base.
 
-Given the following student question and answer, do two things:
-1. Write 4-5 natural question phrasings that students might ask to find this information (include the original question).
-   - If the question or answer mentions a place, building, or service that has a common abbreviation, short form, or colloquial nickname (e.g. "Activity Center" → "AC", "Student Success Center" → "SSC", "Schulze Dining Hall" → "cafeteria" / "dining hall" / "the caf"), include question phrasings that use both the official name and the informal names students might use.
-   ${dayInstruction}
-2. Write a clean, clear answer based strictly on the answer provided. Include both the full name and any common abbreviation or nickname if one exists (e.g. "Activity Center (AC)", "Schulze Dining Hall (also known as the cafeteria)").
-
-Return in this exact format:
-Q: <question 1> | <question 2> | <question 3> | <question 4> | <question 5>
-A: <clean answer>
+Break the answer into the smallest self-contained facts that can answer a student independently.
+Keep related details together when separating them would make the answer incomplete, but split unrelated topics, services, rules, dates, or procedures.
+For each fact:
+Write one concise, self-contained statement based strictly on the provided answer. Include necessary subject names, dates, and qualifiers so it makes sense without the other facts.
+Preserve abbreviations, alternate names, or nicknames only when they appear in the question or answer. Do not invent aliases.
 
 Do not add any information not present in the answer. Do not add any preamble or explanation.
 
@@ -90,14 +65,45 @@ Question: "${question}"
 Answer: "${answer}"`;
   }
 
+  prompt += `\n\nReturn JSON matching the requested schema. Return one chunk when the source contains only one fact. Never repeat a fact across chunks. Do not add information from outside the source.`;
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
-    max_tokens: 400,
+    max_tokens: 2500,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "curated_knowledge_chunks",
+        strict: true,
+        schema: {
+          type: "object",
+          properties: {
+            chunks: {
+              type: "array",
+              minItems: 1,
+              maxItems: 12,
+              items: {
+                type: "object",
+                properties: {
+                  fact: { type: "string" },
+                },
+                required: ["fact"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["chunks"],
+          additionalProperties: false,
+        },
+      },
+    },
   });
 
-  return response.choices[0].message.content.trim();
+  const chunks = normalizeKnowledgeChunks(JSON.parse(response.choices[0].message.content));
+  if (chunks.length === 0) throw new Error("Knowledge curation returned no usable facts");
+  return chunks;
 };
 
 /**

@@ -31,6 +31,55 @@ test("an uncertain question falls through to the existing RAG flow", async () =>
   assert.deepEqual(result.knowledgeIds, [1]);
 });
 
+test("uses an alias-expanded copy for retrieval but preserves the original question for answering", async () => {
+  let embeddedQuery;
+  let retrievedQuery;
+  let polishedQuery;
+  const original = "where is the caf";
+  const expanded = "where is the caf Schulze Dining Hall";
+  const result = await handleChatQuery(original, {
+    hoursHandler: async () => null,
+    aliasExpander: async query => {
+      assert.equal(query, original);
+      return expanded;
+    },
+    embedding: async query => { embeddedQuery = query; return [0.1]; },
+    retriever: async (_embedding, query) => {
+      retrievedQuery = query;
+      return [{ id: 1, cleaned_content: "Schulze Dining Hall is on campus.", similarity: 0.9 }];
+    },
+    hoursToolContext: async () => null,
+    polisher: async query => {
+      polishedQuery = query;
+      return { answerable: true, response: "The caf is Schulze Dining Hall.", relevantCandidateIds: [1] };
+    },
+  });
+
+  assert.equal(embeddedQuery, expanded);
+  assert.equal(retrievedQuery, expanded);
+  assert.equal(polishedQuery, original);
+  assert.equal(result.sourceType, "rag");
+});
+
+test("continues with the original query when alias expansion is unavailable", async () => {
+  let embeddedQuery;
+  const originalError = console.error;
+  console.error = () => {};
+  try {
+    const result = await handleChatQuery("campus question", {
+      hoursHandler: async () => null,
+      aliasExpander: async () => { throw new Error("alias store unavailable"); },
+      embedding: async query => { embeddedQuery = query; return [0.1]; },
+      retriever: async () => [],
+      hoursToolContext: async () => null,
+    });
+    assert.equal(embeddedQuery, "campus question");
+    assert.equal(result.sourceType, "fallback");
+  } finally {
+    console.error = originalError;
+  }
+});
+
 test("an unanswerable retrieved match uses the HawkWall fallback", async () => {
   const result = await handleChatQuery("Is dining open during Fall Break?", {
     hoursHandler: async () => null,

@@ -39,8 +39,9 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import pool from "./db.js";
-import { cleanContent } from "./services/llm.services.js";
+import { curateKnowledge } from "./services/llm.services.js";
 import { generateEmbedding } from "./services/embedding.services.js";
+import { storeApprovedKnowledge } from "./services/approved-knowledge.services.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -82,22 +83,20 @@ const run = async () => {
       console.log(`⚙️  Processing: "${rawContent.substring(0, 60)}..."`);
 
       // Generate retrieval-optimized Q+A format
-      const cleanedContent = await cleanContent({
+      const knowledgeChunks = await curateKnowledge({
         type: "post",
         content: rawContent,
       });
 
-      console.log(`   Cleaned: "${cleanedContent.substring(0, 80)}..."`);
+      console.log(`   Curated into ${knowledgeChunks.length} fact(s)`);
 
-      // Generate embedding from the cleaned Q+A content
-      const embedding = await generateEmbedding(cleanedContent);
-
-      // Insert — source_post_id is NULL for admin-seeded entries
-      await pool.query(
-        `INSERT INTO approved_knowledge (source_post_id, cleaned_content, raw_content, embedding)
-         VALUES ($1, $2, $3, $4)`,
-        [null, cleanedContent, rawContent.trim(), JSON.stringify(embedding)]
-      );
+      await storeApprovedKnowledge({
+        db: pool,
+        sourcePostId: null,
+        rawContent: rawContent.trim(),
+        chunks: knowledgeChunks,
+        generateEmbedding,
+      });
 
       console.log(`✅ Inserted\n`);
       inserted++;

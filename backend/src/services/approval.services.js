@@ -1,6 +1,7 @@
 import pool from "../db.js";
-import { cleanContent } from "./llm.services.js";
+import { curateKnowledge } from "./llm.services.js";
 import { generateEmbedding } from "./embedding.services.js";
+import { storeApprovedKnowledge } from "./approved-knowledge.services.js";
 
 /**
  * PURPOSE:
@@ -9,9 +10,9 @@ import { generateEmbedding } from "./embedding.services.js";
  *
  * WORKFLOW:
  * 1. Fetch the approved answer and its parent question from posts
- * 2. Call LLM once to clean the content
- * 3. Generate embedding from cleaned content
- * 4. Insert into approved_knowledge
+ * 2. Call the LLM once to split and clean it into atomic facts
+ * 3. Generate one embedding per fact
+ * 4. Store every fact atomically in approved_knowledge
  *
  * USED BY:
  * - vote.service.js -> processApproval()
@@ -40,22 +41,19 @@ export const processApproval = async (answerId, parentQuestionId) => {
     const answer = answerRes.rows[0];
     const question = questionRes.rows[0];
 
-    // Clean the Q+A pair using LLM (called once per approval)
-    const cleanedContent = await cleanContent({
+    // Curate the Q+A pair using one LLM call per approval.
+    const knowledgeChunks = await curateKnowledge({
       type: "question",
       question: question.content,
       answer: answer.content,
     });
 
-    // Generate embedding from cleaned content
-    const embedding = await generateEmbedding(cleanedContent);
-
-    // Insert into approved_knowledge
-    await pool.query(
-      `INSERT INTO approved_knowledge (source_post_id, cleaned_content, embedding)
-       VALUES ($1, $2, $3)`,
-      [answer.id, cleanedContent, JSON.stringify(embedding)]
-    );
+    await storeApprovedKnowledge({
+      db: pool,
+      sourcePostId: answer.id,
+      chunks: knowledgeChunks,
+      generateEmbedding,
+    });
 
     console.log(`Approved knowledge stored for answer ID ${answerId}`);
   } catch (err) {
@@ -81,18 +79,17 @@ export const processPostApproval = async (postId) => {
 
     const post = postRes.rows[0];
 
-    const cleanedContent = await cleanContent({
+    const knowledgeChunks = await curateKnowledge({
       type: "post",
       content: post.content,
     });
 
-    const embedding = await generateEmbedding(cleanedContent);
-
-    await pool.query(
-      `INSERT INTO approved_knowledge (source_post_id, cleaned_content, embedding)
-       VALUES ($1, $2, $3)`,
-      [post.id, cleanedContent, JSON.stringify(embedding)]
-    );
+    await storeApprovedKnowledge({
+      db: pool,
+      sourcePostId: post.id,
+      chunks: knowledgeChunks,
+      generateEmbedding,
+    });
 
     console.log(`Approved knowledge stored for post ID ${postId}`);
   } catch (err) {

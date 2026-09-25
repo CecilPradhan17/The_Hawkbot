@@ -5,6 +5,8 @@ import { polishResponse } from "./llm.services.js";
 import { getHoursToolContext, resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
 import { formatKnowledgeCandidates, isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
+import { expandCampusPlaceAliases } from "./campus-place-alias.services.js";
+import { getFacilityDictionary } from "./hours-repository.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -16,14 +18,25 @@ const FALLBACK_MESSAGE =
 
 export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;
-  const hoursHandler = dependencies.hoursHandler || tryHandleHoursQuery;
   const embedding = dependencies.embedding || generateQueryEmbedding;
   const database = dependencies.database || pool;
+  let facilityDictionaryPromise;
+  const facilityDictionary = dependencies.facilityDictionary || (() => {
+    facilityDictionaryPromise ||= getFacilityDictionary(database);
+    return facilityDictionaryPromise;
+  });
+  const hoursHandler = dependencies.hoursHandler
+    || (query => tryHandleHoursQuery(query, { dictionary: facilityDictionary }));
   const retriever = dependencies.retriever
     || ((queryEmbedding, queryText) => retrieveKnowledgeCandidates(queryEmbedding, queryText, { database }));
   const polisher = dependencies.polisher || polishResponse;
-  const hoursToolContext = dependencies.hoursToolContext || getHoursToolContext;
+  const hoursToolContext = dependencies.hoursToolContext
+    || (query => getHoursToolContext(query, { dictionary: facilityDictionary }));
   const hoursToolResolver = dependencies.hoursToolResolver || resolveHoursToolLookup;
+  const aliasExpander = dependencies.aliasExpander
+    || (dependencies.retriever
+      ? async query => query
+      : query => expandCampusPlaceAliases(query, { dictionary: facilityDictionary }));
 
   const smalltalkResult = await smalltalkHandler(userMessage);
   if (smalltalkResult) return smalltalkResult;
@@ -33,8 +46,15 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const hoursResult = await hoursHandler(userMessage);
   if (hoursResult) return hoursResult;
 
-  const queryEmbedding = await embedding(userMessage);
-  const candidates = await retriever(queryEmbedding, userMessage);
+  let retrievalQuery = userMessage;
+  try {
+    retrievalQuery = await aliasExpander(userMessage);
+  } catch (error) {
+    // Alias expansion improves recall but must never prevent ordinary RAG.
+    console.error("Campus place alias expansion failed:", error.message);
+  }
+  const queryEmbedding = await embedding(retrievalQuery);
+  const candidates = await retriever(queryEmbedding, retrievalQuery);
 
   const vectorScores = candidates.map(row => Number(row.similarity)).filter(Number.isFinite);
   const similarity = vectorScores.length ? Math.max(...vectorScores).toFixed(4) : null;
