@@ -4,15 +4,13 @@ import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
 import { getHoursToolContext, resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
-import { retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
+import { isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
  * A confident hours match returns immediately without an embedding or LLM call.
  * Uncertain and non-hours questions preserve the original RAG behavior.
  */
-const SIMILARITY_THRESHOLD = 0.50;
-
 const FALLBACK_MESSAGE =
   "I don't have the answer to that yet. Try posting this question on the HawkWall and another student can answer you!";
 
@@ -22,7 +20,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const embedding = dependencies.embedding || generateQueryEmbedding;
   const database = dependencies.database || pool;
   const retriever = dependencies.retriever
-    || (queryEmbedding => retrieveKnowledgeCandidates(queryEmbedding, { database }));
+    || ((queryEmbedding, queryText) => retrieveKnowledgeCandidates(queryEmbedding, queryText, { database }));
   const polisher = dependencies.polisher || polishResponse;
   const hoursToolContext = dependencies.hoursToolContext || getHoursToolContext;
   const hoursToolResolver = dependencies.hoursToolResolver || resolveHoursToolLookup;
@@ -36,11 +34,11 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   if (hoursResult) return hoursResult;
 
   const queryEmbedding = await embedding(userMessage);
-  const candidates = await retriever(queryEmbedding);
+  const candidates = await retriever(queryEmbedding, userMessage);
 
-  const topMatch = candidates[0];
-  const similarity = topMatch ? parseFloat(topMatch.similarity).toFixed(4) : null;
-  const confidentRows = candidates.filter(row => row.similarity >= SIMILARITY_THRESHOLD);
+  const vectorScores = candidates.map(row => Number(row.similarity)).filter(Number.isFinite);
+  const similarity = vectorScores.length ? Math.max(...vectorScores).toFixed(4) : null;
+  const confidentRows = candidates.filter(isConfidentCandidate);
   let facility = null;
   try {
     facility = await hoursToolContext(userMessage);

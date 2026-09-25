@@ -122,3 +122,25 @@ test("passes all confident candidates from the expanded retrieval pool to the ex
   assert.equal(receivedKnowledge.split("\n\n").length, 10);
   assert.equal(result.response, "Grounded answer");
 });
+
+test("keeps an exact full-text candidate even when its vector similarity is below threshold", async () => {
+  let receivedKnowledge;
+  const result = await handleChatQuery("Where is Banner?", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    retriever: async () => [{
+      id: 7,
+      cleaned_content: "Banner is the student information system.",
+      similarity: 0.31,
+      vector_rank: 9,
+      text_rank: 1,
+    }],
+    hoursToolContext: async () => null,
+    polisher: async (_query, knowledge) => {
+      receivedKnowledge = knowledge;
+      return { answerable: true, response: "Banner is the student information system." };
+    },
+  });
+  assert.match(receivedKnowledge, /Banner/);
+  assert.equal(result.sourceType, "rag");
+});
