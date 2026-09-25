@@ -15,61 +15,42 @@ export default function Header({ rightContent }: HeaderProps) {
   const location = useLocation()
   const isOnChat = location.pathname === '/chat'
   const [animKey, setAnimKey] = useState(0)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const destination = isOnChat ? '/posts' : '/chat'
   const navigationLabel = isOnChat ? '← Hawkwall' : 'Ask Hawkbot'
 
   const navigateBetweenFeatures = () => {
-    setMobileMenuOpen(false)
+    setMenuOpen(false)
     navigate(destination)
   }
 
   useEffect(() => {
-    if (!mobileMenuOpen) return
+    if (!menuOpen) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     closeButtonRef.current?.focus()
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileMenuOpen(false)
+      if (event.key === 'Escape') setMenuOpen(false)
     }
     window.addEventListener('keydown', handleEscape)
     return () => {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [mobileMenuOpen])
+  }, [menuOpen])
 
   return (
     <>
       <header className="relative z-40 border-b border-[#6d1c3a] bg-[#8A244B] px-4 py-3 sm:px-6 sm:py-4">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <div className="hidden min-w-0 items-center gap-5 sm:flex">
-            <button
-              onClick={() => setAnimKey(key => key + 1)}
-              className="flex shrink-0 cursor-pointer select-none border-none bg-transparent p-0"
-              aria-label="Replay Hawkbot animation"
-            >
-              <HawkbotTitle animKey={animKey} />
-            </button>
-            <button
-              onClick={navigateBetweenFeatures}
-              className="group relative w-fit shrink-0"
-              aria-label={isOnChat ? 'Go to Hawkwall' : 'Go to Hawkbot'}
-            >
-              <span className="block translate-y-0 whitespace-nowrap rounded-xl bg-[#6d1c3a] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-all duration-100 ease-in-out [font-family:'Playfair_Display',serif] group-hover:translate-y-[2px] group-hover:shadow-[0_4px_0_rgba(0,0,0,0.35)] group-active:translate-y-[5px] group-active:shadow-[0_1px_0_rgba(0,0,0,0.35)]">
-                {navigationLabel}
-              </span>
-            </button>
-          </div>
-
           <button
             type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg text-white transition hover:bg-[#6d1c3a] sm:hidden"
+            onClick={() => setMenuOpen(true)}
+            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg text-white transition hover:bg-[#6d1c3a]"
             aria-label="Open navigation menu"
-            aria-expanded={mobileMenuOpen}
+            aria-expanded={menuOpen}
             aria-controls="mobile-navigation"
           >
             <span className="h-0.5 w-6 rounded bg-current" />
@@ -83,12 +64,12 @@ export default function Header({ rightContent }: HeaderProps) {
         </div>
       </header>
 
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 sm:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+      {menuOpen && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Navigation menu">
           <button
             type="button"
             className="absolute inset-0 bg-black/45"
-            onClick={() => setMobileMenuOpen(false)}
+            onClick={() => setMenuOpen(false)}
             aria-label="Close navigation menu"
           />
           <nav id="mobile-navigation" className="relative flex h-full w-[min(82vw,20rem)] flex-col bg-[#8A244B] px-5 py-5 shadow-2xl">
@@ -103,7 +84,7 @@ export default function Header({ rightContent }: HeaderProps) {
               <button
                 ref={closeButtonRef}
                 type="button"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() => setMenuOpen(false)}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-2xl text-white transition hover:bg-[#6d1c3a]"
                 aria-label="Close navigation menu"
               >
