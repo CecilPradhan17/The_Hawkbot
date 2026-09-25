@@ -15,45 +15,113 @@ export default function Header({ rightContent }: HeaderProps) {
   const location = useLocation()
   const isOnChat = location.pathname === '/chat'
   const [animKey, setAnimKey] = useState(0)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const destination = isOnChat ? '/posts' : '/chat'
+  const navigationLabel = isOnChat ? '← Hawkwall' : 'Ask Hawkbot'
+
+  const navigateBetweenFeatures = () => {
+    setMobileMenuOpen(false)
+    navigate(destination)
+  }
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeButtonRef.current?.focus()
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [mobileMenuOpen])
 
   return (
-    <header className="bg-[#8A244B] border-b border-[#6d1c3a] px-4 sm:px-6 py-3 sm:py-4 z-40">
-      <div className="max-w-6xl mx-auto grid grid-cols-3 items-center gap-2">
-
-        {/* Left — nav icon button */}
-        <button
-          onClick={() => navigate(isOnChat ? '/posts' : '/chat')}
-          className="group relative flex-shrink-0 w-fit"
-          aria-label={isOnChat ? 'Go to Feed' : 'Go to Chatbot'}
-        >
-          <div className="
-              px-2 py-2 sm:px-3 sm:py-1.5 rounded-xl bg-[#6d1c3a] text-white text-xs sm:text-sm font-semibold whitespace-nowrap [font-family:'Playfair_Display',serif]
-              shadow-[0_6px_0_rgba(0,0,0,0.35)]
-              translate-y-0
-              transition-all duration-100 ease-in-out
-              group-hover:shadow-[0_4px_0_rgba(0,0,0,0.35)] group-hover:translate-y-[2px]
-              group-active:shadow-[0_1px_0_rgba(0,0,0,0.35)] group-active:translate-y-[5px]
-            ">
-            {isOnChat ? '← Posts' : 'Ask Hawkbot'}
+    <>
+      <header className="relative z-40 border-b border-[#6d1c3a] bg-[#8A244B] px-4 py-3 sm:px-6 sm:py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <div className="hidden min-w-0 items-center gap-5 sm:flex">
+            <button
+              onClick={() => setAnimKey(key => key + 1)}
+              className="flex shrink-0 cursor-pointer select-none border-none bg-transparent p-0"
+              aria-label="Replay Hawkbot animation"
+            >
+              <HawkbotTitle animKey={animKey} />
+            </button>
+            <button
+              onClick={navigateBetweenFeatures}
+              className="group relative w-fit shrink-0"
+              aria-label={isOnChat ? 'Go to Hawkwall' : 'Go to Hawkbot'}
+            >
+              <span className="block translate-y-0 whitespace-nowrap rounded-xl bg-[#6d1c3a] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_6px_0_rgba(0,0,0,0.35)] transition-all duration-100 ease-in-out [font-family:'Playfair_Display',serif] group-hover:translate-y-[2px] group-hover:shadow-[0_4px_0_rgba(0,0,0,0.35)] group-active:translate-y-[5px] group-active:shadow-[0_1px_0_rgba(0,0,0,0.35)]">
+                {navigationLabel}
+              </span>
+            </button>
           </div>
-        </button>
 
-        {/* Center — animated cursive SVG title */}
-        <button
-          onClick={() => setAnimKey(k => k + 1)}
-          className="flex ml-4 justify-center cursor-pointer select-none bg-transparent border-none p-0 -translate-x-3 sm:translate-x-0"
-          aria-label="Replay Hawkbot animation"
-        >
-          <HawkbotTitle animKey={animKey} />
-        </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg text-white transition hover:bg-[#6d1c3a] sm:hidden"
+            aria-label="Open navigation menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
+          >
+            <span className="h-0.5 w-6 rounded bg-current" />
+            <span className="h-0.5 w-6 rounded bg-current" />
+            <span className="h-0.5 w-6 rounded bg-current" />
+          </button>
 
-        {/* Right — page-specific actions */}
-        <div className="flex gap-2 sm:gap-3 items-center justify-end">
-          {rightContent}
+          <div className="flex items-center justify-end gap-2 sm:gap-3">
+            {rightContent}
+          </div>
         </div>
+      </header>
 
-      </div>
-    </header>
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 sm:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation menu"
+          />
+          <nav id="mobile-navigation" className="relative flex h-full w-[min(82vw,20rem)] flex-col bg-[#8A244B] px-5 py-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                onClick={() => setAnimKey(key => key + 1)}
+                className="flex cursor-pointer select-none border-none bg-transparent p-0"
+                aria-label="Replay Hawkbot animation"
+              >
+                <HawkbotTitle animKey={animKey} />
+              </button>
+              <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-2xl text-white transition hover:bg-[#6d1c3a]"
+                aria-label="Close navigation menu"
+              >
+                ×
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={navigateBetweenFeatures}
+              className="mt-8 w-full rounded-xl bg-white px-4 py-3 text-left font-semibold text-[#8A244B] shadow-sm transition active:scale-[0.98]"
+            >
+              {navigationLabel}
+            </button>
+          </nav>
+        </div>
+      )}
+    </>
   )
 }
 
