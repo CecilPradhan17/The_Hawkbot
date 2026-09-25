@@ -155,3 +155,27 @@ pagination also cannot jump to an arbitrary page, which is not needed for this f
 **Resume/interview angle:** Replaced an unbounded feed query with indexed keyset
 pagination and incremental rendering, keeping query cost stable as post history grows
 while preserving deterministic ordering during concurrent inserts.
+
+## 2026-09-25 — Session cache for Hawkwall route navigation
+
+**Context:** React Router unmounted Hawkwall when a user opened chat, discarding the
+loaded feed, pagination cursor, expanded replies, and scroll position. Returning to
+Hawkwall therefore repeated the first-page request even when the data had just loaded.
+
+**Decision:** Keep Hawkwall feed state in a user-scoped provider above the routes. A
+return within 120 seconds restores the retained feed and scroll position without a
+request. After 120 seconds, retained posts remain visible while the newest page is
+refetched in the background and pagination restarts from that fresh page.
+
+**Alternatives considered:** Keeping both complete route trees mounted would preserve
+local component state but retain hidden DOM and complicate scroll and modal behavior.
+Reconciling every cached post individually would retain deep pages during refresh but
+adds API and cache complexity that the current feed does not need.
+
+**Trade-offs:** A stale refresh intentionally discards previously loaded deeper pages
+and cached replies. The cache lasts only for the active browser session and is reset
+when the authenticated user changes, avoiding cross-account feed state.
+
+**Resume/interview angle:** Added a stale-while-revalidate route cache that removes
+redundant navigation fetches while retaining a bounded freshness policy and isolating
+personalized state by authenticated user.

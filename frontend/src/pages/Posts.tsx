@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { getPostsPage, deletePost, votePost, getOnePost } from '@/api/posts.api'
-import type { PostResponse, PostsCursor } from '@/api/posts.api'
+import type { PostResponse } from '@/api/posts.api'
 import Header from '@/components/Header'
 import CreatePostModal from '@/components/posts/CreatePostModal'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
@@ -9,45 +9,84 @@ import AnswerQuestionModal from '@/components/posts/AnswerQuestionModal'
 import PostList from '@/components/posts/PostList'
 import PostListSkeleton from '@/components/posts/PostListSkeleton'
 import PostDetailModal from '@/components/posts/PostDetailModal'
+import { useHawkwallFeed } from '@/context/useHawkwallFeed'
+
+const FEED_FRESHNESS_MS = 120_000
 
 export default function Posts() {
   const { userId } = useAuth()
-  const [posts, setPosts] = useState<PostResponse[]>([])
+  const {
+    posts,
+    setPosts,
+    nextCursor,
+    setNextCursor,
+    hasMore,
+    setHasMore,
+    repliesMap,
+    setRepliesMap,
+    repliesOpenMap,
+    setRepliesOpenMap,
+    lastFetchedAt,
+    setLastFetchedAt,
+    scrollPosition,
+    setScrollPosition,
+  } = useHawkwallFeed()
   const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showAskModal, setShowAskModal] = useState(false)
   const [answeringQuestion, setAnsweringQuestion] = useState<PostResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(lastFetchedAt === 0)
   const [error, setError] = useState<string | null>(null)
-  const [nextCursor, setNextCursor] = useState<PostsCursor | null>(null)
-  const [hasMore, setHasMore] = useState(true)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const initialLoadStarted = useRef(false)
   const pageRequestInFlight = useRef(false)
 
-  const [repliesMap, setRepliesMap] = useState<Record<number, PostResponse[]>>({})
-  const [repliesOpenMap, setRepliesOpenMap] = useState<Record<number, boolean>>({})
+  const refreshPosts = useCallback(async () => {
+    const hasCachedFeed = lastFetchedAt > 0
+    setError(null)
+    setRefreshError(null)
+    if (!hasCachedFeed) setLoading(true)
+    try {
+      const data = await getPostsPage()
+      setPosts(data.posts)
+      setNextCursor(data.nextCursor)
+      setHasMore(data.hasMore)
+      setRepliesMap({})
+      setRepliesOpenMap({})
+      setLastFetchedAt(Date.now())
+    } catch {
+      if (hasCachedFeed) {
+        setRefreshError('Could not refresh posts. Showing the previously loaded feed.')
+      } else {
+        setError('Failed to load posts')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [lastFetchedAt, setHasMore, setLastFetchedAt, setNextCursor, setPosts, setRepliesMap, setRepliesOpenMap])
 
   useEffect(() => {
     if (initialLoadStarted.current) return
     initialLoadStarted.current = true
 
-    async function fetchPosts() {
-      try {
-        const data = await getPostsPage()
-        setPosts(data.posts)
-        setNextCursor(data.nextCursor)
-        setHasMore(data.hasMore)
-      } catch {
-        setError('Failed to load posts')
-      } finally {
-        setLoading(false)
-      }
+    const hasCachedFeed = lastFetchedAt > 0
+    const isFresh = hasCachedFeed && Date.now() - lastFetchedAt < FEED_FRESHNESS_MS
+    if (isFresh) {
+      setLoading(false)
+      requestAnimationFrame(() => window.scrollTo({ top: scrollPosition }))
+      return
     }
-    fetchPosts()
-  }, [])
+
+    window.scrollTo({ top: 0 })
+    void refreshPosts()
+  }, [lastFetchedAt, refreshPosts, scrollPosition])
+
+  useEffect(() => {
+    return () => setScrollPosition(window.scrollY)
+  }, [setScrollPosition])
 
   const loadMorePosts = useCallback(async () => {
     if (!hasMore || !nextCursor || pageRequestInFlight.current) return
@@ -69,7 +108,7 @@ export default function Posts() {
       pageRequestInFlight.current = false
       setLoadingMore(false)
     }
-  }, [hasMore, nextCursor])
+  }, [hasMore, nextCursor, setHasMore, setNextCursor, setPosts])
 
   useEffect(() => {
     const target = loadMoreRef.current
@@ -292,6 +331,12 @@ export default function Posts() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             {error}
+          </div>
+        )}
+        {refreshError && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+            <span>{refreshError}</span>
+            <button onClick={() => void refreshPosts()} className="font-semibold underline">Try again</button>
           </div>
         )}
         {!loading && !error && (

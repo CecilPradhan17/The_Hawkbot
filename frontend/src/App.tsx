@@ -10,23 +10,28 @@ import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
 import ServerWakeModal from '@/components/ServerWakeModal'
 import PwaUpdatePrompt from '@/components/PwaUpdatePrompt'
 import { Analytics } from '@vercel/analytics/react'
+import { HawkwallFeedProvider } from '@/context/HawkwallFeedContext'
+import { useAuth } from '@/context/AuthContext'
 
 function AppInner() {
   const { isWaking } = useServerWake()
+  const { userId } = useAuth()
 
   return (
     <>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <HawkwallFeedProvider key={userId ?? 'anonymous'}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/posts" element={<Posts />} />
-          <Route path="/chat" element={<Chatbot />} />
-          <Route path="/hours/admin" element={<HoursAdmin />} />
-        </Route>
-      </Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/posts" element={<Posts />} />
+            <Route path="/chat" element={<Chatbot />} />
+            <Route path="/hours/admin" element={<HoursAdmin />} />
+          </Route>
+        </Routes>
+      </HawkwallFeedProvider>
 
       <ServerWakeModal isWaking={isWaking} />
       <PwaUpdatePrompt />
