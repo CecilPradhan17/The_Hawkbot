@@ -4,6 +4,7 @@ import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
 import { getHoursToolContext, resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
+import { retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -20,6 +21,8 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const hoursHandler = dependencies.hoursHandler || tryHandleHoursQuery;
   const embedding = dependencies.embedding || generateQueryEmbedding;
   const database = dependencies.database || pool;
+  const retriever = dependencies.retriever
+    || (queryEmbedding => retrieveKnowledgeCandidates(queryEmbedding, { database }));
   const polisher = dependencies.polisher || polishResponse;
   const hoursToolContext = dependencies.hoursToolContext || getHoursToolContext;
   const hoursToolResolver = dependencies.hoursToolResolver || resolveHoursToolLookup;
@@ -33,18 +36,11 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   if (hoursResult) return hoursResult;
 
   const queryEmbedding = await embedding(userMessage);
-  const result = await database.query(
-    `SELECT cleaned_content,
-            1 - (embedding <=> $1::vector) AS similarity
-     FROM approved_knowledge
-     ORDER BY embedding <=> $1::vector
-     LIMIT 3`,
-    [JSON.stringify(queryEmbedding)]
-  );
+  const candidates = await retriever(queryEmbedding);
 
-  const topMatch = result.rows[0];
+  const topMatch = candidates[0];
   const similarity = topMatch ? parseFloat(topMatch.similarity).toFixed(4) : null;
-  const confidentRows = result.rows.filter(row => row.similarity >= SIMILARITY_THRESHOLD);
+  const confidentRows = candidates.filter(row => row.similarity >= SIMILARITY_THRESHOLD);
   let facility = null;
   try {
     facility = await hoursToolContext(userMessage);

@@ -99,3 +99,26 @@ test("a failed hours tool lookup resumes grounded RAG answering", async () => {
   assert.equal(result.response, "Grounded RAG answer");
   assert.equal(result.sourceType, "rag");
 });
+
+test("passes all confident candidates from the expanded retrieval pool to the existing AI call", async () => {
+  const candidates = Array.from({ length: 10 }, (_, index) => ({
+    id: index + 1,
+    cleaned_content: `Candidate ${index + 1}`,
+    similarity: 0.9 - index * 0.01,
+  }));
+  let receivedKnowledge;
+  const result = await handleChatQuery("Broad campus question", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    retriever: async () => candidates,
+    hoursToolContext: async () => null,
+    polisher: async (_query, knowledge) => {
+      receivedKnowledge = knowledge;
+      return { answerable: true, response: "Grounded answer" };
+    },
+  });
+  assert.match(receivedKnowledge, /Candidate 1/);
+  assert.match(receivedKnowledge, /Candidate 10/);
+  assert.equal(receivedKnowledge.split("\n\n").length, 10);
+  assert.equal(result.response, "Grounded answer");
+});
