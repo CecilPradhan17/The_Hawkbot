@@ -115,8 +115,10 @@ Answer: "${answer}"`;
  * @returns {Promise<{answerable: boolean, response: string, relevantCandidateIds?: number[]}>} grounded answerability result
  */
 export const polishResponse = async (userQuery, knowledge, options = {}) => {
-  const facility = options.facility || null;
-  const allowHoursTool = options.allowHoursTool !== false && facility;
+  const facilities = Array.isArray(options.facilities) && options.facilities.length
+    ? options.facilities
+    : options.facility ? [{ ...options.facility, aliases: options.facility.aliases || [] }] : [];
+  const allowHoursTool = options.allowHoursTool !== false && facilities.length > 0;
   const currentDate = options.currentDate || new Date().toISOString().slice(0, 10);
   const candidateIds = Array.isArray(options.candidateIds) ? options.candidateIds.map(Number) : [];
   const prompt = `You are a helpful university campus assistant chatbot.
@@ -130,7 +132,9 @@ When answerable is true, respond conversationally and helpfully in 1-2 sentences
 Do not use unselected candidates and do not add information that is not provided.
 When answerable is false, return an empty response and an empty relevantCandidateIds array. Do not write an apology or suggest another source.
 
-${allowHoursTool ? `You can request lookup_hours for ${facility.facilityName} when the question asks about its schedule, opening, closing, or availability. Use the tool instead of guessing from campus knowledge. Resolve relative dates using the campus date ${currentDate}.` : "No hours lookup tool is available for this request."}
+${allowHoursTool ? `You can request lookup_hours when the question asks about a listed facility's schedule, opening, closing, or availability. Structured hours have priority over campus knowledge. Infer obvious misspellings, singular/plural differences, abbreviations, and conversational references from the facility catalog, but never invent a facility ID. If multiple facilities are plausible, do not call the tool. Resolve relative dates using the campus date ${currentDate}.
+
+Facility catalog: ${JSON.stringify(facilities)}` : "No hours lookup tool is available for this request."}
 
 Knowledge: "${knowledge}"`;
 
@@ -138,11 +142,16 @@ Knowledge: "${knowledge}"`;
     type: "function",
     function: {
       name: "lookup_hours",
-      description: `Look up authoritative structured hours for ${facility.facilityName}.`,
+      description: "Look up authoritative structured hours for one facility from the provided catalog.",
       strict: true,
       parameters: {
         type: "object",
         properties: {
+          facilityId: {
+            type: "integer",
+            enum: facilities.map(facility => facility.facilityId),
+            description: "Facility ID selected from the provided catalog.",
+          },
           intent: {
             type: "string",
             enum: ["open_now", "opening_time", "closing_time", "hours_on_date", "weekly_hours"],
@@ -150,7 +159,7 @@ Knowledge: "${knowledge}"`;
           date: { type: ["string", "null"], description: "Campus date in YYYY-MM-DD, or null when not applicable." },
           specialEvent: { type: ["string", "null"], description: "Named period or event such as Fall Break, or null." },
         },
-        required: ["intent", "date", "specialEvent"],
+        required: ["facilityId", "intent", "date", "specialEvent"],
         additionalProperties: false,
       },
     },

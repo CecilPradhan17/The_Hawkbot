@@ -1,6 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleChatQuery } from "../src/services/chatbot.services.js";
+import { buildFacilityCatalog, handleChatQuery } from "../src/services/chatbot.services.js";
+
+test("groups facility aliases into the AI hours-tool catalog", () => {
+  assert.deepEqual(buildFacilityCatalog([
+    { id: 4, name: "Starbucks", normalized_alias: "starbucks" },
+    { id: 4, name: "Starbucks", normalized_alias: "starbucks coffee" },
+  ]), [{
+    facilityId: 4,
+    facilityName: "Starbucks",
+    aliases: ["starbucks", "starbucks coffee"],
+  }]);
+});
 
 test("a structured hours answer skips embedding, vector search, and polishing", async () => {
   const expected = { response: "Scheduled hours", matched: true, sourceType: "hours" };
@@ -128,6 +139,58 @@ test("the existing RAG model call can recover a missed structured-hours question
   });
   assert.equal(result, expected);
   assert.deepEqual(resolverArguments, [facility, { intent: "open_now", date: null, specialEvent: null }]);
+});
+
+test("the AI can recover a misspelled facility and prioritize its structured schedule", async () => {
+  const starbucks = { facilityId: 4, facilityName: "Starbucks", aliases: ["starbucks"] };
+  const expected = { response: "Starbucks is open until 6:00 PM.", matched: true, sourceType: "hours" };
+  let resolverArguments;
+  const result = await handleChatQuery("is starbuck open rn", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    retriever: async () => [],
+    facilityCatalog: async () => [starbucks],
+    polisher: async (_query, knowledge, options) => {
+      assert.equal(knowledge, "[]");
+      assert.deepEqual(options.facilities, [starbucks]);
+      return {
+        answerable: false,
+        response: "",
+        hoursLookup: { facilityId: 4, intent: "open_now", date: null, specialEvent: null },
+      };
+    },
+    hoursToolResolver: async (...args) => { resolverArguments = args; return expected; },
+  });
+  assert.equal(result, expected);
+  assert.deepEqual(resolverArguments, [
+    starbucks,
+    { intent: "open_now", date: null, specialEvent: null },
+  ]);
+});
+
+test("a failed generalized hours lookup falls through to grounded RAG", async () => {
+  const starbucks = { facilityId: 4, facilityName: "Starbucks", aliases: ["starbucks"] };
+  let calls = 0;
+  const result = await handleChatQuery("starbuck hours during an unknown event", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    retriever: async () => [{ id: 8, cleaned_content: "Verified alternate hours", similarity: 0.9 }],
+    facilityCatalog: async () => [starbucks],
+    polisher: async (_query, _knowledge, options) => {
+      calls += 1;
+      return options.allowHoursTool
+        ? {
+            answerable: false,
+            response: "",
+            hoursLookup: { facilityId: 4, intent: "weekly_hours", date: null, specialEvent: "Unknown Event" },
+          }
+        : { answerable: true, response: "Grounded alternate hours", relevantCandidateIds: [8] };
+    },
+    hoursToolResolver: async () => null,
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.response, "Grounded alternate hours");
+  assert.equal(result.sourceType, "rag");
 });
 
 test("a failed hours tool lookup resumes grounded RAG answering", async () => {

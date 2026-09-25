@@ -25,6 +25,16 @@ test("returns null for uncertain wording so existing RAG can handle it", async (
   assert.equal(result, null);
 });
 
+test("falls through to RAG when the structured schedule cannot verify the requested date", async () => {
+  const recorded = [];
+  const result = await tryHandleHoursQuery("What are the AC hours on January 10 2027?", {
+    dictionary, scheduleReader: schedule, now,
+    metrics: async columns => recorded.push(columns),
+  });
+  assert.equal(result, null);
+  assert.deepEqual(recorded[0], ["unverified_answers", "rag_fallbacks"]);
+});
+
 test("routes stored special-period names to their special hours", async () => {
   const specialSchedule = async () => {
     const value = await schedule();

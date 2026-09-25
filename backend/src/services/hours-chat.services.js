@@ -101,8 +101,12 @@ export async function tryHandleHoursQuery(message, dependencies = {}) {
     ? { ...classification, intent: "named_hours", namedHours }
     : classification;
   const answer = answerHoursQuestion(schedule, resolvedClassification, now);
+  if (answer.unverified) {
+    record(["unverified_answers", "rag_fallbacks"], metrics);
+    return null;
+  }
   record([
-    answer.unverified ? "unverified_answers" : "structured_hits",
+    "structured_hits",
     "embedding_calls_avoided",
     "llm_calls_avoided",
   ], metrics);

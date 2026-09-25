@@ -2,7 +2,7 @@ import pool from "../db.js";
 import { DateTime } from "luxon";
 import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
-import { getHoursToolContext, resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
+import { resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
 import { formatKnowledgeCandidates, isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 import { expandCampusPlaceAliases } from "./campus-place-alias.services.js";
@@ -15,6 +15,23 @@ import { getFacilityDictionary } from "./hours-repository.services.js";
  */
 const FALLBACK_MESSAGE =
   "I don't have the answer to that yet. Try posting this question on the HawkWall and another student can answer you!";
+
+export const buildFacilityCatalog = rows => {
+  const facilities = new Map();
+  for (const row of rows || []) {
+    const id = Number(row.id ?? row.facilityId);
+    if (!Number.isInteger(id) || !row.name && !row.facilityName) continue;
+    const current = facilities.get(id) || {
+      facilityId: id,
+      facilityName: row.name || row.facilityName,
+      aliases: [],
+    };
+    const alias = row.normalized_alias;
+    if (alias && !current.aliases.includes(alias)) current.aliases.push(alias);
+    facilities.set(id, current);
+  }
+  return [...facilities.values()];
+};
 
 export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;
@@ -30,8 +47,6 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const retriever = dependencies.retriever
     || ((queryEmbedding, queryText) => retrieveKnowledgeCandidates(queryEmbedding, queryText, { database }));
   const polisher = dependencies.polisher || polishResponse;
-  const hoursToolContext = dependencies.hoursToolContext
-    || (query => getHoursToolContext(query, { dictionary: facilityDictionary }));
   const hoursToolResolver = dependencies.hoursToolResolver || resolveHoursToolLookup;
   const aliasExpander = dependencies.aliasExpander
     || (dependencies.retriever
@@ -59,26 +74,40 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const vectorScores = candidates.map(row => Number(row.similarity)).filter(Number.isFinite);
   const similarity = vectorScores.length ? Math.max(...vectorScores).toFixed(4) : null;
   const confidentRows = candidates.filter(isConfidentCandidate);
-  let facility = null;
+  let facilities = [];
   try {
-    facility = await hoursToolContext(userMessage);
+    if (dependencies.facilityCatalog) {
+      facilities = await dependencies.facilityCatalog();
+    } else if (dependencies.hoursToolContext) {
+      const legacyContext = await dependencies.hoursToolContext(userMessage);
+      facilities = legacyContext ? [legacyContext] : [];
+    } else {
+      facilities = buildFacilityCatalog(await facilityDictionary());
+    }
   } catch (error) {
-    console.error("Hours tool context failed:", error.message);
+    console.error("Hours tool catalog failed:", error.message);
   }
-  if (confidentRows.length === 0 && !facility) {
+  if (confidentRows.length === 0 && facilities.length === 0) {
     return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
   }
 
   const candidateIds = confidentRows.map(row => Number(row.id));
   const combinedKnowledge = formatKnowledgeCandidates(confidentRows);
   let polished = await polisher(userMessage, combinedKnowledge, {
-    facility,
-    allowHoursTool: Boolean(facility),
+    facilities,
+    // Temporary compatibility for injected polishers while the public option is the catalog.
+    facility: facilities.length === 1 ? facilities[0] : null,
+    allowHoursTool: facilities.length > 0,
     currentDate: DateTime.now().setZone("America/Chicago").toISODate(),
     candidateIds,
   });
-  if (polished?.hoursLookup && facility) {
-    const hoursAnswer = await hoursToolResolver(facility, polished.hoursLookup);
+  if (polished?.hoursLookup) {
+    const requestedId = Number(polished.hoursLookup.facilityId);
+    const facility = facilities.find(item => item.facilityId === requestedId)
+      || (facilities.length === 1 && !Number.isInteger(requestedId) ? facilities[0] : null);
+    const lookup = { ...polished.hoursLookup };
+    delete lookup.facilityId;
+    const hoursAnswer = facility ? await hoursToolResolver(facility, lookup) : null;
     if (hoursAnswer) return hoursAnswer;
     if (confidentRows.length === 0) {
       return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
