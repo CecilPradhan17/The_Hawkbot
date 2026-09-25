@@ -179,3 +179,29 @@ when the authenticated user changes, avoiding cross-account feed state.
 **Resume/interview angle:** Added a stale-while-revalidate route cache that removes
 redundant navigation fetches while retaining a bounded freshness policy and isolating
 personalized state by authenticated user.
+
+## 2026-09-25 — Hawkbot prompt as the Hawkwall entry point
+
+**Context:** Hawkwall is the authenticated landing page to encourage community
+participation, but presenting posts first can imply that public posting is the primary
+way to get an answer even though Hawkbot should be the first path.
+
+**Decision:** Place a compact Hawkbot prompt above the feed using the same personalized
+greetings, logo, validation, and daily usage rules as the full chat. Submitting moves
+the question through transient router state to the dedicated chat page, where it is
+cleared from navigation state and sent exactly once. The feed does not run a parallel
+chat implementation or make the chat API request itself.
+
+**Alternatives considered:** Making chat the landing page would weaken the deliberate
+community-engagement role of Hawkwall. Embedding a complete conversation in the feed
+would duplicate chat state and create competing page responsibilities. Putting the
+question in the URL would make private text visible in history and shared links.
+
+**Trade-offs:** Navigation is required before the answer begins, and transient router
+state does not survive a browser crash between submission and chat initialization.
+In exchange, chat ownership, rate limiting, error handling, and fallback-to-Hawkwall
+behavior remain centralized on the full chat page.
+
+**Resume/interview angle:** Designed a cross-feature onboarding funnel that preserves
+community engagement while clarifying the AI-first answer path, with a single-owner
+submission flow that avoids duplicate requests and URL exposure of user questions.

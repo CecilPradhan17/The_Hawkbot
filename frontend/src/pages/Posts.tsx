@@ -10,6 +10,7 @@ import PostList from '@/components/posts/PostList'
 import PostListSkeleton from '@/components/posts/PostListSkeleton'
 import PostDetailModal from '@/components/posts/PostDetailModal'
 import { useHawkwallFeed } from '@/context/useHawkwallFeed'
+import HawkwallChatPrompt from '@/components/HawkwallChatPrompt'
 
 const FEED_FRESHNESS_MS = 120_000
 
@@ -325,6 +326,7 @@ export default function Posts() {
       />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <HawkwallChatPrompt />
         {loading && (
           <PostListSkeleton />
         )}

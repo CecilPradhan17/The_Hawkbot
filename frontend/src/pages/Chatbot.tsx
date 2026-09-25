@@ -3,7 +3,14 @@ import { sendChatMessage } from '@/api/chat.api'
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  DAILY_CHAT_LIMIT,
+  MAX_CHAT_MESSAGE_LENGTH,
+  getRandomChatGreeting,
+  getStoredChatUsage,
+  saveChatUsage,
+} from '@/utils/chatSession'
 
 interface Message {
   id: number
@@ -18,30 +25,6 @@ interface Message {
 interface QuestionDraft {
   messageId: number
   content: string
-}
-
-const DAILY_LIMIT = 7
-const MAX_MESSAGE_LENGTH = 250
-const withName = (name: string | null) => name ? `, ${name}` : ''
-const GREETINGS = [
-  (name: string | null) => `What's on your mind${withName(name)}?`,
-  (name: string | null) => `How can I help${withName(name)}?`,
-  (name: string | null) => `What are we figuring out today${withName(name)}?`,
-  (name: string | null) => `Where should we start${withName(name)}?`,
-  (name: string | null) => `What can I help you find${withName(name)}?`,
-]
-
-function getTodayKey() {
-  return `hawkbot_usage_${new Date().toISOString().split('T')[0]}`
-}
-
-function getStoredUsage(): number {
-  const stored = localStorage.getItem(getTodayKey())
-  return stored ? parseInt(stored, 10) : 0
-}
-
-function saveUsage(count: number) {
-  localStorage.setItem(getTodayKey(), String(count))
 }
 
 function BotMessageContent({ content }: { content: string }) {
@@ -61,22 +44,35 @@ function BotMessageContent({ content }: { content: string }) {
 
 export default function Chatbot() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { username, isAdmin } = useAuth()
+  const initialMessage = typeof (location.state as { initialMessage?: unknown } | null)?.initialMessage === 'string'
+    ? (location.state as { initialMessage: string }).initialMessage
+    : ''
   const [messages, setMessages] = useState<Message[]>([])
-  const [greeting] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)])
-  const [input, setInput] = useState('')
+  const [greeting] = useState(() => getRandomChatGreeting(username))
+  const [input, setInput] = useState(initialMessage)
   const [loading, setLoading] = useState(false)
   const [inputError, setInputError] = useState<string | null>(null)
-  const [messagesUsed, setMessagesUsed] = useState(() => getStoredUsage())
-  const [rateLimited, setRateLimited] = useState(() => !isAdmin && getStoredUsage() >= DAILY_LIMIT)
+  const [messagesUsed, setMessagesUsed] = useState(() => getStoredChatUsage())
+  const [rateLimited, setRateLimited] = useState(() => !isAdmin && getStoredChatUsage() >= DAILY_CHAT_LIMIT)
   const [questionDraft, setQuestionDraft] = useState<QuestionDraft | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const initialMessagePending = useRef(Boolean(initialMessage))
 
   // Auto-focus input on page load to show keyboard immediately on mobile
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    if (!initialMessagePending.current) return
+    initialMessagePending.current = false
+    navigate('/chat', { replace: true, state: null })
+    formRef.current?.requestSubmit()
+  }, [navigate])
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -86,8 +82,8 @@ export default function Chatbot() {
   const handleSend = async () => {
     const trimmed = input.trim()
     if (!trimmed || loading || rateLimited) return
-    if (trimmed.length > MAX_MESSAGE_LENGTH) {
-      setInputError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer`)
+    if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+      setInputError(`Message must be ${MAX_CHAT_MESSAGE_LENGTH} characters or fewer`)
       return
     }
     setInputError(null)
@@ -108,8 +104,8 @@ export default function Chatbot() {
       if (!isAdmin) {
         setMessagesUsed(prev => {
           const next = prev + 1
-          saveUsage(next)
-          if (next >= DAILY_LIMIT) setRateLimited(true)
+          saveChatUsage(next)
+          if (next >= DAILY_CHAT_LIMIT) setRateLimited(true)
           return next
         })
       }
@@ -130,8 +126,8 @@ export default function Chatbot() {
 
       if (isRateLimit) {
         setRateLimited(true)
-        setMessagesUsed(DAILY_LIMIT)
-        saveUsage(DAILY_LIMIT)
+        setMessagesUsed(DAILY_CHAT_LIMIT)
+        saveChatUsage(DAILY_CHAT_LIMIT)
       }
 
       setMessages(prev => [
@@ -149,10 +145,6 @@ export default function Chatbot() {
       setLoading(false)
       inputRef.current?.focus()
     }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleSend()
   }
 
   const isInputDisabled = loading || (!isAdmin && rateLimited)
@@ -178,7 +170,7 @@ export default function Chatbot() {
                 className="h-16 w-16 rounded-xl"
               />
               <h1 className="text-2xl sm:text-3xl font-semibold text-[#8A244B]">
-                {greeting(username)}
+                {greeting}
               </h1>
             </div>
           )}
@@ -248,10 +240,10 @@ export default function Chatbot() {
           <p className={`text-xs font-medium mb-1.5 ${rateLimited ? 'text-[#8A244B]' : 'text-slate-500'}`}>
             {rateLimited
               ? 'Daily limit reached — see you tomorrow!'
-              : `${DAILY_LIMIT - messagesUsed} question${DAILY_LIMIT - messagesUsed !== 1 ? 's' : ''} remaining today`}
+              : `${DAILY_CHAT_LIMIT - messagesUsed} question${DAILY_CHAT_LIMIT - messagesUsed !== 1 ? 's' : ''} remaining today`}
           </p>
           <div className="flex gap-1.5">
-            {Array.from({ length: DAILY_LIMIT }).map((_, i) => (
+            {Array.from({ length: DAILY_CHAT_LIMIT }).map((_, i) => (
               <div
                 key={i}
                 className="flex-1 h-1 rounded-full transition-colors duration-300"
@@ -262,7 +254,7 @@ export default function Chatbot() {
         </div>}
 
         {/* Input bar */}
-        <div className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors flex-shrink-0
+        <form ref={formRef} onSubmit={event => { event.preventDefault(); void handleSend() }} className={`flex gap-3 bg-white border rounded-2xl px-4 py-3 shadow-sm transition-colors flex-shrink-0
           ${isInputDisabled ? 'border-slate-100 opacity-60' : 'border-slate-200'}`}
         >
           <input
@@ -271,16 +263,15 @@ export default function Chatbot() {
             value={input}
             onChange={(e) => {
               setInput(e.target.value)
-              if (e.target.value.length > MAX_MESSAGE_LENGTH) {
-                setInputError(`Message must be ${MAX_MESSAGE_LENGTH} characters or fewer`)
+              if (e.target.value.length > MAX_CHAT_MESSAGE_LENGTH) {
+                setInputError(`Message must be ${MAX_CHAT_MESSAGE_LENGTH} characters or fewer`)
               } else {
                 setInputError(null)
               }
             }}
-            onKeyDown={handleKeyDown}
             placeholder={rateLimited ? 'Daily limit reached' : 'Ask about campus...'}
             disabled={isInputDisabled}
-            maxLength={MAX_MESSAGE_LENGTH + 50}
+            maxLength={MAX_CHAT_MESSAGE_LENGTH + 50}
             /*
              * font-size must be at least 16px on iOS to prevent
              * Safari from auto-zooming when the input is focused.
@@ -290,7 +281,7 @@ export default function Chatbot() {
                        focus:outline-none disabled:cursor-not-allowed bg-transparent"
           />
           <button
-            onClick={handleSend}
+            type="submit"
             disabled={isInputDisabled || !input.trim() || !!inputError}
             className="px-4 py-1.5 bg-[#8A244B] text-white text-sm rounded-xl
                        hover:scale-105 active:scale-95 disabled:opacity-50
@@ -298,13 +289,13 @@ export default function Chatbot() {
           >
             Send
           </button>
-        </div>
+        </form>
         {inputError && (
           <p className="text-xs text-[#8A244B] mt-1.5 px-1">{inputError}</p>
         )}
         {!inputError && input.length > 200 && (
           <p className="text-xs text-slate-400 mt-1.5 px-1 text-right">
-            {input.length}/{MAX_MESSAGE_LENGTH}
+            {input.length}/{MAX_CHAT_MESSAGE_LENGTH}
           </p>
         )}
       </main>
