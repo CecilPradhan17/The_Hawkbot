@@ -8,6 +8,15 @@ export const isConfidentCandidate = candidate =>
   Number(candidate?.similarity) >= RAG_SIMILARITY_THRESHOLD
   || candidate?.text_rank !== null && candidate?.text_rank !== undefined;
 
+export const formatKnowledgeCandidates = candidates => JSON.stringify(
+  candidates.map(candidate => ({
+    id: Number(candidate.id),
+    content: candidate.cleaned_content,
+  })),
+  null,
+  2,
+);
+
 /**
  * Uses an exact cosine-distance scan while Hawkbot's knowledge base is small.
  * Adding zero to the distance expression intentionally prevents PostgreSQL

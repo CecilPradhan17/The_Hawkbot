@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   RAG_CANDIDATE_LIMIT,
   RAG_SOURCE_POOL_LIMIT,
+  formatKnowledgeCandidates,
   isConfidentCandidate,
   retrieveKnowledgeCandidates,
 } from "../src/services/rag-retrieval.services.js";
@@ -61,4 +62,15 @@ test("provides a concurrent GIN index for the full-text retrieval expression", (
   assert.match(migration, /to_tsvector/);
   assert.match(migration, /COALESCE\(cleaned_content, ''\)/);
   assert.match(migration, /COALESCE\(raw_content, ''\)/);
+});
+
+test("formats retrieved facts as ID-labeled JSON candidates", () => {
+  const formatted = formatKnowledgeCandidates([
+    { id: 12, cleaned_content: "Banner handles registration." },
+    { id: 19, cleaned_content: "Canvas contains assignments." },
+  ]);
+  assert.deepEqual(JSON.parse(formatted), [
+    { id: 12, content: "Banner handles registration." },
+    { id: 19, content: "Canvas contains assignments." },
+  ]);
 });

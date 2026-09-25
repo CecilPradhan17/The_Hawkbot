@@ -20,21 +20,22 @@ test("an uncertain question falls through to the existing RAG flow", async () =>
   const result = await handleChatQuery("Tell me about campus", {
     hoursHandler: async () => null,
     embedding: async () => { embedded = true; return [0.1, 0.2]; },
-    database: { query: async () => ({ rows: [{ cleaned_content: "Verified fact", similarity: 0.9 }] }) },
+    database: { query: async () => ({ rows: [{ id: 1, cleaned_content: "Verified fact", similarity: 0.9 }] }) },
     hoursToolContext: async () => null,
-    polisher: async () => { polished = true; return { answerable: true, response: "Helpful answer" }; },
+    polisher: async () => { polished = true; return { answerable: true, response: "Helpful answer", relevantCandidateIds: [1] }; },
   });
   assert.equal(embedded, true);
   assert.equal(polished, true);
   assert.equal(result.sourceType, "rag");
   assert.equal(result.response, "Helpful answer");
+  assert.deepEqual(result.knowledgeIds, [1]);
 });
 
 test("an unanswerable retrieved match uses the HawkWall fallback", async () => {
   const result = await handleChatQuery("Is dining open during Fall Break?", {
     hoursHandler: async () => null,
     embedding: async () => [0.1],
-    database: { query: async () => ({ rows: [{ cleaned_content: "Dining serves lunch daily", similarity: 0.9 }] }) },
+    database: { query: async () => ({ rows: [{ id: 1, cleaned_content: "Dining serves lunch daily", similarity: 0.9 }] }) },
     hoursToolContext: async () => null,
     polisher: async () => ({ answerable: false, response: "" }),
   });
@@ -85,13 +86,13 @@ test("a failed hours tool lookup resumes grounded RAG answering", async () => {
   const result = await handleChatQuery("Dining during an unknown event", {
     hoursHandler: async () => null,
     embedding: async () => [0.1],
-    database: { query: async () => ({ rows: [{ cleaned_content: "Verified dining fact", similarity: 0.9 }] }) },
+    database: { query: async () => ({ rows: [{ id: 1, cleaned_content: "Verified dining fact", similarity: 0.9 }] }) },
     hoursToolContext: async () => ({ facilityId: 4, facilityName: "Dining" }),
     polisher: async (_query, _knowledge, options) => {
       calls += 1;
       return options.allowHoursTool
         ? { answerable: false, response: "", hoursLookup: { intent: "weekly_hours", date: null, specialEvent: "Unknown Event" } }
-        : { answerable: true, response: "Grounded RAG answer" };
+        : { answerable: true, response: "Grounded RAG answer", relevantCandidateIds: [1] };
     },
     hoursToolResolver: async () => null,
   });
@@ -112,15 +113,18 @@ test("passes all confident candidates from the expanded retrieval pool to the ex
     embedding: async () => [0.1],
     retriever: async () => candidates,
     hoursToolContext: async () => null,
-    polisher: async (_query, knowledge) => {
+    polisher: async (_query, knowledge, options) => {
       receivedKnowledge = knowledge;
-      return { answerable: true, response: "Grounded answer" };
+      assert.deepEqual(options.candidateIds, candidates.map(candidate => candidate.id));
+      return { answerable: true, response: "Grounded answer", relevantCandidateIds: [1, 10] };
     },
   });
-  assert.match(receivedKnowledge, /Candidate 1/);
-  assert.match(receivedKnowledge, /Candidate 10/);
-  assert.equal(receivedKnowledge.split("\n\n").length, 10);
+  const parsedKnowledge = JSON.parse(receivedKnowledge);
+  assert.equal(parsedKnowledge.length, 10);
+  assert.deepEqual(parsedKnowledge[0], { id: 1, content: "Candidate 1" });
+  assert.deepEqual(parsedKnowledge[9], { id: 10, content: "Candidate 10" });
   assert.equal(result.response, "Grounded answer");
+  assert.deepEqual(result.knowledgeIds, [1, 10]);
 });
 
 test("keeps an exact full-text candidate even when its vector similarity is below threshold", async () => {
@@ -138,9 +142,25 @@ test("keeps an exact full-text candidate even when its vector similarity is belo
     hoursToolContext: async () => null,
     polisher: async (_query, knowledge) => {
       receivedKnowledge = knowledge;
-      return { answerable: true, response: "Banner is the student information system." };
+      return { answerable: true, response: "Banner is the student information system.", relevantCandidateIds: [7] };
     },
   });
   assert.match(receivedKnowledge, /Banner/);
   assert.equal(result.sourceType, "rag");
+});
+
+test("rejects an answer that cites a candidate outside the retrieved pool", async () => {
+  const result = await handleChatQuery("Campus question", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    retriever: async () => [{ id: 3, cleaned_content: "Retrieved fact", similarity: 0.9 }],
+    hoursToolContext: async () => null,
+    polisher: async () => ({
+      answerable: true,
+      response: "Unsupported answer",
+      relevantCandidateIds: [999],
+    }),
+  });
+  assert.equal(result.matched, false);
+  assert.equal(result.sourceType, "fallback");
 });

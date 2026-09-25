@@ -4,7 +4,7 @@ import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
 import { getHoursToolContext, resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
-import { isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
+import { formatKnowledgeCandidates, isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -49,13 +49,13 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
     return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
   }
 
-  const combinedKnowledge = confidentRows
-    .map(row => row.cleaned_content)
-    .join("\n\n");
+  const candidateIds = confidentRows.map(row => Number(row.id));
+  const combinedKnowledge = formatKnowledgeCandidates(confidentRows);
   let polished = await polisher(userMessage, combinedKnowledge, {
     facility,
     allowHoursTool: Boolean(facility),
     currentDate: DateTime.now().setZone("America/Chicago").toISODate(),
+    candidateIds,
   });
   if (polished?.hoursLookup && facility) {
     const hoursAnswer = await hoursToolResolver(facility, polished.hoursLookup);
@@ -63,10 +63,19 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
     if (confidentRows.length === 0) {
       return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
     }
-    polished = await polisher(userMessage, combinedKnowledge, { allowHoursTool: false });
+    polished = await polisher(userMessage, combinedKnowledge, { allowHoursTool: false, candidateIds });
   }
-  if (!polished?.answerable || !polished.response?.trim()) {
+  const selectedIds = Array.isArray(polished?.relevantCandidateIds)
+    ? [...new Set(polished.relevantCandidateIds.map(Number))]
+    : [];
+  const allowedIds = new Set(candidateIds);
+  const validSelection = selectedIds.length > 0
+    && selectedIds.every(id => Number.isInteger(id) && allowedIds.has(id));
+  if (!polished?.answerable || !polished.response?.trim() || !validSelection) {
     return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
   }
-  return { response: polished.response.trim(), matched: true, similarity, sourceType: "rag" };
+  return {
+    response: polished.response.trim(), matched: true, similarity, sourceType: "rag",
+    knowledgeIds: selectedIds,
+  };
 };
