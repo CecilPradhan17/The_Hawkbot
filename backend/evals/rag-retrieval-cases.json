@@ -1,0 +1,65 @@
+{
+  "minimumTop3Accuracy": 0.9,
+  "cases": [
+    {
+      "query": "where can i get free math tutoring",
+      "expectedAny": ["free tutoring", "meet with tutors"]
+    },
+    {
+      "query": "who can help me choose classes for graduation",
+      "expectedAny": ["academic advising", "plan their courses"]
+    },
+    {
+      "query": "can my group reserve a private study room",
+      "expectedAny": ["private study rooms"]
+    },
+    {
+      "query": "where can i use a computer for homework",
+      "expectedAny": ["computers available"]
+    },
+    {
+      "query": "who can walk me safely across campus",
+      "expectedAny": ["safety escort"]
+    },
+    {
+      "query": "i need help understanding student loans",
+      "expectedAny": ["student loans", "loans and payment options"]
+    },
+    {
+      "query": "where do i request an official transcript",
+      "expectedAny": ["official transcript requests"]
+    },
+    {
+      "query": "who helps students drop a course",
+      "expectedAny": ["add or drop classes"]
+    },
+    {
+      "query": "what site do professors use for grades and assignments",
+      "expectedAny": ["canvas", "assignments, grades"]
+    },
+    {
+      "query": "where can someone review my resume",
+      "expectedAny": ["improve their resumes", "with resumes"]
+    },
+    {
+      "query": "where can i talk to someone about anxiety privately",
+      "expectedAny": ["confidential mental health", "stress, anxiety"]
+    },
+    {
+      "query": "my laptop cannot connect to campus wifi",
+      "expectedAny": ["connect their devices to campus wifi"]
+    },
+    {
+      "query": "where do the warhawks play basketball",
+      "expectedAny": ["fant-ewing coliseum"]
+    },
+    {
+      "query": "where can i find final exam dates",
+      "expectedAny": ["academic calendar", "final exams"]
+    },
+    {
+      "query": "where is the sga office",
+      "expectedAny": ["student government association", "student union building"]
+    }
+  ]
+}
