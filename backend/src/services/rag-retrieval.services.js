@@ -35,6 +35,7 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
               ROW_NUMBER() OVER (ORDER BY (embedding <=> $1::vector) + 0) AS vector_rank
        FROM approved_knowledge
        WHERE embedding IS NOT NULL
+         AND status = 'active'
        ORDER BY (embedding <=> $1::vector) + 0
        LIMIT $3
      ),
@@ -48,7 +49,8 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
               ) AS text_rank
        FROM approved_knowledge k
        CROSS JOIN text_query q
-       WHERE to_tsvector('english', COALESCE(k.cleaned_content, '') || ' ' || COALESCE(k.raw_content, '')) @@ q.query
+       WHERE k.status = 'active'
+         AND to_tsvector('english', COALESCE(k.cleaned_content, '') || ' ' || COALESCE(k.raw_content, '')) @@ q.query
        ORDER BY ts_rank_cd(
          to_tsvector('english', COALESCE(k.cleaned_content, '') || ' ' || COALESCE(k.raw_content, '')),
          q.query
@@ -70,7 +72,7 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
             END AS similarity,
             fused.vector_rank, fused.text_rank, fused.retrieval_score
      FROM fused
-     JOIN approved_knowledge k ON k.id = fused.id
+     JOIN approved_knowledge k ON k.id = fused.id AND k.status = 'active'
      ORDER BY fused.retrieval_score DESC,
               CASE WHEN k.embedding IS NULL THEN NULL ELSE k.embedding <=> $1::vector END
      LIMIT $4`,

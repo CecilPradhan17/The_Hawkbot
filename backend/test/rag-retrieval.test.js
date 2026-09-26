@@ -26,6 +26,9 @@ test("fuses exact vector and full-text candidates into a ten-result pool", async
   assert.equal(RAG_SOURCE_POOL_LIMIT, 20);
   assert.deepEqual(captured.values, [JSON.stringify([0.1, 0.2]), "Where is the SSC?", 20, 10]);
   assert.match(captured.text, /WHERE embedding IS NOT NULL/);
+  assert.match(captured.text, /AND status = 'active'/);
+  assert.match(captured.text, /WHERE k\.status = 'active'/);
+  assert.match(captured.text, /k\.id = fused\.id AND k\.status = 'active'/);
   assert.match(captured.text, /ORDER BY \(embedding <=> \$1::vector\) \+ 0/);
   assert.match(captured.text, /websearch_to_tsquery\('english', \$2\)/);
   assert.match(captured.text, /to_tsvector\('english'/);
@@ -34,6 +37,23 @@ test("fuses exact vector and full-text candidates into a ten-result pool", async
   assert.match(captured.text, /LIMIT \$4/);
   assert.match(captured.text, /source_post_id/);
   assert.match(captured.text, /approved_at/);
+});
+
+test("defines lifecycle metadata without automatically expiring knowledge", () => {
+  const migration = readFileSync(
+    new URL("../migrations/017_add_knowledge_lifecycle.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(migration, /status TEXT NOT NULL DEFAULT 'active'/);
+  assert.match(migration, /review_category TEXT/);
+  assert.match(migration, /last_verified_at TIMESTAMPTZ/);
+  assert.match(migration, /review_due_at TIMESTAMPTZ/);
+  assert.match(migration, /verification_requested_at TIMESTAMPTZ/);
+  assert.match(migration, /superseded_by_id INTEGER/);
+  assert.match(migration, /'active', 'needs_update', 'replaced'/);
+  assert.match(migration, /'stable', 'yearly', 'term', 'frequent'/);
+  assert.match(migration, /SET last_verified_at = COALESCE\(approved_at, NOW\(\)\)/);
+  assert.doesNotMatch(migration, /valid_from|valid_until|expires_at/i);
 });
 
 test("allows a smaller candidate limit for diagnostics", async () => {
