@@ -3,7 +3,6 @@ import { useAuth } from '@/context/AuthContext'
 import { getPostsPage, deletePost, votePost, getOnePost } from '@/api/posts.api'
 import type { PostResponse } from '@/api/posts.api'
 import Header from '@/components/Header'
-import CreatePostModal from '@/components/posts/CreatePostModal'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
 import AnswerQuestionModal from '@/components/posts/AnswerQuestionModal'
 import PostList from '@/components/posts/PostList'
@@ -33,8 +32,7 @@ export default function Posts() {
     setScrollPosition,
   } = useHawkwallFeed()
   const [selectedPost, setSelectedPost] = useState<PostResponse | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showAskModal, setShowAskModal] = useState(false)
+  const [showPostModal, setShowPostModal] = useState(false)
   const [answeringQuestion, setAnsweringQuestion] = useState<PostResponse | null>(null)
   const [loading, setLoading] = useState(lastFetchedAt === 0)
   const [error, setError] = useState<string | null>(null)
@@ -306,20 +304,11 @@ export default function Posts() {
         rightContent={
           <>
             <button
-              onClick={() => setShowAskModal(true)}
+              onClick={() => setShowPostModal(true)}
               className="px-2 sm:px-4 py-2 bg-[#1B5E8A] text-white rounded-lg
                          hover:scale-105 active:scale-95 transition-all text-xs sm:text-sm whitespace-nowrap"
             >
-              <span className="hidden sm:inline">Ask a Question</span>
-              <span className="sm:hidden">Ask</span>
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-2 sm:px-4 py-2 bg-white text-[#8A244B] rounded-lg
-                         hover:scale-105 active:scale-95 transition-all text-xs sm:text-sm whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">Create Post</span>
-              <span className="sm:hidden">Post</span>
+              Post
             </button>
           </>
         }
@@ -374,15 +363,9 @@ export default function Posts() {
         )}
       </main>
 
-      {showCreateModal && (
-        <CreatePostModal
-          onClose={() => setShowCreateModal(false)}
-          onPostCreated={handlePostCreated}
-        />
-      )}
-      {showAskModal && (
+      {showPostModal && (
         <AskQuestionModal
-          onClose={() => setShowAskModal(false)}
+          onClose={() => setShowPostModal(false)}
           onPostCreated={handlePostCreated}
         />
       )}
