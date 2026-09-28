@@ -49,8 +49,9 @@ import { signToken } from "../utils/jwt.js";
 import { isAdminEmail } from "../utils/admin.js";
 
 export const loginUserInDB = async ({email, password}) => {
-        const res = await pool.query(`SELECT id, email, username, password_hash FROM users 
-            WHERE email = $1;`,
+        const res = await pool.query(`SELECT u.id, u.email, u.username, u.password_hash FROM users u
+            WHERE u.email = $1
+              AND COALESCE((to_jsonb(u)->>'is_system')::boolean, FALSE) = FALSE;`,
             [email]);
         
         const user = res.rows[0];
