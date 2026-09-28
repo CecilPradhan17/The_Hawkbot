@@ -5,14 +5,14 @@ import { normalizeKnowledgeChunks } from "../src/services/knowledge-curation.ser
 test("keeps each curated fact as independent retrieval knowledge", () => {
   const chunks = normalizeKnowledgeChunks({
     chunks: [
-      { fact: "The tutoring center is in Walker Hall." },
-      { fact: "The tutoring center closes at 8:00 PM." },
+      { fact: "The tutoring center is in Walker Hall.", reviewCategory: "stable" },
+      { fact: "The tutoring center closes at 8:00 PM.", reviewCategory: "frequent" },
     ],
   });
 
   assert.deepEqual(chunks, [
-    "The tutoring center is in Walker Hall.",
-    "The tutoring center closes at 8:00 PM.",
+    { content: "The tutoring center is in Walker Hall.", reviewCategory: "stable" },
+    { content: "The tutoring center closes at 8:00 PM.", reviewCategory: "frequent" },
   ]);
 });
 
@@ -27,6 +27,13 @@ test("drops malformed and duplicate chunks", () => {
   });
 
   assert.equal(chunks.length, 1);
+  assert.equal(chunks[0].reviewCategory, "frequent");
+});
+
+test("defaults an unsupported review category to frequent", () => {
+  assert.deepEqual(normalizeKnowledgeChunks({
+    chunks: [{ fact: "The Registrar processes transcripts.", reviewCategory: "sometimes" }],
+  }), [{ content: "The Registrar processes transcripts.", reviewCategory: "frequent" }]);
 });
 
 test("rejects a non-array chunk payload", () => {

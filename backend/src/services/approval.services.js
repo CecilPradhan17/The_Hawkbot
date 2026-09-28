@@ -51,6 +51,10 @@ export const processApproval = async (answerId, parentQuestionId) => {
     await storeApprovedKnowledge({
       db: pool,
       sourcePostId: answer.id,
+      rawContent: JSON.stringify({
+        question: question.content,
+        answer: answer.content,
+      }),
       chunks: knowledgeChunks,
       generateEmbedding,
     });
@@ -87,6 +91,7 @@ export const processPostApproval = async (postId) => {
     await storeApprovedKnowledge({
       db: pool,
       sourcePostId: post.id,
+      rawContent: post.content,
       chunks: knowledgeChunks,
       generateEmbedding,
     });

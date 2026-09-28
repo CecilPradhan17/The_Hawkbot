@@ -28,15 +28,19 @@ test("stores every atomic fact in one committed transaction", async () => {
   await storeApprovedKnowledge({
     db,
     sourcePostId: 42,
-    chunks: ["first fact", "second fact"],
+    chunks: [
+      { content: "first fact", reviewCategory: "stable" },
+      { content: "second fact", reviewCategory: "yearly" },
+    ],
     generateEmbedding: async (text) => [text.length],
   });
 
   assert.deepEqual(calls.map(({ text }) => text.trim().split(/\s+/)[0]), [
     "BEGIN", "INSERT", "INSERT", "COMMIT", "RELEASE",
   ]);
-  assert.deepEqual(calls[1].params, [42, "first fact", null, "[10]"]);
-  assert.deepEqual(calls[2].params, [42, "second fact", null, "[11]"]);
+  assert.deepEqual(calls[1].params, [42, "first fact", null, "[10]", "stable"]);
+  assert.deepEqual(calls[2].params, [42, "second fact", null, "[11]", "yearly"]);
+  assert.match(calls[1].text, /review_category/);
 });
 
 test("rolls back all chunks when any insert fails", async () => {
@@ -46,7 +50,10 @@ test("rolls back all chunks when any insert fails", async () => {
     storeApprovedKnowledge({
       db,
       sourcePostId: 42,
-      chunks: ["first fact", "second fact"],
+      chunks: [
+        { content: "first fact", reviewCategory: "stable" },
+        { content: "second fact", reviewCategory: "yearly" },
+      ],
       generateEmbedding: async () => [0.1],
     }),
     /insert failed/
@@ -62,7 +69,7 @@ test("does not open a transaction when embedding generation fails", async () => 
     storeApprovedKnowledge({
       db,
       sourcePostId: 42,
-      chunks: ["first fact"],
+      chunks: [{ content: "first fact", reviewCategory: "stable" }],
       generateEmbedding: async () => { throw new Error("embedding failed"); },
     }),
     /embedding failed/

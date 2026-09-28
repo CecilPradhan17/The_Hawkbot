@@ -11,9 +11,9 @@ export const storeApprovedKnowledge = async ({
 
   // Complete external embedding calls before opening a database transaction.
   const embeddedChunks = await Promise.all(
-    chunks.map(async (cleanedContent) => ({
-      cleanedContent,
-      embedding: await generateEmbedding(cleanedContent),
+    chunks.map(async (chunk) => ({
+      ...chunk,
+      embedding: await generateEmbedding(chunk.content),
     }))
   );
 
@@ -21,11 +21,12 @@ export const storeApprovedKnowledge = async ({
   try {
     await client.query("BEGIN");
 
-    for (const { cleanedContent, embedding } of embeddedChunks) {
+    for (const { content, reviewCategory, embedding } of embeddedChunks) {
       await client.query(
-        `INSERT INTO approved_knowledge (source_post_id, cleaned_content, raw_content, embedding)
-         VALUES ($1, $2, $3, $4)`,
-        [sourcePostId, cleanedContent, rawContent, JSON.stringify(embedding)]
+        `INSERT INTO approved_knowledge
+           (source_post_id, cleaned_content, raw_content, embedding, review_category)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [sourcePostId, content, rawContent, JSON.stringify(embedding), reviewCategory]
       );
     }
 

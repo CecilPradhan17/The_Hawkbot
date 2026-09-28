@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { normalizeGroundedResponse } from "./rag-grounding.services.js";
 import { normalizeKnowledgeChunks } from "./knowledge-curation.services.js";
+import { buildQuestionCurationSource } from "./knowledge-curation-prompt.services.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -28,7 +29,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  */
 export const cleanContent = async ({ type, content, question, answer }) => {
   const chunks = await curateKnowledge({ type, content, question, answer });
-  return chunks[0];
+  return chunks[0].content;
 };
 
 /**
@@ -46,6 +47,11 @@ Keep related details together when separating them would make the answer incompl
 For each fact:
 Write one concise, self-contained statement. Include necessary subject names, dates, and qualifiers so it makes sense without the other facts.
 Preserve abbreviations, alternate names, or nicknames only when they appear in the source. Do not invent aliases.
+Assign exactly one review category:
+- stable: institutional identity, building locations, or general facility purposes that rarely change
+- yearly: office services, procedures, contact information, or other information commonly reviewed annually
+- term: semester-dependent policies, academic information, or services that commonly change by term
+- frequent: schedules, deadlines, events, availability, or any fact whose stability is uncertain
 
 Do not add any information not present in the fact. Do not add any preamble or explanation.
 
@@ -56,13 +62,17 @@ Fact: "${content}"`;
 Break the answer into the smallest self-contained facts that can answer a student independently.
 Keep related details together when separating them would make the answer incomplete, but split unrelated topics, services, rules, dates, or procedures.
 For each fact:
-Write one concise, self-contained statement based strictly on the provided answer. Include necessary subject names, dates, and qualifiers so it makes sense without the other facts.
+Write one concise, self-contained statement for each fact. Include necessary subject names, dates, and qualifiers so it makes sense without the original question or the other facts.
 Preserve abbreviations, alternate names, or nicknames only when they appear in the question or answer. Do not invent aliases.
+Assign exactly one review category:
+- stable: institutional identity, building locations, or general facility purposes that rarely change
+- yearly: office services, procedures, contact information, or other information commonly reviewed annually
+- term: semester-dependent policies, academic information, or services that commonly change by term
+- frequent: schedules, deadlines, events, availability, or any fact whose stability is uncertain
 
-Do not add any information not present in the answer. Do not add any preamble or explanation.
+Do not add any preamble or explanation.
 
-Question: "${question}"
-Answer: "${answer}"`;
+${buildQuestionCurationSource({ question, answer })}`;
   }
 
   prompt += `\n\nReturn JSON matching the requested schema. Return one chunk when the source contains only one fact. Never repeat a fact across chunks. Do not add information from outside the source.`;
@@ -88,8 +98,12 @@ Answer: "${answer}"`;
                 type: "object",
                 properties: {
                   fact: { type: "string" },
+                  reviewCategory: {
+                    type: "string",
+                    enum: ["stable", "yearly", "term", "frequent"],
+                  },
                 },
-                required: ["fact"],
+                required: ["fact", "reviewCategory"],
                 additionalProperties: false,
               },
             },
