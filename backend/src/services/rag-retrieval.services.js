@@ -1,5 +1,10 @@
 import pool from "../db.js";
 
+const serializeTimestamp = value => {
+  if (value instanceof Date) return value.toISOString();
+  return value ? String(value) : null;
+};
+
 export const RAG_CANDIDATE_LIMIT = 10;
 export const RAG_SOURCE_POOL_LIMIT = 20;
 export const RAG_SIMILARITY_THRESHOLD = 0.50;
@@ -12,6 +17,8 @@ export const formatKnowledgeCandidates = candidates => JSON.stringify(
   candidates.map(candidate => ({
     id: Number(candidate.id),
     content: candidate.cleaned_content,
+    approvedAt: serializeTimestamp(candidate.approved_at),
+    lastVerifiedAt: serializeTimestamp(candidate.last_verified_at || candidate.approved_at),
   })),
   null,
   2,
@@ -66,7 +73,8 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
        FROM vector_ranked v
        FULL OUTER JOIN text_ranked t ON t.id = v.id
      )
-     SELECT k.id, k.source_post_id, k.cleaned_content, k.raw_content, k.approved_at,
+     SELECT k.id, k.source_post_id, k.cleaned_content, k.raw_content,
+            k.approved_at, k.last_verified_at,
             CASE WHEN k.embedding IS NULL THEN NULL
                  ELSE 1 - (k.embedding <=> $1::vector)
             END AS similarity,

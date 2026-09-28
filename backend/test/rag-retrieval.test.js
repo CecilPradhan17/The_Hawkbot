@@ -37,6 +37,7 @@ test("fuses exact vector and full-text candidates into a ten-result pool", async
   assert.match(captured.text, /LIMIT \$4/);
   assert.match(captured.text, /source_post_id/);
   assert.match(captured.text, /approved_at/);
+  assert.match(captured.text, /last_verified_at/);
 });
 
 test("defines lifecycle metadata without automatically expiring knowledge", () => {
@@ -86,11 +87,31 @@ test("provides a concurrent GIN index for the full-text retrieval expression", (
 
 test("formats retrieved facts as ID-labeled JSON candidates", () => {
   const formatted = formatKnowledgeCandidates([
-    { id: 12, cleaned_content: "Banner handles registration." },
-    { id: 19, cleaned_content: "Canvas contains assignments." },
+    {
+      id: 12,
+      cleaned_content: "Banner handles registration.",
+      approved_at: "2025-08-01T12:00:00.000Z",
+      last_verified_at: "2026-08-01T12:00:00.000Z",
+    },
+    {
+      id: 19,
+      cleaned_content: "Canvas contains assignments.",
+      approved_at: new Date("2026-01-10T12:00:00.000Z"),
+      last_verified_at: null,
+    },
   ]);
   assert.deepEqual(JSON.parse(formatted), [
-    { id: 12, content: "Banner handles registration." },
-    { id: 19, content: "Canvas contains assignments." },
+    {
+      id: 12,
+      content: "Banner handles registration.",
+      approvedAt: "2025-08-01T12:00:00.000Z",
+      lastVerifiedAt: "2026-08-01T12:00:00.000Z",
+    },
+    {
+      id: 19,
+      content: "Canvas contains assignments.",
+      approvedAt: "2026-01-10T12:00:00.000Z",
+      lastVerifiedAt: "2026-01-10T12:00:00.000Z",
+    },
   ]);
 });

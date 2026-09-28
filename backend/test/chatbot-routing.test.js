@@ -218,6 +218,8 @@ test("passes all confident candidates from the expanded retrieval pool to the ex
     id: index + 1,
     cleaned_content: `Candidate ${index + 1}`,
     similarity: 0.9 - index * 0.01,
+    approved_at: "2026-01-01T12:00:00.000Z",
+    last_verified_at: "2026-08-01T12:00:00.000Z",
   }));
   let receivedKnowledge;
   const result = await handleChatQuery("Broad campus question", {
@@ -233,8 +235,18 @@ test("passes all confident candidates from the expanded retrieval pool to the ex
   });
   const parsedKnowledge = JSON.parse(receivedKnowledge);
   assert.equal(parsedKnowledge.length, 10);
-  assert.deepEqual(parsedKnowledge[0], { id: 1, content: "Candidate 1" });
-  assert.deepEqual(parsedKnowledge[9], { id: 10, content: "Candidate 10" });
+  assert.deepEqual(parsedKnowledge[0], {
+    id: 1,
+    content: "Candidate 1",
+    approvedAt: "2026-01-01T12:00:00.000Z",
+    lastVerifiedAt: "2026-08-01T12:00:00.000Z",
+  });
+  assert.deepEqual(parsedKnowledge[9], {
+    id: 10,
+    content: "Candidate 10",
+    approvedAt: "2026-01-01T12:00:00.000Z",
+    lastVerifiedAt: "2026-08-01T12:00:00.000Z",
+  });
   assert.equal(result.response, "Grounded answer");
   assert.deepEqual(result.knowledgeIds, [1, 10]);
 });
