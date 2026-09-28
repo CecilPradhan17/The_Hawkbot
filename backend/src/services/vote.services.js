@@ -1,5 +1,6 @@
 import pool from "../db.js";
 import { processApproval, processPostApproval } from "./approval.services.js";
+import { resolveVerificationOutcome } from "./knowledge-review.services.js";
 import 'dotenv/config';
 
 /**
@@ -18,20 +19,24 @@ import 'dotenv/config';
  */
 const APPROVAL_THRESHOLD = process.env.VOTE_APPROVAL_THRESHOLD;
 
-const determinePostStatus = (voteCount) => {
-  if (voteCount >= APPROVAL_THRESHOLD) return "approved";
-  if (voteCount <= -APPROVAL_THRESHOLD) return "disapproved";
-  return "pending";
-};
-
-export const voteOnPost = async ({ userId, postId, vote }) => {
+export const voteOnPost = async ({ userId, postId, vote }, dependencies = {}) => {
+  const database = dependencies.database || pool;
+  const postApproval = dependencies.postApproval || processPostApproval;
+  const answerApproval = dependencies.answerApproval || processApproval;
+  const verificationResolver = dependencies.verificationResolver || resolveVerificationOutcome;
+  const threshold = Number(dependencies.approvalThreshold || APPROVAL_THRESHOLD);
+  if (!Number.isFinite(threshold) || threshold <= 0) {
+    throw new Error("VOTE_APPROVAL_THRESHOLD must be a positive number");
+  }
+  const client = await database.connect();
   try {
-    await pool.query("BEGIN");
+    await client.query("BEGIN");
 
-    const postRes = await pool.query(
+    const postRes = await client.query(
       `SELECT id, type, parent_id, status
        FROM posts
-       WHERE id = $1`,
+       WHERE id = $1
+       FOR UPDATE`,
       [postId]
     );
 
@@ -50,7 +55,7 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
     }
 
     // Check existing vote
-    const existing = await pool.query(
+    const existing = await client.query(
       `SELECT vote FROM post_votes
        WHERE user_id = $1 AND post_id = $2`,
       [userId, postId]
@@ -58,12 +63,12 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
 
     if (existing.rows.length === 0) {
       // First vote
-      await pool.query(
+      await client.query(
         `INSERT INTO post_votes (user_id, post_id, vote)
          VALUES ($1, $2, $3)`,
         [userId, postId, vote]
       );
-      await pool.query(
+      await client.query(
         `UPDATE posts
          SET vote_count = vote_count + $1
          WHERE id = $2`,
@@ -74,12 +79,12 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
 
       if (prevVote === vote) {
         // Toggle off
-        await pool.query(
+        await client.query(
           `DELETE FROM post_votes
            WHERE user_id = $1 AND post_id = $2`,
           [userId, postId]
         );
-        await pool.query(
+        await client.query(
           `UPDATE posts
            SET vote_count = vote_count - $1
            WHERE id = $2`,
@@ -87,13 +92,13 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
         );
       } else {
         // Switch vote
-        await pool.query(
+        await client.query(
           `UPDATE post_votes
            SET vote = $1
            WHERE user_id = $2 AND post_id = $3`,
           [vote, userId, postId]
         );
-        await pool.query(
+        await client.query(
           `UPDATE posts
            SET vote_count = vote_count + $1
            WHERE id = $2`,
@@ -103,26 +108,34 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
     }
 
     // Get updated vote count
-    const updated = await pool.query(
+    const updated = await client.query(
       `SELECT vote_count FROM posts WHERE id = $1`,
       [postId]
     );
 
     const voteCount = updated.rows[0].vote_count;
-    const newStatus = determinePostStatus(voteCount);
+    const newStatus = voteCount >= threshold
+      ? "approved"
+      : voteCount <= -threshold ? "disapproved" : "pending";
 
     // Update this answer's status
-    await pool.query(
+    await client.query(
       `UPDATE posts
        SET status = $1
        WHERE id = $2`,
       [newStatus, postId]
     );
 
-    if (type === "post" && newStatus === "approved") {
-      await pool.query("COMMIT");
+    if (type === "verification" && newStatus !== "pending") {
+      await verificationResolver(client, postId, newStatus);
+      await client.query("COMMIT");
+      return { voteCount, status: newStatus };
+    }
 
-      processPostApproval(postId).catch((err) =>
+    if (type === "post" && newStatus === "approved") {
+      await client.query("COMMIT");
+
+      Promise.resolve(postApproval(postId)).catch((err) =>
         console.error("processPostApproval error:", err)
       );
 
@@ -130,7 +143,7 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
     }
 
     if (type === "answer" && newStatus === "approved") {
-      await pool.query(
+      await client.query(
         `UPDATE posts
          SET status = 'approved'
          WHERE id = $1 AND type = 'question'`,
@@ -138,7 +151,7 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
       );
 
       // Disapprove all sibling answers
-      await pool.query(
+      await client.query(
         `UPDATE posts
          SET status = 'disapproved'
          WHERE parent_id = $1
@@ -149,21 +162,23 @@ export const voteOnPost = async ({ userId, postId, vote }) => {
 
       // Commit before triggering approval pipeline
       // so the DB state is clean if approval takes time
-      await pool.query("COMMIT");
+      await client.query("COMMIT");
 
       // Fire-and-forget: does not block the vote response
-      processApproval(postId, parent_id).catch((err) =>
+      Promise.resolve(answerApproval(postId, parent_id)).catch((err) =>
         console.error("processApproval error:", err)
       );
 
       return { voteCount, status: newStatus };
     }
 
-    await pool.query("COMMIT");
+    await client.query("COMMIT");
 
     return { voteCount, status: newStatus };
   } catch (err) {
-    await pool.query("ROLLBACK");
+    await client.query("ROLLBACK");
     throw err;
+  } finally {
+    client.release();
   }
 };

@@ -39,6 +39,57 @@ export const calculateNextReviewAt = (reviewCategory, lastVerifiedAt) => {
 export const buildVerificationPostContent = fact =>
   `Hawkbot currently knows:\n“${String(fact).trim()}”\n\nIs this still accurate?`;
 
+export const resolveVerificationOutcome = async (
+  client,
+  postId,
+  postStatus,
+  resolvedAt = new Date(),
+) => {
+  if (!["approved", "disapproved"].includes(postStatus)) return false;
+  const result = await client.query(
+    `SELECT v.id, v.knowledge_id, k.review_category
+     FROM knowledge_verifications v
+     JOIN approved_knowledge k ON k.id = v.knowledge_id
+     WHERE v.post_id = $1 AND v.status = 'open'
+     FOR UPDATE OF v, k`,
+    [postId]
+  );
+  if (result.rowCount !== 1) throw new Error("Open verification not found");
+  const verification = result.rows[0];
+
+  if (postStatus === "approved") {
+    const reviewDueAt = calculateNextReviewAt(verification.review_category, resolvedAt);
+    await client.query(
+      `UPDATE knowledge_verifications
+       SET status = 'reconfirmed', resolved_at = $1
+       WHERE id = $2`,
+      [resolvedAt, verification.id]
+    );
+    await client.query(
+      `UPDATE approved_knowledge
+       SET status = 'active', last_verified_at = $1, review_due_at = $2,
+           verification_requested_at = NULL
+       WHERE id = $3`,
+      [resolvedAt, reviewDueAt, verification.knowledge_id]
+    );
+  } else {
+    await client.query(
+      `UPDATE knowledge_verifications
+       SET status = 'rejected', resolved_at = $1
+       WHERE id = $2`,
+      [resolvedAt, verification.id]
+    );
+    await client.query(
+      `UPDATE approved_knowledge
+       SET status = 'needs_update', review_due_at = NULL,
+           verification_requested_at = NULL
+       WHERE id = $1`,
+      [verification.knowledge_id]
+    );
+  }
+  return true;
+};
+
 export const createDueVerificationPosts = async ({
   database = pool,
   now = DateTime.now().setZone(CAMPUS_TIME_ZONE),
@@ -118,6 +169,96 @@ export const createDueVerificationPosts = async ({
 
     await client.query("COMMIT");
     return created;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+export const resolveExpiredVerifications = async ({
+  database = pool,
+  now = DateTime.now().setZone(CAMPUS_TIME_ZONE),
+} = {}) => {
+  const runAt = asCampusDateTime(now);
+  if (!runAt.isValid) throw new Error("A valid scheduler time is required");
+  const client = await database.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(4815162342)");
+    const systemUser = await client.query(
+      "SELECT id FROM users WHERE is_system = TRUE LIMIT 1"
+    );
+    if (systemUser.rowCount !== 1) throw new Error("Hawkbot system account is missing");
+
+    const dayStart = runAt.startOf("day");
+    const dayEnd = dayStart.plus({ days: 1 });
+    const count = await client.query(
+      `SELECT COUNT(*)::integer AS count FROM knowledge_verifications
+       WHERE opened_at >= $1 AND opened_at < $2`,
+      [dayStart.toUTC().toJSDate(), dayEnd.toUTC().toJSDate()]
+    );
+    let retryCapacity = Math.max(DAILY_VERIFICATION_LIMIT - Number(count.rows[0]?.count || 0), 0);
+    const expired = await client.query(
+      `SELECT v.id, v.knowledge_id, v.post_id, v.cycle_started_at,
+              v.attempt_number, k.cleaned_content, k.review_category
+       FROM knowledge_verifications v
+       JOIN approved_knowledge k ON k.id = v.knowledge_id
+       WHERE v.status = 'open' AND v.closes_at <= $1
+       ORDER BY v.closes_at ASC, v.id ASC
+       FOR UPDATE OF v, k SKIP LOCKED`,
+      [runAt.toUTC().toJSDate()]
+    );
+
+    const results = [];
+    for (const verification of expired.rows) {
+      if (verification.attempt_number === 1 && retryCapacity === 0) continue;
+      const terminal = verification.attempt_number === 2;
+      await client.query(
+        `UPDATE knowledge_verifications
+         SET status = $1, resolved_at = $2
+         WHERE id = $3`,
+        [terminal ? "exhausted" : "unresolved", runAt.toUTC().toJSDate(), verification.id]
+      );
+      await client.query("UPDATE posts SET status = 'closed' WHERE id = $1", [verification.post_id]);
+
+      if (terminal) {
+        const nextReview = calculateNextReviewAt(verification.review_category, runAt);
+        await client.query(
+          `UPDATE approved_knowledge
+           SET verification_requested_at = NULL, review_due_at = $1
+           WHERE id = $2`,
+          [nextReview, verification.knowledge_id]
+        );
+        results.push({ knowledgeId: verification.knowledge_id, status: "exhausted" });
+        continue;
+      }
+
+      const post = await client.query(
+        `INSERT INTO posts (content, author_id, type, parent_id)
+         VALUES ($1, $2, 'verification', NULL)
+         RETURNING id`,
+        [buildVerificationPostContent(verification.cleaned_content), systemUser.rows[0].id]
+      );
+      const openedAt = runAt.toUTC();
+      await client.query(
+        `INSERT INTO knowledge_verifications
+           (knowledge_id, post_id, cycle_started_at, attempt_number, status, opened_at, closes_at)
+         VALUES ($1, $2, $3, 2, 'open', $4, $5)`,
+        [verification.knowledge_id, post.rows[0].id, verification.cycle_started_at,
+          openedAt.toJSDate(), openedAt.plus({ days: VERIFICATION_ATTEMPT_DAYS }).toJSDate()]
+      );
+      await client.query(
+        "UPDATE approved_knowledge SET verification_requested_at = $1 WHERE id = $2",
+        [openedAt.toJSDate(), verification.knowledge_id]
+      );
+      retryCapacity -= 1;
+      results.push({ knowledgeId: verification.knowledge_id, status: "retried" });
+    }
+
+    await client.query("COMMIT");
+    return results;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
