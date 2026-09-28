@@ -8,6 +8,7 @@ import {
   createDueVerificationPosts,
   resolveExpiredVerifications,
   resolveVerificationOutcome,
+  runKnowledgeReview,
 } from "../src/services/knowledge-review.services.js";
 
 test("calculates stable, yearly, frequent, and term review dates", () => {
@@ -163,4 +164,42 @@ test("a full daily cap defers a first retry without closing it", async () => {
   const { database, calls } = expiryDb({ attemptNumber: 1, dailyCount: 5 });
   assert.deepEqual(await resolveExpiredVerifications({ database }), []);
   assert.equal(calls.some(({ text }) => text.includes("SET status = $1, resolved_at")), false);
+});
+
+test("the daily runner resolves expired attempts before creating due posts", async () => {
+  const calls = [];
+  const database = { name: "test database" };
+  const now = DateTime.fromISO("2026-09-28T09:00:00", { zone: "America/Chicago" });
+  const result = await runKnowledgeReview({
+    database,
+    now,
+    expiredResolver: async options => {
+      calls.push({ step: "expired", options });
+      return [{ knowledgeId: 1, status: "retried" }];
+    },
+    duePostCreator: async options => {
+      calls.push({ step: "due", options });
+      return [{ knowledgeId: 2, post: { id: 20 } }];
+    },
+  });
+
+  assert.deepEqual(calls.map(call => call.step), ["expired", "due"]);
+  assert.equal(calls[0].options.database, database);
+  assert.equal(calls[1].options.now, now);
+  assert.deepEqual(result, {
+    resolved: [{ knowledgeId: 1, status: "retried" }],
+    created: [{ knowledgeId: 2, post: { id: 20 } }],
+  });
+});
+
+test("the daily runner does not create posts if expiration handling fails", async () => {
+  let creatorCalled = false;
+  await assert.rejects(
+    runKnowledgeReview({
+      expiredResolver: async () => { throw new Error("expiration failed"); },
+      duePostCreator: async () => { creatorCalled = true; },
+    }),
+    /expiration failed/,
+  );
+  assert.equal(creatorCalled, false);
 });

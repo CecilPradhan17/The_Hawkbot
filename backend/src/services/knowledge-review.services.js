@@ -266,3 +266,14 @@ export const resolveExpiredVerifications = async ({
     client.release();
   }
 };
+
+export const runKnowledgeReview = async ({
+  database = pool,
+  now = DateTime.now().setZone(CAMPUS_TIME_ZONE),
+  expiredResolver = resolveExpiredVerifications,
+  duePostCreator = createDueVerificationPosts,
+} = {}) => {
+  const resolved = await expiredResolver({ database, now });
+  const created = await duePostCreator({ database, now });
+  return { resolved, created };
+};

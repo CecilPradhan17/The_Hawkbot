@@ -205,3 +205,28 @@ behavior remain centralized on the full chat page.
 **Resume/interview angle:** Designed a cross-feature onboarding funnel that preserves
 community engagement while clarifying the AI-first answer path, with a single-owner
 submission flow that avoids duplicate requests and URL exposure of user questions.
+
+## 2026-09-28 — GitHub-scheduled knowledge verification
+
+**Context:** Knowledge review needs to expire unanswered verification posts, retry a
+first attempt once, and publish newly due reviews. Hawkbot's Render web service may
+sleep or restart, so an in-process timer cannot guarantee that a daily run occurs.
+
+**Decision:** Expose the review workflow as a one-shot backend command and invoke it
+daily with GitHub Actions using an encrypted `DATABASE_URL` repository secret. Each
+run handles expired attempts first and then publishes newly due facts; both stages
+share the database-enforced open-review rule and five-post daily cap.
+
+**Alternatives considered:** A `setInterval` inside Express is simpler but misses runs
+while the service sleeps and can duplicate work if multiple instances start. A Render
+Cron Job provides managed run history but has a monthly minimum charge. Triggering the
+workflow from user requests would make correctness depend on traffic and add latency.
+
+**Trade-offs:** The repository must have a correctly configured `DATABASE_URL` secret,
+and GitHub may delay scheduled workflows during periods of high load. In exchange,
+the free-tier web service uses no extra Render compute, review timing is independent
+of web traffic, and transactions plus advisory locks make overlapping runs safe.
+
+**Resume/interview angle:** Designed a durable scheduled workflow for an ephemeral web
+runtime, separating background work from request handling and protecting it with
+transactional idempotency and a global publication cap.
