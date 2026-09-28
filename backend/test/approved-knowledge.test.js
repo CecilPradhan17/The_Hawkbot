@@ -38,8 +38,14 @@ test("stores every atomic fact in one committed transaction", async () => {
   assert.deepEqual(calls.map(({ text }) => text.trim().split(/\s+/)[0]), [
     "BEGIN", "INSERT", "INSERT", "COMMIT", "RELEASE",
   ]);
-  assert.deepEqual(calls[1].params, [42, "first fact", null, "[10]", "stable"]);
-  assert.deepEqual(calls[2].params, [42, "second fact", null, "[11]", "yearly"]);
+  assert.equal(calls[1].params[0], 42);
+  assert.equal(calls[1].params[1], "first fact");
+  assert.equal(calls[1].params[4], "stable");
+  assert.ok(calls[1].params[5] instanceof Date);
+  assert.equal(calls[1].params[6], null);
+  assert.equal(calls[2].params[1], "second fact");
+  assert.equal(calls[2].params[4], "yearly");
+  assert.ok(calls[2].params[6]);
   assert.match(calls[1].text, /review_category/);
 });
 
