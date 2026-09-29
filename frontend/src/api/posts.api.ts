@@ -8,7 +8,7 @@ export interface PostResponse {
   vote_count: number
   status: 'approved' | 'disapproved' | 'pending'
   created_at: string
-  type: 'post' | 'question' | 'answer'
+  type: 'post' | 'question' | 'answer' | 'verification'
   parent_id: number | null
   approved_child_id: number | null
   answers?: PostResponse[]

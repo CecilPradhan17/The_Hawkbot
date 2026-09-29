@@ -23,6 +23,7 @@ export default function Post({
   onToggleReplies
 }: PostProps) {
   const isQuestion = post.type === 'question'
+  const isVerification = post.type === 'verification'
   const [repliesLoading, setRepliesLoading] = useState(false)
 
   const handleToggleReplies = async (e: React.MouseEvent) => {
@@ -38,10 +39,17 @@ export default function Post({
   const replyCountDisplay = repliesOpen ? replies.length : post.reply_count
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-all">
+    <div className={`rounded-xl p-6 shadow-sm border hover:shadow-md transition-all ${isVerification ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-200'}`}>
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
-        <p className="text-xs text-slate-500">{getTimeAgo(post.created_at)}</p>
+        <div>
+          {isVerification && (
+            <span className="mb-1 inline-flex rounded-full bg-[#8A244B] px-2.5 py-1 text-xs font-semibold text-white">
+              Hawkbot verification
+            </span>
+          )}
+          <p className="text-xs text-slate-500">{getTimeAgo(post.created_at)}</p>
+        </div>
         <button
           onClick={() => onViewPost(post.id)}
           className="text-[#8A244B] hover:underline active:scale-95 transition-all text-sm font-medium"
@@ -52,6 +60,11 @@ export default function Post({
 
       {/* Content */}
       <p className="text-slate-700 mb-4">{post.content}</p>
+      {isVerification && (
+        <p className="mb-3 text-xs font-medium text-amber-900">
+          Vote HawkYeah if this is still accurate, or HawkNah if it needs updating.
+        </p>
+      )}
 
       {/* Footer actions */}
       <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
