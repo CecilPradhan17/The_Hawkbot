@@ -230,3 +230,27 @@ of web traffic, and transactions plus advisory locks make overlapping runs safe.
 **Resume/interview angle:** Designed a durable scheduled workflow for an ephemeral web
 runtime, separating background work from request handling and protecting it with
 transactional idempotency and a global publication cap.
+
+## 2026-09-29 — Thresholded outdated reports for RAG facts
+
+**Context:** Students need a way to flag an answer that relies on knowledge that may
+no longer be accurate, but a single report must not let one account remove or disable
+community-approved knowledge.
+
+**Decision:** Show an Outdated action only on RAG answers with cited knowledge IDs.
+Each authenticated user can create one open report per fact. Once open reports reach
+the same threshold as community approval, the fact becomes due for early verification
+but remains active until the community verification post reaches a verdict.
+
+**Alternatives considered:** Immediately hiding a fact after one report enables abuse.
+Free-text reports require manual interpretation and cannot reliably identify the fact
+that grounded an answer. A separate report threshold would add another configuration
+whose meaning overlaps the existing community-consensus threshold.
+
+**Trade-offs:** If one answer uses multiple atomic facts, the report applies to each
+one because the interface cannot know which clause concerned the user. Reports also
+wait for the daily review job rather than bypassing its five-post publication cap.
+
+**Resume/interview angle:** Added traceable, abuse-resistant user feedback to a RAG
+system by connecting generated answers back to atomic source IDs and routing consensus
+through a transactional human-in-the-loop revalidation workflow.

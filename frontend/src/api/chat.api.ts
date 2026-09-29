@@ -8,6 +8,11 @@ export interface ChatResponse {
   response: string
   matched: boolean
   similarity?: number
+  knowledgeIds?: number[]
+}
+
+export function reportOutdatedKnowledge(knowledgeIds: number[]): Promise<{ reported: boolean; queued: boolean }> {
+  return api.post('/chat/outdated', { knowledgeIds })
 }
 
 export function sendChatMessage(data: ChatRequest): Promise<ChatResponse> {

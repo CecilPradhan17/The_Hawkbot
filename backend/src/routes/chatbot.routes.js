@@ -1,5 +1,5 @@
 import express from "express";
-import { handleChat } from "../controllers/chatbot.controllers.js";
+import { handleChat, reportOutdated } from "../controllers/chatbot.controllers.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { chatLimiter } from "../middleware/rateLimiter.js";
 
@@ -18,5 +18,6 @@ import { chatLimiter } from "../middleware/rateLimiter.js";
 const router = express.Router();
 
 router.post("/", requireAuth, chatLimiter, handleChat);
+router.post("/outdated", requireAuth, reportOutdated);
 
 export default router;

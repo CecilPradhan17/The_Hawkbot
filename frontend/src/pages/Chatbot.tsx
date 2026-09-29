@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { sendChatMessage } from '@/api/chat.api'
+import { reportOutdatedKnowledge, sendChatMessage } from '@/api/chat.api'
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
@@ -20,6 +20,8 @@ interface Message {
   isError?: boolean
   draftQuestion?: string
   postedToHawkwall?: boolean
+  knowledgeIds?: number[]
+  outdatedState?: 'sending' | 'reported' | 'error'
 }
 
 interface QuestionDraft {
@@ -119,6 +121,7 @@ export default function Chatbot() {
           content: data.response,
           matched: data.matched,
           draftQuestion: data.matched ? undefined : trimmed,
+          knowledgeIds: data.knowledgeIds,
         },
       ])
     } catch (err: unknown) {
@@ -148,6 +151,17 @@ export default function Chatbot() {
   }
 
   const isInputDisabled = loading || (!isAdmin && rateLimited)
+
+  const handleOutdated = async (message: Message) => {
+    if (!message.knowledgeIds?.length || message.outdatedState === 'sending') return
+    setMessages(previous => previous.map(item => item.id === message.id ? { ...item, outdatedState: 'sending' } : item))
+    try {
+      await reportOutdatedKnowledge(message.knowledgeIds)
+      setMessages(previous => previous.map(item => item.id === message.id ? { ...item, outdatedState: 'reported' } : item))
+    } catch {
+      setMessages(previous => previous.map(item => item.id === message.id ? { ...item, outdatedState: 'error' } : item))
+    }
+  }
 
   return (
     /*
@@ -204,6 +218,22 @@ export default function Chatbot() {
                       )}
                     </div>
                   )}
+                  {message.role === 'bot' && message.matched && message.knowledgeIds?.length ? (
+                    <div className="mt-3 flex justify-end border-t border-slate-100 pt-2">
+                      {message.outdatedState === 'reported' ? (
+                        <span className="text-xs font-medium text-slate-500">Thanks — reported for review</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleOutdated(message)}
+                          disabled={message.outdatedState === 'sending'}
+                          className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-amber-50 hover:text-amber-800 disabled:opacity-50"
+                        >
+                          {message.outdatedState === 'sending' ? 'Reporting…' : message.outdatedState === 'error' ? 'Try reporting again' : 'Outdated?'}
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
                 {message.role === 'bot' && !message.isError && index === messages.length - 1 && (
                   <img

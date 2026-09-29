@@ -1,4 +1,5 @@
 import { handleChatQuery } from "../services/chatbot.services.js";
+import { reportKnowledgeOutdated } from "../services/knowledge-feedback.services.js";
 
 /**
  * PURPOSE:
@@ -32,5 +33,20 @@ export const handleChat = async (req, res, next) => {
     res.status(200).json(result);
   } catch (err) {
     next(err);
+  }
+};
+
+export const reportOutdated = async (req, res, next) => {
+  try {
+    const { knowledgeIds } = req.body || {};
+    if (!Array.isArray(knowledgeIds)) {
+      const error = new Error("knowledgeIds must be an array");
+      error.status = 400;
+      return next(error);
+    }
+    const result = await reportKnowledgeOutdated({ userId: req.user.id, knowledgeIds });
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
   }
 };

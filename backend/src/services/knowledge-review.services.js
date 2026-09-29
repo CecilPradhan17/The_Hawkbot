@@ -87,6 +87,11 @@ export const resolveVerificationOutcome = async (
       [verification.knowledge_id]
     );
   }
+  await client.query(
+    `UPDATE knowledge_outdated_reports SET resolved_at = $1
+     WHERE knowledge_id = $2 AND resolved_at IS NULL`,
+    [resolvedAt, verification.knowledge_id],
+  );
   return true;
 };
 
@@ -230,6 +235,11 @@ export const resolveExpiredVerifications = async ({
            SET verification_requested_at = NULL, review_due_at = $1
            WHERE id = $2`,
           [nextReview, verification.knowledge_id]
+        );
+        await client.query(
+          `UPDATE knowledge_outdated_reports SET resolved_at = $1
+           WHERE knowledge_id = $2 AND resolved_at IS NULL`,
+          [runAt.toUTC().toJSDate(), verification.knowledge_id],
         );
         results.push({ knowledgeId: verification.knowledge_id, status: "exhausted" });
         continue;
