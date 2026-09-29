@@ -44,6 +44,7 @@ export interface VoteRequest {
 
 export interface VoteResponse {
   voteCount: number
+  status: 'approved' | 'disapproved' | 'pending'
 }
 
 export function createPost(data: CreatePostRequest): Promise<PostResponse> {

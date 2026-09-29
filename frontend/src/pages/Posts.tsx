@@ -253,6 +253,7 @@ export default function Posts() {
   }
 
   const handleVote = async (postId: number, voteValue: 1 | -1) => {
+    const targetIsVerification = posts.some(post => post.id === postId && post.type === 'verification')
     // Optimistic update
     setPosts(prev => prev.map(post =>
       post.id === postId ? updatePost(post, voteValue) : post
@@ -264,6 +265,12 @@ export default function Posts() {
 
     try {
       const response = await votePost(postId, { vote: voteValue })
+
+      if (targetIsVerification && response.status !== 'pending') {
+        setPosts(prev => prev.filter(post => post.id !== postId))
+        if (selectedPost?.id === postId) setSelectedPost(null)
+        return
+      }
 
       // Reconcile vote_count with server (user_vote already correct from optimistic update)
       setPosts(prev => prev.map(post =>
