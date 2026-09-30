@@ -30,7 +30,7 @@ export default function Header({ rightContent }: HeaderProps) {
   const handleLogout = () => {
     setMenuOpen(false)
     logout()
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   useEffect(() => {
