@@ -148,13 +148,28 @@ When answerable is true, respond conversationally and helpfully in 1-2 sentences
 Do not use unselected candidates and do not add information that is not provided.
 When answerable is false, return an empty response and an empty relevantCandidateIds array. Do not write an apology or suggest another source.
 
+Request open_schulze_menu when the student is asking what food, dishes, or menu items are currently or subsequently available at Schulze Dining Hall, the dining hall, or the cafeteria. Do not request it for operating-hours, location, meal-plan, or general dining questions. Never answer a menu question from campus knowledge.
+
 ${allowHoursTool ? `You can request lookup_hours when the question asks about a listed facility's schedule, opening, closing, or availability. Structured hours have priority over campus knowledge. Infer obvious misspellings, singular/plural differences, abbreviations, and conversational references from the facility catalog, but never invent a facility ID. If multiple facilities are plausible, do not call the tool. Resolve relative dates using the campus date ${currentDate}.
 
 Facility catalog: ${JSON.stringify(facilities)}` : "No hours lookup tool is available for this request."}
 
 Knowledge: "${knowledge}"`;
 
-  const tools = allowHoursTool ? [{
+  const tools = [{
+    type: "function",
+    function: {
+      name: "open_schulze_menu",
+      description: "Direct the student to the official Schulze Dining Hall menu without describing menu contents.",
+      strict: true,
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  }, ...(allowHoursTool ? [{
     type: "function",
     function: {
       name: "lookup_hours",
@@ -179,7 +194,7 @@ Knowledge: "${knowledge}"`;
         additionalProperties: false,
       },
     },
-  }] : [];
+  }] : [])];
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -209,10 +224,13 @@ Knowledge: "${knowledge}"`;
     },
   });
 
-  const toolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "lookup_hours");
-  if (toolCall) {
+  const menuToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "open_schulze_menu");
+  if (menuToolCall) return { answerable: false, response: "", diningMenuLink: true };
+
+  const hoursToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "lookup_hours");
+  if (hoursToolCall) {
     try {
-      return { answerable: false, response: "", hoursLookup: JSON.parse(toolCall.function.arguments) };
+      return { answerable: false, response: "", hoursLookup: JSON.parse(hoursToolCall.function.arguments) };
     } catch {
       return { answerable: false, response: "" };
     }

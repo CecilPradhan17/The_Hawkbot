@@ -22,6 +22,31 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-09-30 — Link-only live dining menu guidance
+
+**Context:** MyDiningHub exposes Schulze's current menu through an undocumented public
+GraphQL endpoint, but its published terms do not clearly authorize Hawkbot to call,
+cache, and republish that data. Rendering and scraping the dining page would still
+depend on the same backend while adding latency and fragility.
+
+**Decision:** Route recognized Schulze menu questions deterministically to the official
+ULM Dining page. If unusual wording reaches the grounded AI stage, the model may invoke
+a menu-link tool, but the backend owns and returns the fixed URL. Hawkbot does not
+fetch, scrape, cache, summarize, or ingest live menu data. Dining-hours questions
+remain owned by the existing structured-hours system.
+
+**Alternatives considered:** Call the GraphQL endpoint directly (fast and structured,
+but undocumented and not clearly authorized); render and scrape the webpage (slower,
+more fragile, and does not avoid the underlying endpoint or terms issue).
+
+**Trade-offs:** Students leave Hawkbot to inspect the menu and do not receive an inline
+answer. In exchange, the feature has no live-menu data dependency, operational cost,
+or stale-menu risk, and can later be upgraded if ULM Dining authorizes an integration.
+
+**Resume/interview angle:** Demonstrates a product decision that balanced user
+experience against platform terms, reliability, and maintenance, then encoded the
+boundary as deterministic routing rather than leaving it to probabilistic RAG.
+
 ## 2026-09-16 — Structured campus hours before general RAG
 
 **Context:** Facility schedules are date-sensitive, include holidays and semester

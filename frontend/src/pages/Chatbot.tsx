@@ -34,11 +34,24 @@ function BotMessageContent({ content }: { content: string }) {
   const sourceIndex = content.lastIndexOf(marker)
   if (sourceIndex === -1) return <>{content}</>
 
+  const source = content.slice(sourceIndex + marker.length).trim()
+  const sourceIsUrl = /^https:\/\/[^\s]+$/.test(source)
+
   return (
     <>
       {content.slice(0, sourceIndex)}
       <p className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-500">
-        Source:{content.slice(sourceIndex + marker.length)}
+        Source:{' '}
+        {sourceIsUrl ? (
+          <a
+            href={source}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]"
+          >
+            View the official ULM Dining menu
+          </a>
+        ) : source}
       </p>
     </>
   )

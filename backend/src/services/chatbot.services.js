@@ -7,6 +7,7 @@ import { tryHandleSmalltalk } from "./smalltalk.services.js";
 import { formatKnowledgeCandidates, isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 import { expandCampusPlaceAliases } from "./campus-place-alias.services.js";
 import { getFacilityDictionary } from "./hours-repository.services.js";
+import { diningMenuLinkResponse, tryHandleDiningMenuLink } from "./dining-menu-link.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -35,6 +36,7 @@ export const buildFacilityCatalog = rows => {
 
 export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;
+  const diningMenuHandler = dependencies.diningMenuHandler || tryHandleDiningMenuLink;
   const embedding = dependencies.embedding || generateQueryEmbedding;
   const database = dependencies.database || pool;
   let facilityDictionaryPromise;
@@ -55,6 +57,9 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
 
   const smalltalkResult = await smalltalkHandler(userMessage);
   if (smalltalkResult) return smalltalkResult;
+
+  const diningMenuResult = await diningMenuHandler(userMessage);
+  if (diningMenuResult) return diningMenuResult;
 
   // Structured campus hours are authoritative for recognized hours questions.
   // An uncovered date returns an explicit unverified response rather than stale RAG data.
@@ -101,6 +106,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
     currentDate: DateTime.now().setZone("America/Chicago").toISODate(),
     candidateIds,
   });
+  if (polished?.diningMenuLink) return diningMenuLinkResponse();
   if (polished?.hoursLookup) {
     const requestedId = Number(polished.hoursLookup.facilityId);
     const facility = facilities.find(item => item.facilityId === requestedId)
@@ -113,6 +119,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
       return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
     }
     polished = await polisher(userMessage, combinedKnowledge, { allowHoursTool: false, candidateIds });
+    if (polished?.diningMenuLink) return diningMenuLinkResponse();
   }
   const selectedIds = Array.isArray(polished?.relevantCandidateIds)
     ? [...new Set(polished.relevantCandidateIds.map(Number))]

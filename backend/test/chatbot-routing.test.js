@@ -25,6 +25,32 @@ test("a structured hours answer skips embedding, vector search, and polishing", 
   assert.equal(result, expected);
 });
 
+test("a dining menu question returns the official link without AI or retrieval", async () => {
+  const fail = async () => { throw new Error("Hours, AI, and RAG should not run"); };
+  const result = await handleChatQuery("What is Schulze serving right now?", {
+    hoursHandler: fail,
+    embedding: fail,
+    database: { query: fail },
+    polisher: fail,
+  });
+  assert.equal(result.sourceType, "dining_link");
+  assert.equal(result.matched, true);
+  assert.match(result.response, /https:\/\/ulm\.mydininghub\.com\/en\/location\/schulze/);
+});
+
+test("the AI can route an unusually worded dining request to the fixed official link", async () => {
+  const result = await handleChatQuery("Can I grab something to eat at Schulze today?", {
+    hoursHandler: async () => null,
+    embedding: async () => [0.1],
+    retriever: async () => [],
+    facilityCatalog: async () => [{ facilityId: 2, facilityName: "Schulze Dining Hall", aliases: ["caf"] }],
+    polisher: async () => ({ answerable: false, response: "", diningMenuLink: true }),
+  });
+  assert.equal(result.sourceType, "dining_link");
+  assert.equal(result.matched, true);
+  assert.match(result.response, /https:\/\/ulm\.mydininghub\.com\/en\/location\/schulze/);
+});
+
 test("an uncertain question falls through to the existing RAG flow", async () => {
   let embedded = false;
   let polished = false;
