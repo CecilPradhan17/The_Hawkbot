@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '@/context/AuthContext'
 
 interface HeaderProps {
   rightContent?: React.ReactNode
@@ -13,6 +14,7 @@ const HAWKBOT_PATH = "M 31.6 98 Q 43 98 52.55 94.05 Q 62.1 90.1 69.55 83.4 Q 77 
 export default function Header({ rightContent }: HeaderProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { logout } = useAuth()
   const isOnChat = location.pathname === '/chat'
   const [animKey, setAnimKey] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -23,6 +25,12 @@ export default function Header({ rightContent }: HeaderProps) {
   const navigateBetweenFeatures = () => {
     setMenuOpen(false)
     navigate(destination)
+  }
+
+  const handleLogout = () => {
+    setMenuOpen(false)
+    logout()
+    navigate('/login', { replace: true })
   }
 
   useEffect(() => {
@@ -98,6 +106,14 @@ export default function Header({ rightContent }: HeaderProps) {
               className="mt-8 w-full rounded-xl bg-white px-4 py-3 text-left font-semibold text-[#8A244B] shadow-sm transition active:scale-[0.98]"
             >
               {navigationLabel}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-auto w-full rounded-xl border border-white/60 px-4 py-3 text-left font-semibold text-white transition hover:bg-[#6d1c3a] active:scale-[0.98]"
+            >
+              Log out
             </button>
           </nav>
         </div>
