@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { expandCampusPlaceAliases } from "../src/services/campus-place-alias.services.js";
+import { expandCampusPlaceAliases, resolveUniqueCampusFacility } from "../src/services/campus-place-alias.services.js";
 
 const dictionary = async () => [
   { id: 1, name: "Activity Center", normalized_alias: "activity center" },
@@ -51,5 +51,12 @@ test("skips an alias that maps to multiple facilities", async () => {
   assert.equal(
     await expandCampusPlaceAliases("where is the gym", { dictionary: ambiguousDictionary }),
     "where is the gym",
+  );
+});
+
+test("resolves one facility through any stored alias", async () => {
+  assert.deepEqual(
+    await resolveUniqueCampusFacility("whats at the caf", { dictionary }),
+    { id: 2, name: "Schulze Dining Hall" },
   );
 });

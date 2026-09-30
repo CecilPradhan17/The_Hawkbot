@@ -58,7 +58,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const smalltalkResult = await smalltalkHandler(userMessage);
   if (smalltalkResult) return smalltalkResult;
 
-  const diningMenuResult = await diningMenuHandler(userMessage);
+  const diningMenuResult = await diningMenuHandler(userMessage, { dictionary: facilityDictionary });
   if (diningMenuResult) return diningMenuResult;
 
   // Structured campus hours are authoritative for recognized hours questions.

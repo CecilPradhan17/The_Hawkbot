@@ -28,6 +28,9 @@ test("a structured hours answer skips embedding, vector search, and polishing", 
 test("a dining menu question returns the official link without AI or retrieval", async () => {
   const fail = async () => { throw new Error("Hours, AI, and RAG should not run"); };
   const result = await handleChatQuery("What is Schulze serving right now?", {
+    facilityDictionary: async () => [
+      { id: 2, name: "Schulze Dining Hall", normalized_alias: "schulze" },
+    ],
     hoursHandler: fail,
     embedding: fail,
     database: { query: fail },

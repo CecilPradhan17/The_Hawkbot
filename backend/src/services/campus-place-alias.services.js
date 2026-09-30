@@ -6,6 +6,23 @@ const MAX_CANONICAL_ADDITIONS = 5;
 const containsPhrase = (normalizedQuery, normalizedPhrase) =>
   ` ${normalizedQuery} `.includes(` ${normalizedPhrase} `);
 
+export const resolveUniqueCampusFacility = async (query, dependencies = {}) => {
+  const dictionary = dependencies.dictionary
+    || (() => getFacilityDictionary(dependencies.database));
+  const normalizedQuery = normalizeAlias(query);
+  if (!normalizedQuery) return null;
+
+  const matches = new Map();
+  for (const entry of await dictionary()) {
+    const alias = normalizeAlias(entry.normalized_alias);
+    if (alias && containsPhrase(normalizedQuery, alias)) {
+      matches.set(Number(entry.id), { id: Number(entry.id), name: entry.name });
+    }
+  }
+
+  return matches.size === 1 ? [...matches.values()][0] : null;
+};
+
 export const expandCampusPlaceAliases = async (query, dependencies = {}) => {
   const dictionary = dependencies.dictionary
     || (() => getFacilityDictionary(dependencies.database));

@@ -1,3 +1,6 @@
+import { normalizeAlias } from "./hours-publication.services.js";
+import { resolveUniqueCampusFacility } from "./campus-place-alias.services.js";
+
 export const SCHULZE_MENU_URL = "https://ulm.mydininghub.com/en/location/schulze";
 
 export const diningMenuLinkResponse = () => ({
@@ -14,13 +17,15 @@ const normalize = message => message
   .replace(/\s+/g, " ")
   .trim();
 
-export function tryHandleDiningMenuLink(message) {
+export async function tryHandleDiningMenuLink(message, dependencies = {}) {
   if (typeof message !== "string") return null;
   const normalized = normalize(message);
-  const namesDiningLocation = /\b(?:schulze|dining hall|cafeteria|the caf|ulm dining)\b/.test(normalized);
-  const asksForMenu = /\bmenu\b|\bserv(?:e|es|ed|ing)\b|\bwhat(?:'s| is) for (?:breakfast|brunch|lunch|dinner)\b|\bwhat (?:food|foods|dishes)\b|\bwhat do they have\b/.test(normalized);
+  const asksForMenu = /\bmenu\b|\bserv(?:e|es|ed|ing)\b|\b(?:what's|whats|what is) (?:at|for)\b|\bwhat (?:food|foods|dishes)\b|\bwhat do they have\b/.test(normalized);
+  if (!asksForMenu) return null;
 
-  if (!namesDiningLocation || !asksForMenu) return null;
+  const facility = await resolveUniqueCampusFacility(message, dependencies);
+  const canonicalName = normalizeAlias(facility?.name);
+  if (!facility || !/\b(?:schulze|dining)\b/.test(canonicalName)) return null;
 
   return diningMenuLinkResponse();
 }
