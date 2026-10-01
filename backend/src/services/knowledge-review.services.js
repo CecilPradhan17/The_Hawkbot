@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import pool from "../db.js";
+import { createCorrectionQuestion } from "./knowledge-correction.services.js";
 
 export const CAMPUS_TIME_ZONE = "America/Chicago";
 export const DAILY_VERIFICATION_LIMIT = 5;
@@ -47,7 +48,7 @@ export const resolveVerificationOutcome = async (
 ) => {
   if (!["approved", "disapproved"].includes(postStatus)) return false;
   const result = await client.query(
-    `SELECT v.id, v.knowledge_id, k.review_category
+    `SELECT v.id, v.knowledge_id, k.review_category, k.cleaned_content
      FROM knowledge_verifications v
      JOIN approved_knowledge k ON k.id = v.knowledge_id
      WHERE v.post_id = $1 AND v.status = 'open'
@@ -86,6 +87,11 @@ export const resolveVerificationOutcome = async (
        WHERE id = $1`,
       [verification.knowledge_id]
     );
+    await createCorrectionQuestion(client, {
+      knowledgeId: verification.knowledge_id,
+      fact: verification.cleaned_content,
+      createdAt: resolvedAt,
+    });
   }
   await client.query(
     `UPDATE knowledge_outdated_reports SET resolved_at = $1

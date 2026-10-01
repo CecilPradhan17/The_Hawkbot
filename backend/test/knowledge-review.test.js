@@ -109,7 +109,10 @@ test("rejecting marks the fact as needing an update", async () => {
   const client = {
     async query(text, params) {
       calls.push({ text, params });
-      if (text.includes("FROM knowledge_verifications v")) return { rowCount: 1, rows: [{ id: 42, knowledge_id: 8, review_category: "term" }] };
+      if (text.includes("FROM knowledge_verifications v")) return { rowCount: 1, rows: [{ id: 42, knowledge_id: 8, review_category: "term", cleaned_content: "The current fact." }] };
+      if (text.includes("FROM knowledge_correction_questions")) return { rowCount: 0, rows: [] };
+      if (text.includes("FROM users")) return { rowCount: 1, rows: [{ id: 900 }] };
+      if (text.includes("INSERT INTO posts")) return { rowCount: 1, rows: [{ id: 901 }] };
       return { rows: [] };
     },
   };
@@ -117,6 +120,7 @@ test("rejecting marks the fact as needing an update", async () => {
   const update = calls.find(({ text }) => text.includes("UPDATE approved_knowledge"));
   assert.match(update.text, /status = 'needs_update'/);
   assert.deepEqual(update.params, [8]);
+  assert.ok(calls.some(({ text }) => text.includes("INSERT INTO knowledge_correction_questions")));
 });
 
 const expiryDb = ({ attemptNumber, dailyCount = 0 }) => {
