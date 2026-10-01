@@ -21,6 +21,7 @@
  * - /api/login -> handled by login.routes.js
  * - /api/chat -> handled by chatbot.routes.js
  * - /api/hours -> handled by hours.routes.js
+ * - /api/knowledge/admin -> handled by knowledge-admin.routes.js
  *
  * Notes:
  * - Keeps route registration centralized and readable
@@ -37,6 +38,7 @@ import registerRoutes from './register.routes.js';
 import loginRoutes from './login.routes.js';
 import chatbotRoutes from './chatbot.routes.js';
 import hoursRoutes from './hours.routes.js';
+import knowledgeAdminRoutes from './knowledge-admin.routes.js';
 
 const router = express.Router();
 
@@ -48,5 +50,6 @@ router.use("/register", registerRoutes);
 router.use("/login", loginRoutes);
 router.use("/chat", chatbotRoutes);
 router.use("/hours", hoursRoutes);
+router.use("/knowledge/admin", knowledgeAdminRoutes);
 
 export default router;
