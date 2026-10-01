@@ -1,0 +1,55 @@
+import pool from "../db.js";
+
+const VALID_STATUSES = new Set(["all", "active", "needs_update", "replaced"]);
+
+export const listKnowledgeForAdmin = async (
+  { status = "all", limit = 50, offset = 0 } = {},
+  database = pool,
+) => {
+  if (!VALID_STATUSES.has(status)) {
+    const error = new Error("Invalid knowledge status");
+    error.status = 400;
+    throw error;
+  }
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+  const result = await database.query(
+    `SELECT k.id, k.cleaned_content AS content, k.raw_content,
+            k.status, k.review_category, k.last_verified_at, k.review_due_at,
+            k.verification_requested_at, k.source_post_id, source.content AS source_content,
+            source.type AS source_type, k.superseded_by_id,
+            replacement.cleaned_content AS replacement_content,
+            verification.status AS latest_verification_status,
+            verification.resolved_at AS latest_verification_at,
+            correction.status AS correction_status,
+            correction.question_post_id AS correction_question_post_id,
+            COUNT(*) OVER()::integer AS total_count
+     FROM approved_knowledge k
+     LEFT JOIN posts source ON source.id = k.source_post_id
+     LEFT JOIN approved_knowledge replacement ON replacement.id = k.superseded_by_id
+     LEFT JOIN LATERAL (
+       SELECT status, resolved_at
+       FROM knowledge_verifications
+       WHERE knowledge_id = k.id
+       ORDER BY opened_at DESC, id DESC
+       LIMIT 1
+     ) verification ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT status, question_post_id
+       FROM knowledge_correction_questions
+       WHERE knowledge_id = k.id
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1
+     ) correction ON TRUE
+     WHERE ($1 = 'all' OR k.status = $1)
+     ORDER BY k.id DESC
+     LIMIT $2 OFFSET $3`,
+    [status, safeLimit, safeOffset],
+  );
+  return {
+    items: result.rows.map(({ total_count, ...row }) => row),
+    total: Number(result.rows[0]?.total_count || 0),
+    limit: safeLimit,
+    offset: safeOffset,
+  };
+};
