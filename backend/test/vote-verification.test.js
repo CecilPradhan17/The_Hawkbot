@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { voteOnPost } from "../src/services/vote.services.js";
+import { resolveApprovalThreshold, voteOnPost } from "../src/services/vote.services.js";
 
 const createVoteDatabase = ({ voteCount = 3 } = {}) => {
   const calls = [];
@@ -83,4 +83,8 @@ test("rejects an invalid vote threshold before opening a database connection", a
     /must be a positive number/,
   );
   assert.equal(connected, false);
+});
+
+test("uses a safe approval threshold when deployment configuration is absent", () => {
+  assert.equal(resolveApprovalThreshold(null), 5);
 });

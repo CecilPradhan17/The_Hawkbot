@@ -18,16 +18,22 @@ import 'dotenv/config';
  * vote.controller.js → handleVote
  */
 const APPROVAL_THRESHOLD = process.env.VOTE_APPROVAL_THRESHOLD;
+const DEFAULT_APPROVAL_THRESHOLD = 5;
+
+export const resolveApprovalThreshold = (configuredThreshold = APPROVAL_THRESHOLD) => {
+  const threshold = Number(configuredThreshold ?? DEFAULT_APPROVAL_THRESHOLD);
+  if (!Number.isFinite(threshold) || threshold <= 0) {
+    throw new Error("VOTE_APPROVAL_THRESHOLD must be a positive number");
+  }
+  return threshold;
+};
 
 export const voteOnPost = async ({ userId, postId, vote }, dependencies = {}) => {
   const database = dependencies.database || pool;
   const postApproval = dependencies.postApproval || processPostApproval;
   const answerApproval = dependencies.answerApproval || processApproval;
   const verificationResolver = dependencies.verificationResolver || resolveVerificationOutcome;
-  const threshold = Number(dependencies.approvalThreshold || APPROVAL_THRESHOLD);
-  if (!Number.isFinite(threshold) || threshold <= 0) {
-    throw new Error("VOTE_APPROVAL_THRESHOLD must be a positive number");
-  }
+  const threshold = resolveApprovalThreshold(dependencies.approvalThreshold);
   const client = await database.connect();
   try {
     await client.query("BEGIN");
