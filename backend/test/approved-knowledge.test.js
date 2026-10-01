@@ -11,6 +11,7 @@ const createDb = ({ failOnInsert = 0 } = {}) => {
       if (text.includes("INSERT")) {
         inserts += 1;
         if (inserts === failOnInsert) throw new Error("insert failed");
+        return { rows: [{ id: 100 + inserts }] };
       }
       return { rows: [] };
     },
@@ -82,4 +83,40 @@ test("does not open a transaction when embedding generation fails", async () => 
   );
 
   assert.equal(calls.length, 0);
+});
+
+test("runs replacement linking inside the storage transaction", async () => {
+  const { db, calls } = createDb();
+  let callbackClient;
+
+  const stored = await storeApprovedKnowledge({
+    db,
+    sourcePostId: 42,
+    chunks: [{ content: "replacement fact", reviewCategory: "yearly" }],
+    generateEmbedding: async () => [0.1],
+    afterStore: async ({ client, stored: inserted }) => {
+      callbackClient = client;
+      assert.deepEqual(inserted, [{ id: 101, content: "replacement fact", reviewCategory: "yearly" }]);
+      await client.query("UPDATE correction link");
+    },
+  });
+
+  assert.ok(callbackClient);
+  assert.deepEqual(stored, [{ id: 101, content: "replacement fact", reviewCategory: "yearly" }]);
+  assert.deepEqual(calls.slice(-3).map(({ text }) => text), ["UPDATE correction link", "COMMIT", "RELEASE"]);
+});
+
+test("rolls back inserted facts when replacement linking fails", async () => {
+  const { db, calls } = createDb();
+  await assert.rejects(
+    storeApprovedKnowledge({
+      db,
+      sourcePostId: 42,
+      chunks: [{ content: "replacement fact", reviewCategory: "yearly" }],
+      generateEmbedding: async () => [0.1],
+      afterStore: async () => { throw new Error("link failed"); },
+    }),
+    /link failed/,
+  );
+  assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["ROLLBACK", "RELEASE"]);
 });

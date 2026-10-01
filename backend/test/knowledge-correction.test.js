@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import {
   buildCorrectionQuestionContent,
   createCorrectionQuestion,
+  findOpenCorrectionForQuestion,
+  linkCorrectionReplacement,
 } from "../src/services/knowledge-correction.services.js";
 
 test("builds a normal correction question within the post limit", () => {
@@ -61,4 +63,51 @@ test("migration links one open correction question to a stale fact", () => {
   assert.match(migration, /question_post_id INTEGER NOT NULL UNIQUE REFERENCES posts/);
   assert.match(migration, /replacement_knowledge_id INTEGER REFERENCES approved_knowledge/);
   assert.match(migration, /knowledge_correction_questions_one_open_per_fact_idx/);
+});
+
+test("finds an open correction by its HawkWall question", async () => {
+  const database = {
+    async query(_text, params) {
+      assert.deepEqual(params, [44]);
+      return { rows: [{ id: 5, knowledge_id: 8 }] };
+    },
+  };
+  assert.deepEqual(
+    await findOpenCorrectionForQuestion(database, 44),
+    { id: 5, knowledge_id: 8 },
+  );
+});
+
+test("links the stale fact and resolves its correction", async () => {
+  const calls = [];
+  const client = {
+    async query(text, params) {
+      calls.push({ text, params });
+      return { rowCount: 1, rows: [{ id: 1 }] };
+    },
+  };
+  const resolvedAt = new Date("2026-10-01T15:00:00.000Z");
+  await linkCorrectionReplacement(client, {
+    correctionId: 5,
+    knowledgeId: 8,
+    replacementKnowledgeId: 12,
+    resolvedAt,
+  });
+  assert.match(calls[0].text, /status = 'replaced'/);
+  assert.deepEqual(calls[0].params, [12, 8]);
+  assert.match(calls[1].text, /status = 'resolved'/);
+  assert.deepEqual(calls[1].params, [12, resolvedAt, 5]);
+});
+
+test("refuses to resolve a correction when the stale fact is unavailable", async () => {
+  const client = { async query() { return { rowCount: 0, rows: [] }; } };
+  await assert.rejects(
+    linkCorrectionReplacement(client, {
+      correctionId: 5,
+      knowledgeId: 8,
+      replacementKnowledgeId: 12,
+      resolvedAt: new Date(),
+    }),
+    /not available for replacement/,
+  );
 });

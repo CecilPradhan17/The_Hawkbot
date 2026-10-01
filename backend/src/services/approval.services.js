@@ -2,6 +2,10 @@ import pool from "../db.js";
 import { curateKnowledge } from "./llm.services.js";
 import { generateEmbedding } from "./embedding.services.js";
 import { storeApprovedKnowledge } from "./approved-knowledge.services.js";
+import {
+  findOpenCorrectionForQuestion,
+  linkCorrectionReplacement,
+} from "./knowledge-correction.services.js";
 
 /**
  * PURPOSE:
@@ -21,14 +25,20 @@ import { storeApprovedKnowledge } from "./approved-knowledge.services.js";
  * This function is fire-and-forget from vote.service.js.
  * Errors are caught and logged without disrupting the vote response.
  */
-export const processApproval = async (answerId, parentQuestionId) => {
+export const processApproval = async (answerId, parentQuestionId, dependencies = {}) => {
+  const database = dependencies.database || pool;
+  const curator = dependencies.curator || curateKnowledge;
+  const embeddingGenerator = dependencies.embeddingGenerator || generateEmbedding;
+  const storage = dependencies.storage || storeApprovedKnowledge;
+  const correctionFinder = dependencies.correctionFinder || findOpenCorrectionForQuestion;
+  const replacementLinker = dependencies.replacementLinker || linkCorrectionReplacement;
   try {
-    const answerRes = await pool.query(
+    const answerRes = await database.query(
       `SELECT id, content FROM posts WHERE id = $1`,
       [answerId]
     );
 
-    const questionRes = await pool.query(
+    const questionRes = await database.query(
       `SELECT id, content FROM posts WHERE id = $1`,
       [parentQuestionId]
     );
@@ -40,23 +50,34 @@ export const processApproval = async (answerId, parentQuestionId) => {
 
     const answer = answerRes.rows[0];
     const question = questionRes.rows[0];
+    const correction = await correctionFinder(database, parentQuestionId);
 
     // Curate the Q+A pair using one LLM call per approval.
-    const knowledgeChunks = await curateKnowledge({
+    const knowledgeChunks = await curator({
       type: "question",
       question: question.content,
       answer: answer.content,
     });
 
-    await storeApprovedKnowledge({
-      db: pool,
+    await storage({
+      db: database,
       sourcePostId: answer.id,
       rawContent: JSON.stringify({
         question: question.content,
         answer: answer.content,
       }),
       chunks: knowledgeChunks,
-      generateEmbedding,
+      generateEmbedding: embeddingGenerator,
+      afterStore: correction
+        ? async ({ client, stored, verifiedAt }) => {
+            await replacementLinker(client, {
+              correctionId: correction.id,
+              knowledgeId: correction.knowledge_id,
+              replacementKnowledgeId: stored[0].id,
+              resolvedAt: verifiedAt,
+            });
+          }
+        : null,
     });
 
     console.log(`Approved knowledge stored for answer ID ${answerId}`);

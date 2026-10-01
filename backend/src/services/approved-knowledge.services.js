@@ -6,6 +6,7 @@ export const storeApprovedKnowledge = async ({
   rawContent = null,
   chunks,
   generateEmbedding,
+  afterStore = null,
 }) => {
   if (!Array.isArray(chunks) || chunks.length === 0) {
     throw new Error("At least one knowledge chunk is required");
@@ -24,20 +25,25 @@ export const storeApprovedKnowledge = async ({
   const client = await db.connect();
   try {
     await client.query("BEGIN");
+    const stored = [];
 
     for (const { content, reviewCategory, embedding } of embeddedChunks) {
       const reviewDueAt = calculateNextReviewAt(reviewCategory, verifiedAt);
-      await client.query(
+      const inserted = await client.query(
         `INSERT INTO approved_knowledge
            (source_post_id, cleaned_content, raw_content, embedding, review_category,
             last_verified_at, review_due_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
         [sourcePostId, content, rawContent, JSON.stringify(embedding), reviewCategory,
           verifiedAt, reviewDueAt]
       );
+      stored.push({ id: inserted.rows[0].id, content, reviewCategory });
     }
 
+    if (afterStore) await afterStore({ client, stored, verifiedAt });
     await client.query("COMMIT");
+    return stored;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

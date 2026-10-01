@@ -279,3 +279,29 @@ wait for the daily review job rather than bypassing its five-post publication ca
 **Resume/interview angle:** Added traceable, abuse-resistant user feedback to a RAG
 system by connecting generated answers back to atomic source IDs and routing consensus
 through a transactional human-in-the-loop revalidation workflow.
+
+## 2026-10-01 — Community correction questions replace stale facts
+
+**Context:** A rejected verification correctly removes stale knowledge from RAG, but
+without a replacement path the community has no clear way to supply updated facts and
+new approvals cannot be associated with the specific knowledge they supersede.
+
+**Decision:** When HawkNah reaches the verification threshold, Hawkbot creates one
+normal HawkWall question linked to the stale fact. Students answer and vote through the
+existing workflow. Approval still curates and embeds atomic facts; inside that same
+storage transaction, the first new atomic fact becomes the canonical replacement, the
+old fact becomes `replaced`, and the correction question becomes `resolved`.
+
+**Alternatives considered:** Free-form admin editing would bypass community approval
+and require careful embedding regeneration. Treating the correction as unrelated new
+knowledge would leave no lineage and could preserve conflicting records. A separate
+correction UI would duplicate the established question, answer, and voting workflow.
+
+**Trade-offs:** A correction answer that produces multiple atomic facts uses the first
+as the direct successor because the stale record has one `superseded_by_id`; all other
+curated facts are still stored as active knowledge. Correction wording is deterministic
+and truncated to the standard 250-character post limit, avoiding another AI call.
+
+**Resume/interview angle:** Completed a community-governed knowledge lifecycle with
+transactional lineage from stale fact to correction question to embedded replacement,
+reusing existing moderation primitives while preventing partial replacement state.
