@@ -14,7 +14,7 @@ const HAWKBOT_PATH = "M 31.6 98 Q 43 98 52.55 94.05 Q 62.1 90.1 69.55 83.4 Q 77 
 export default function Header({ rightContent }: HeaderProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { logout } = useAuth()
+  const { isAdmin, logout } = useAuth()
   const isOnChat = location.pathname === '/chat'
   const [animKey, setAnimKey] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -25,6 +25,11 @@ export default function Header({ rightContent }: HeaderProps) {
   const navigateBetweenFeatures = () => {
     setMenuOpen(false)
     navigate(destination)
+  }
+
+  const navigateTo = (path: string) => {
+    setMenuOpen(false)
+    navigate(path)
   }
 
   const handleLogout = () => {
@@ -107,6 +112,38 @@ export default function Header({ rightContent }: HeaderProps) {
             >
               {navigationLabel}
             </button>
+
+            {isAdmin && (
+              <div className="mt-6 border-t border-white/25 pt-5">
+                <p className="px-1 text-xs font-bold uppercase tracking-widest text-white/70">Admin tools</p>
+                <div className="mt-3 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('/hours/admin')}
+                    aria-current={location.pathname === '/hours/admin' ? 'page' : undefined}
+                    className={`w-full rounded-xl px-4 py-3 text-left font-semibold transition active:scale-[0.98] ${
+                      location.pathname === '/hours/admin'
+                        ? 'bg-white text-[#8A244B] shadow-sm'
+                        : 'border border-white/40 text-white hover:bg-[#6d1c3a]'
+                    }`}
+                  >
+                    Hours Manager
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('/knowledge/admin')}
+                    aria-current={location.pathname === '/knowledge/admin' ? 'page' : undefined}
+                    className={`w-full rounded-xl px-4 py-3 text-left font-semibold transition active:scale-[0.98] ${
+                      location.pathname === '/knowledge/admin'
+                        ? 'bg-white text-[#8A244B] shadow-sm'
+                        : 'border border-white/40 text-white hover:bg-[#6d1c3a]'
+                    }`}
+                  >
+                    Knowledge Manager
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
               type="button"
