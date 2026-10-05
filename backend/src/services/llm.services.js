@@ -136,6 +136,7 @@ export const polishResponse = async (userQuery, knowledge, options = {}) => {
   const allowHoursTool = options.allowHoursTool !== false && facilities.length > 0;
   const currentDate = options.currentDate || new Date().toISOString().slice(0, 10);
   const candidateIds = Array.isArray(options.candidateIds) ? options.candidateIds.map(Number) : [];
+  const officialResources = Array.isArray(options.officialResources) ? options.officialResources : [];
   const prompt = `You are a helpful university campus assistant chatbot.
 A student asked: "${userQuery}"
 
@@ -147,6 +148,15 @@ Set answerable to false when the knowledge is merely related but does not contai
 When answerable is true, respond conversationally and helpfully in 1-2 sentences using only the selected candidates.
 Do not use unselected candidates and do not add information that is not provided.
 When answerable is false, return an empty response and an empty relevantCandidateIds array. Do not write an apology or suggest another source.
+
+${officialResources.length ? `You can request open_official_resource when one listed official resource is the best place for the student to get information that is not fully answered by campus knowledge. Select only a resource ID from the catalog. Do not claim to have read or retrieved information from the linked page.
+
+Official resource catalog: ${JSON.stringify(officialResources.map(resource => ({
+    resourceId: resource.resourceId,
+    name: resource.name,
+    description: resource.description,
+    aliases: resource.aliases,
+  })))}` : "No official resource link tool is available for this request."}
 
 Request open_schulze_menu when the student is asking what food, dishes, or menu items are currently or subsequently available at Schulze Dining Hall, the dining hall, or the cafeteria. Do not request it for operating-hours, location, meal-plan, or general dining questions. Never answer a menu question from campus knowledge.
 
@@ -169,7 +179,25 @@ Knowledge: "${knowledge}"`;
         additionalProperties: false,
       },
     },
-  }, ...(allowHoursTool ? [{
+  }, ...(officialResources.length ? [{
+    type: "function",
+    function: {
+      name: "open_official_resource",
+      description: "Direct the student to one validated official university resource from the provided catalog.",
+      strict: true,
+      parameters: {
+        type: "object",
+        properties: {
+          resourceId: {
+            type: "integer",
+            enum: officialResources.map(resource => resource.resourceId),
+          },
+        },
+        required: ["resourceId"],
+        additionalProperties: false,
+      },
+    },
+  }] : []), ...(allowHoursTool ? [{
     type: "function",
     function: {
       name: "lookup_hours",
@@ -226,6 +254,15 @@ Knowledge: "${knowledge}"`;
 
   const menuToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "open_schulze_menu");
   if (menuToolCall) return { answerable: false, response: "", diningMenuLink: true };
+
+  const resourceToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "open_official_resource");
+  if (resourceToolCall) {
+    try {
+      return { answerable: false, response: "", officialResourceId: JSON.parse(resourceToolCall.function.arguments).resourceId };
+    } catch {
+      return { answerable: false, response: "" };
+    }
+  }
 
   const hoursToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "lookup_hours");
   if (hoursToolCall) {

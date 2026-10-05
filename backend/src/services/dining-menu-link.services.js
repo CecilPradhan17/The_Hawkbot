@@ -4,9 +4,10 @@ import { resolveUniqueCampusFacility } from "./campus-place-alias.services.js";
 export const SCHULZE_MENU_URL = "https://ulm.mydininghub.com/en/location/schulze";
 
 export const diningMenuLinkResponse = () => ({
-  response: `You can view the current Schulze Dining Hall menu on ULM Dining's official website.\n\nSource: ${SCHULZE_MENU_URL}`,
+  response: "You can view the current Schulze Dining Hall menu on ULM Dining's official website.",
   matched: true,
   sourceType: "dining_link",
+  sources: [{ title: "ULM Dining menu", url: SCHULZE_MENU_URL, lastVerifiedAt: null }],
 });
 
 const normalize = message => message

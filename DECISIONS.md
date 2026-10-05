@@ -22,6 +22,25 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-10-01 — Official resources are a curated directory, not scraped knowledge
+
+**Context:** Hawkbot needs to help with information that has not yet been contributed
+to HawkWall, while avoiding the maintenance and authorization burden of scraping.
+
+**Decision:** Store reviewed URLs, descriptions, response copy, priorities, and aliases
+in PostgreSQL. Match clear navigation requests deterministically, and let the LLM route
+unusual wording only through a tool constrained to active resource IDs. The backend
+validates the selected ID and returns structured source metadata to the client.
+
+**Alternatives considered:** Live scraping and page-specific hardcoded routes. Scraping
+is deferred until a source needs inline live data; hardcoded routes do not scale.
+
+**Trade-offs:** The directory can guide students to authoritative pages but does not
+claim to read their current contents. Links require periodic human verification.
+
+**Resume/interview angle:** Added a governed, database-driven resource layer that
+expands coverage without relaxing RAG grounding or coupling the client to external URLs.
+
 ## 2026-09-30 — Link-only live dining menu guidance
 
 **Context:** MyDiningHub exposes Schulze's current menu through an undocumented public

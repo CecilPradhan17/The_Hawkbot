@@ -8,6 +8,12 @@ import { formatKnowledgeCandidates, isConfidentCandidate, retrieveKnowledgeCandi
 import { expandCampusPlaceAliases } from "./campus-place-alias.services.js";
 import { getFacilityDictionary } from "./hours-repository.services.js";
 import { diningMenuLinkResponse, tryHandleDiningMenuLink } from "./dining-menu-link.services.js";
+import {
+  getOfficialResourceCatalog,
+  isResourceNavigationRequest,
+  matchOfficialResource,
+  officialResourceResponse,
+} from "./official-resource.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -49,6 +55,8 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const retriever = dependencies.retriever
     || ((queryEmbedding, queryText) => retrieveKnowledgeCandidates(queryEmbedding, queryText, { database }));
   const polisher = dependencies.polisher || polishResponse;
+  const resourceCatalog = dependencies.resourceCatalog
+    || (dependencies.retriever ? async () => [] : () => getOfficialResourceCatalog(database));
   const hoursToolResolver = dependencies.hoursToolResolver || resolveHoursToolLookup;
   const aliasExpander = dependencies.aliasExpander
     || (dependencies.retriever
@@ -65,6 +73,17 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   // An uncovered date returns an explicit unverified response rather than stale RAG data.
   const hoursResult = await hoursHandler(userMessage);
   if (hoursResult) return hoursResult;
+
+  let officialResources = [];
+  try {
+    officialResources = await resourceCatalog();
+  } catch (error) {
+    console.error("Official resource catalog failed:", error.message);
+  }
+  const matchedResource = matchOfficialResource(userMessage, officialResources);
+  if (matchedResource && isResourceNavigationRequest(userMessage)) {
+    return officialResourceResponse(matchedResource);
+  }
 
   let retrievalQuery = userMessage;
   try {
@@ -92,7 +111,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   } catch (error) {
     console.error("Hours tool catalog failed:", error.message);
   }
-  if (confidentRows.length === 0 && facilities.length === 0) {
+  if (confidentRows.length === 0 && facilities.length === 0 && officialResources.length === 0) {
     return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
   }
 
@@ -105,7 +124,12 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
     allowHoursTool: facilities.length > 0,
     currentDate: DateTime.now().setZone("America/Chicago").toISODate(),
     candidateIds,
+    officialResources,
   });
+  if (polished?.officialResourceId) {
+    const selectedResource = officialResources.find(resource => resource.resourceId === Number(polished.officialResourceId));
+    if (selectedResource) return officialResourceResponse(selectedResource);
+  }
   if (polished?.diningMenuLink) return diningMenuLinkResponse();
   if (polished?.hoursLookup) {
     const requestedId = Number(polished.hoursLookup.facilityId);
@@ -128,6 +152,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   const validSelection = selectedIds.length > 0
     && selectedIds.every(id => Number.isInteger(id) && allowedIds.has(id));
   if (!polished?.answerable || !polished.response?.trim() || !validSelection) {
+    if (matchedResource) return officialResourceResponse(matchedResource);
     return { response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" };
   }
   return {

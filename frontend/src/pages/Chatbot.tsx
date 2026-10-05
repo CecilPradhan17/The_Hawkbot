@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { reportOutdatedKnowledge, sendChatMessage } from '@/api/chat.api'
+import { reportOutdatedKnowledge, sendChatMessage, type ChatSource } from '@/api/chat.api'
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
@@ -21,6 +21,7 @@ interface Message {
   draftQuestion?: string
   postedToHawkwall?: boolean
   knowledgeIds?: number[]
+  sources?: ChatSource[]
   outdatedState?: 'sending' | 'reported' | 'error'
 }
 
@@ -29,7 +30,28 @@ interface QuestionDraft {
   content: string
 }
 
-function BotMessageContent({ content }: { content: string }) {
+function BotMessageContent({ content, sources = [] }: { content: string; sources?: ChatSource[] }) {
+  if (sources.length) {
+    return (
+      <>
+        {content}
+        <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2 text-xs text-slate-500">
+          <span>Official source:</span>
+          {sources.map(source => (
+            <a
+              key={source.url}
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-fit font-medium text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]"
+            >
+              {source.title}
+            </a>
+          ))}
+        </div>
+      </>
+    )
+  }
   const marker = '\n\nSource:'
   const sourceIndex = content.lastIndexOf(marker)
   if (sourceIndex === -1) return <>{content}</>
@@ -135,6 +157,7 @@ export default function Chatbot() {
           matched: data.matched,
           draftQuestion: data.matched ? undefined : trimmed,
           knowledgeIds: data.knowledgeIds,
+          sources: data.sources,
         },
       ])
     } catch (err: unknown) {
@@ -216,7 +239,7 @@ export default function Chatbot() {
                         : 'bg-white text-slate-700 shadow-sm border border-slate-200 rounded-bl-sm'
                     }`}
                 >
-                  {message.role === 'bot' ? <BotMessageContent content={message.content} /> : message.content}
+                  {message.role === 'bot' ? <BotMessageContent content={message.content} sources={message.sources} /> : message.content}
                   {message.role === 'bot' && message.matched === false && !message.isError && (
                     <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
                       {message.postedToHawkwall ? (

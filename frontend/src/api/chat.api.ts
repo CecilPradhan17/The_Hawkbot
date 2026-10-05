@@ -9,6 +9,13 @@ export interface ChatResponse {
   matched: boolean
   similarity?: number
   knowledgeIds?: number[]
+  sources?: ChatSource[]
+}
+
+export interface ChatSource {
+  title: string
+  url: string
+  lastVerifiedAt?: string | null
 }
 
 export function reportOutdatedKnowledge(knowledgeIds: number[]): Promise<{ reported: boolean; queued: boolean }> {

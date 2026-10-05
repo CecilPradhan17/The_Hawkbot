@@ -38,7 +38,7 @@ test("a dining menu question returns the official link without AI or retrieval",
   });
   assert.equal(result.sourceType, "dining_link");
   assert.equal(result.matched, true);
-  assert.match(result.response, /https:\/\/ulm\.mydininghub\.com\/en\/location\/schulze/);
+  assert.equal(result.sources[0].url, "https://ulm.mydininghub.com/en/location/schulze");
 });
 
 test("the AI can route an unusually worded dining request to the fixed official link", async () => {
@@ -51,7 +51,7 @@ test("the AI can route an unusually worded dining request to the fixed official 
   });
   assert.equal(result.sourceType, "dining_link");
   assert.equal(result.matched, true);
-  assert.match(result.response, /https:\/\/ulm\.mydininghub\.com\/en\/location\/schulze/);
+  assert.equal(result.sources[0].url, "https://ulm.mydininghub.com/en/location/schulze");
 });
 
 test("an uncertain question falls through to the existing RAG flow", async () => {
@@ -316,4 +316,40 @@ test("rejects an answer that cites a candidate outside the retrieved pool", asyn
   });
   assert.equal(result.matched, false);
   assert.equal(result.sourceType, "fallback");
+});
+
+test("a direct resource request skips embeddings and returns a validated official link", async () => {
+  const fail = async () => { throw new Error("RAG should not run"); };
+  const resource = {
+    resourceId: 12, slug: "employee-directory", name: "ULM employee directory",
+    description: "Faculty and staff contacts", url: "https://ulmapps.ulm.edu/search/index.php?tab=1",
+    responseText: "Search the official directory.", aliases: ["professor email", "employee directory"], priority: 90,
+  };
+  const result = await handleChatQuery("Where can I find my professor's email?", {
+    hoursHandler: async () => null,
+    resourceCatalog: async () => [resource],
+    embedding: fail,
+  });
+  assert.equal(result.sourceType, "official_resource");
+  assert.equal(result.sources[0].url, resource.url);
+});
+
+test("the AI may select only a resource from the backend catalog", async () => {
+  const resource = {
+    resourceId: 20, slug: "library", name: "ULM Library", description: "Research help",
+    url: "https://www.ulm.edu/library/", responseText: "Use the library website.", aliases: ["research guide"],
+  };
+  const result = await handleChatQuery("I need scholarly sources for my paper", {
+    hoursHandler: async () => null,
+    resourceCatalog: async () => [resource],
+    embedding: async () => [0.1],
+    retriever: async () => [],
+    facilityCatalog: async () => [],
+    polisher: async (_query, _knowledge, options) => {
+      assert.deepEqual(options.officialResources, [resource]);
+      return { answerable: false, response: "", officialResourceId: 20 };
+    },
+  });
+  assert.equal(result.sourceType, "official_resource");
+  assert.equal(result.sources[0].url, resource.url);
 });
