@@ -7,6 +7,7 @@ import Posts from '@/pages/Posts'
 import Chatbot from '@/pages/Chatbot'
 import Landing from '@/pages/Landing'
 import HoursAdmin from '@/pages/HoursAdmin'
+import KnowledgeAdmin from '@/pages/KnowledgeAdmin'
 import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
 import ServerWakeModal from '@/components/ServerWakeModal'
 import PwaUpdatePrompt from '@/components/PwaUpdatePrompt'
@@ -36,6 +37,24 @@ function GuestOnlyRoute({ children }: { children: ReactNode }) {
   return children
 }
 
+function AdminOnlyRoute({ children }: { children: ReactNode }) {
+  const { isAdmin, isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-background"
+        role="status"
+        aria-label="Checking administrator access"
+      >
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      </div>
+    )
+  }
+
+  return isAdmin ? children : <Navigate to="/posts" replace />
+}
+
 function AppInner() {
   const { isWaking } = useServerWake()
   const { userId } = useAuth()
@@ -52,6 +71,7 @@ function AppInner() {
             <Route path="/posts" element={<Posts />} />
             <Route path="/chat" element={<Chatbot />} />
             <Route path="/hours/admin" element={<HoursAdmin />} />
+            <Route path="/knowledge/admin" element={<AdminOnlyRoute><KnowledgeAdmin /></AdminOnlyRoute>} />
           </Route>
         </Routes>
       </HawkwallFeedProvider>
