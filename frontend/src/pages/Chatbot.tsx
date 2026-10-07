@@ -3,8 +3,7 @@ import { reportOutdatedKnowledge, sendChatMessage, type ChatSource } from '@/api
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   DAILY_CHAT_LIMIT,
   MAX_CHAT_MESSAGE_LENGTH,
@@ -32,6 +31,39 @@ interface QuestionDraft {
   content: string
 }
 
+const chatStorageKey = (userId: number) => `hawkbot-chat-messages:${userId}`
+
+function loadChatMessages(userId: number | null): Message[] {
+  if (userId === null) return []
+  try {
+    const stored = sessionStorage.getItem(chatStorageKey(userId))
+    if (!stored) return []
+    const parsed: unknown = JSON.parse(stored)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((message): message is Message => {
+      if (!message || typeof message !== 'object') return false
+      const candidate = message as Partial<Message>
+      return typeof candidate.id === 'number'
+        && (candidate.role === 'user' || candidate.role === 'bot')
+        && typeof candidate.content === 'string'
+    })
+  } catch {
+    return []
+  }
+}
+
+function saveChatMessages(userId: number | null, messages: Message[]) {
+  if (userId === null) return
+  try {
+    const stableMessages = messages.map(message => message.outdatedState === 'sending'
+      ? { ...message, outdatedState: undefined }
+      : message)
+    sessionStorage.setItem(chatStorageKey(userId), JSON.stringify(stableMessages))
+  } catch {
+    // Storage can be unavailable in private browsing or when its quota is exhausted.
+  }
+}
+
 function BotMessageContent({ content, sources = [] }: { content: string; sources?: ChatSource[] }) {
   if (sources.length) {
     return (
@@ -51,7 +83,7 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
                   {source.createdAt ? ` · ${getTimeAgo(source.createdAt)}` : ''}
                 </span>
                 <Link to={source.url} className="font-semibold text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]">
-                  View discussion
+                  See source
                 </Link>
               </div>
             </div>
@@ -100,11 +132,11 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
 export default function Chatbot() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { username, isAdmin } = useAuth()
+  const { userId, username, isAdmin } = useAuth()
   const initialMessage = typeof (location.state as { initialMessage?: unknown } | null)?.initialMessage === 'string'
     ? (location.state as { initialMessage: string }).initialMessage
     : ''
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<Message[]>(() => loadChatMessages(userId))
   const [greeting] = useState(() => getRandomChatGreeting(username))
   const [input, setInput] = useState(initialMessage)
   const [loading, setLoading] = useState(false)
@@ -121,6 +153,10 @@ export default function Chatbot() {
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    saveChatMessages(userId, messages)
+  }, [messages, userId])
 
   useEffect(() => {
     if (!initialMessagePending.current) return

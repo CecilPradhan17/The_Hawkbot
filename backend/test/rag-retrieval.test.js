@@ -63,7 +63,7 @@ test("builds one inspectable HawkWall citation per selected source post", () => 
     excerpt: "Apply through the student employment portal.",
     postId: 52,
     threadPostId: 40,
-    url: "/posts?post=40",
+    url: "/sources/hawkwall/40?source=52",
     approvalCount: 8,
     createdAt: "2026-09-01T12:00:00.000Z",
     lastVerifiedAt: "2026-10-01T12:00:00.000Z",

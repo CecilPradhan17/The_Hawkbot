@@ -8,6 +8,7 @@ import Chatbot from '@/pages/Chatbot'
 import Landing from '@/pages/Landing'
 import HoursAdmin from '@/pages/HoursAdmin'
 import KnowledgeAdmin from '@/pages/KnowledgeAdmin'
+import HawkWallSource from '@/pages/HawkWallSource'
 import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
 import ServerWakeModal from '@/components/ServerWakeModal'
 import PwaUpdatePrompt from '@/components/PwaUpdatePrompt'
@@ -69,7 +70,8 @@ function AppInner() {
 
           <Route element={<ProtectedRoute />}>
             <Route path="/posts" element={<Posts />} />
-            <Route path="/chat" element={<Chatbot />} />
+            <Route path="/chat" element={<Chatbot key={userId ?? 'unknown'} />} />
+            <Route path="/sources/hawkwall/:threadId" element={<HawkWallSource />} />
             <Route path="/hours/admin" element={<HoursAdmin />} />
             <Route path="/knowledge/admin" element={<AdminOnlyRoute><KnowledgeAdmin /></AdminOnlyRoute>} />
           </Route>

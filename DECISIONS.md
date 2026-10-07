@@ -22,6 +22,29 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-10-06 — Chat history is tab-scoped and evidence opens outside the feed
+
+**Context:** Following a HawkWall citation unmounted the chat and lost its local
+conversation. Citations also opened the full HawkWall feed, making it difficult to
+inspect the exact evidence and return to the answer.
+
+**Decision:** Persist each user's rendered chat messages in `sessionStorage`, keyed by
+user ID, so navigation and refreshes in the same tab restore the conversation while
+closing the tab clears it. HawkWall citations now open a dedicated read-only evidence
+route that shows the isolated thread, highlights the exact source post, preserves
+moderation labels, and links directly back to Hawkbot.
+
+**Alternatives considered:** Global React state would survive route changes but not a
+refresh; `localStorage` or server-side transcripts would retain conversations beyond the
+tab and require a separate privacy and deletion policy.
+
+**Trade-offs:** In-flight requests are not resumed, and conversation history does not
+sync across tabs or devices. That matches the requested tab lifetime without creating a
+durable chat-history product.
+
+**Resume/interview angle:** Added privacy-bounded client persistence and a focused
+evidence-inspection workflow with account isolation and source-level highlighting.
+
 ## 2026-10-06 — RAG answers preserve inspectable HawkWall provenance
 
 **Context:** Hawkbot could select several approved facts, but returned only a synthesized
