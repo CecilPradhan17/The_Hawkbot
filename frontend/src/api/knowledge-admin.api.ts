@@ -112,3 +112,12 @@ export async function updateAdminKnowledgeReviewCategory(
     reviewDueAt: result.review_due_at,
   }
 }
+
+export function queueAdminKnowledgeReview(knowledgeId: number): Promise<{
+  id: number
+  queued: boolean
+  alreadyOpen: boolean
+  reviewDueAt?: string
+}> {
+  return api.post(`/knowledge/admin/${knowledgeId}/review`, {})
+}
