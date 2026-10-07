@@ -1,6 +1,8 @@
 import pool from "../db.js";
+import { calculateNextReviewAt } from "./knowledge-review.services.js";
 
 const VALID_STATUSES = new Set(["all", "active", "needs_update", "replaced"]);
+const VALID_REVIEW_CATEGORIES = new Set(["stable", "yearly", "term", "frequent"]);
 
 export const listKnowledgeForAdmin = async (
   { status = "all", limit = 50, offset = 0 } = {},
@@ -52,4 +54,58 @@ export const listKnowledgeForAdmin = async (
     limit: safeLimit,
     offset: safeOffset,
   };
+};
+
+export const updateKnowledgeReviewCategory = async (
+  knowledgeId,
+  reviewCategory,
+  database = pool,
+) => {
+  const id = Number(knowledgeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    const error = new Error("Invalid knowledge ID");
+    error.status = 400;
+    throw error;
+  }
+  if (!VALID_REVIEW_CATEGORIES.has(reviewCategory)) {
+    const error = new Error("Invalid review category");
+    error.status = 400;
+    throw error;
+  }
+
+  const client = await database.connect();
+  try {
+    await client.query("BEGIN");
+    const current = await client.query(
+      `SELECT id, status, last_verified_at
+       FROM approved_knowledge
+       WHERE id = $1
+       FOR UPDATE`,
+      [id],
+    );
+    if (current.rowCount !== 1) {
+      const error = new Error("Knowledge fact not found");
+      error.status = 404;
+      throw error;
+    }
+
+    const fact = current.rows[0];
+    const reviewDueAt = fact.status === "active"
+      ? calculateNextReviewAt(reviewCategory, fact.last_verified_at)
+      : null;
+    const updated = await client.query(
+      `UPDATE approved_knowledge
+       SET review_category = $1, review_due_at = $2
+       WHERE id = $3
+       RETURNING id, review_category, review_due_at`,
+      [reviewCategory, reviewDueAt, id],
+    );
+    await client.query("COMMIT");
+    return updated.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 };
