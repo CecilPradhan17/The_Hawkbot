@@ -80,15 +80,18 @@ const normalizeItem = (item: RawAdminKnowledgeItem): AdminKnowledgeItem => ({
 
 export async function getAdminKnowledge({
   status = 'all',
+  search = '',
   limit = 50,
   offset = 0,
 }: {
   status?: KnowledgeStatusFilter
+  search?: string
   limit?: number
   offset?: number
 } = {}): Promise<AdminKnowledgePage> {
   const query = new URLSearchParams({
     status,
+    search,
     limit: String(limit),
     offset: String(offset),
   })
