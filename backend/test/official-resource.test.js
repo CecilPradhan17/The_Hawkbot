@@ -42,3 +42,28 @@ test("treats a missing resource table as a pending migration", async () => {
   });
   assert.deepEqual(result, []);
 });
+
+test("routes natural campus-job wording to the validated career resource", () => {
+  const [career] = buildOfficialResourceCatalog([
+    {
+      id: 12, slug: "career-development", name: "ULM Career Development and Handshake",
+      description: "Jobs, internships, Handshake, and campus employment guidance",
+      url: "https://www.ulm.edu/careerdevelopment/careerservices/handshake.html",
+      response_text: "Use ULM Handshake to search for jobs.", priority: 95,
+      normalized_alias: "on campus jobs",
+    },
+    {
+      id: 12, slug: "career-development", name: "ULM Career Development and Handshake",
+      description: "Jobs, internships, Handshake, and campus employment guidance",
+      url: "https://www.ulm.edu/careerdevelopment/careerservices/handshake.html",
+      response_text: "Use ULM Handshake to search for jobs.", priority: 95,
+      normalized_alias: "campus jobs",
+    },
+  ]);
+
+  assert.equal(
+    matchOfficialResource("How do I find on campus jobs?", [career])?.slug,
+    "career-development",
+  );
+  assert.equal(isResourceNavigationRequest("How do I find on campus jobs?"), true);
+});
