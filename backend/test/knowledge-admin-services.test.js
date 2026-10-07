@@ -41,7 +41,7 @@ test("lists knowledge with pagination metadata", async () => {
     limit: 20,
     offset: 10,
   });
-  assert.deepEqual(calls[0].params, ["active", 20, 10]);
+  assert.deepEqual(calls[0].params, ["active", "", 20, 10]);
   assert.match(calls[0].text, /knowledge_verifications/);
   assert.match(calls[0].text, /knowledge_correction_questions/);
 });
@@ -76,8 +76,30 @@ test("caps the page size and prevents negative offsets", async () => {
     database,
   );
 
-  assert.deepEqual(params, ["all", 100, 0]);
+  assert.deepEqual(params, ["all", "", 100, 0]);
   assert.deepEqual(result, { items: [], total: 0, limit: 100, offset: 0 });
+});
+
+test("searches indexed fact and raw text with a bounded query", async () => {
+  let call;
+  const database = {
+    async query(text, params) {
+      call = { text, params };
+      return { rows: [] };
+    },
+  };
+
+  await listKnowledgeForAdmin(
+    { status: "active", search: `  ${"library ".repeat(40)}  `, limit: 25 },
+    database,
+  );
+
+  assert.match(call.text, /websearch_to_tsquery/);
+  assert.match(call.text, /COALESCE\(k\.raw_content/);
+  assert.equal(call.params[0], "active");
+  assert.equal(call.params[1].length, 200);
+  assert.equal(call.params[1].startsWith("library"), true);
+  assert.deepEqual(call.params.slice(2), [25, 0]);
 });
 
 const categoryUpdateDatabase = ({ status = "active", found = true } = {}) => {

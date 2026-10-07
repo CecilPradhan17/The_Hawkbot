@@ -5,7 +5,7 @@ const VALID_STATUSES = new Set(["all", "active", "needs_update", "replaced"]);
 const VALID_REVIEW_CATEGORIES = new Set(["stable", "yearly", "term", "frequent"]);
 
 export const listKnowledgeForAdmin = async (
-  { status = "all", limit = 50, offset = 0 } = {},
+  { status = "all", search = "", limit = 50, offset = 0 } = {},
   database = pool,
 ) => {
   if (!VALID_STATUSES.has(status)) {
@@ -13,6 +13,7 @@ export const listKnowledgeForAdmin = async (
     error.status = 400;
     throw error;
   }
+  const safeSearch = String(search || "").trim().slice(0, 200);
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
   const safeOffset = Math.max(Number(offset) || 0, 0);
   const result = await database.query(
@@ -44,9 +45,16 @@ export const listKnowledgeForAdmin = async (
        LIMIT 1
      ) correction ON TRUE
      WHERE ($1 = 'all' OR k.status = $1)
+       AND (
+         $2 = '' OR
+         to_tsvector(
+           'english',
+           COALESCE(k.cleaned_content, '') || ' ' || COALESCE(k.raw_content, '')
+         ) @@ websearch_to_tsquery('english', $2)
+       )
      ORDER BY k.id DESC
-     LIMIT $2 OFFSET $3`,
-    [status, safeLimit, safeOffset],
+     LIMIT $3 OFFSET $4`,
+    [status, safeSearch, safeLimit, safeOffset],
   );
   return {
     items: result.rows.map(({ total_count, ...row }) => row),
