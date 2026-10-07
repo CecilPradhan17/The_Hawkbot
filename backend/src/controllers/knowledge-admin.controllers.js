@@ -8,6 +8,7 @@ export async function getKnowledgeForAdmin(req, res, next) {
   try {
     const result = await listKnowledgeForAdmin({
       status: req.query.status || "all",
+      search: req.query.search || "",
       limit: req.query.limit,
       offset: req.query.offset,
     });
