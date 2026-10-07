@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   listKnowledgeForAdmin,
+  queueKnowledgeReview,
   updateKnowledgeReviewCategory,
 } from "../src/services/knowledge-admin.services.js";
 
@@ -138,6 +139,62 @@ test("rolls back category updates when the fact does not exist", async () => {
   await assert.rejects(
     updateKnowledgeReviewCategory(99, "stable", database),
     (error) => error.status === 404 && error.message === "Knowledge fact not found",
+  );
+  assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["ROLLBACK", "RELEASE"]);
+});
+
+const reviewQueueDatabase = ({ status = "active", hasOpenVerification = false } = {}) => {
+  const calls = [];
+  const client = {
+    async query(text, params) {
+      calls.push({ text, params });
+      if (text.includes("SELECT k.id, k.status")) {
+        return {
+          rowCount: 1,
+          rows: [{ id: 7, status, has_open_verification: hasOpenVerification }],
+        };
+      }
+      if (text.includes("UPDATE approved_knowledge")) {
+        return { rows: [{ id: 7, review_due_at: new Date("2026-10-06T14:00:00Z") }] };
+      }
+      return { rows: [] };
+    },
+    release() { calls.push({ text: "RELEASE" }); },
+  };
+  return { database: { async connect() { return client; } }, calls };
+};
+
+test("queues an active fact for the next verification run", async () => {
+  const { database, calls } = reviewQueueDatabase();
+  const result = await queueKnowledgeReview(7, database);
+
+  assert.deepEqual(result, {
+    id: 7,
+    reviewDueAt: new Date("2026-10-06T14:00:00Z"),
+    queued: true,
+    alreadyOpen: false,
+  });
+  const update = calls.find(({ text }) => text.includes("UPDATE approved_knowledge"));
+  assert.match(update.text, /review_due_at = NOW\(\)/);
+  assert.match(update.text, /verification_requested_at = NULL/);
+  assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["COMMIT", "RELEASE"]);
+});
+
+test("does not queue a duplicate when verification is already open", async () => {
+  const { database, calls } = reviewQueueDatabase({ hasOpenVerification: true });
+  const result = await queueKnowledgeReview(7, database);
+
+  assert.deepEqual(result, { id: 7, queued: false, alreadyOpen: true });
+  assert.equal(calls.some(({ text }) => text.includes("UPDATE approved_knowledge")), false);
+  assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["COMMIT", "RELEASE"]);
+});
+
+test("refuses to queue inactive knowledge", async () => {
+  const { database, calls } = reviewQueueDatabase({ status: "needs_update" });
+
+  await assert.rejects(
+    queueKnowledgeReview(7, database),
+    (error) => error.status === 409 && error.message === "Only active knowledge can be reviewed",
   );
   assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["ROLLBACK", "RELEASE"]);
 });

@@ -109,3 +109,62 @@ export const updateKnowledgeReviewCategory = async (
     client.release();
   }
 };
+
+export const queueKnowledgeReview = async (knowledgeId, database = pool) => {
+  const id = Number(knowledgeId);
+  if (!Number.isInteger(id) || id <= 0) {
+    const error = new Error("Invalid knowledge ID");
+    error.status = 400;
+    throw error;
+  }
+
+  const client = await database.connect();
+  try {
+    await client.query("BEGIN");
+    const current = await client.query(
+      `SELECT k.id, k.status,
+              EXISTS (
+                SELECT 1 FROM knowledge_verifications v
+                WHERE v.knowledge_id = k.id AND v.status = 'open'
+              ) AS has_open_verification
+       FROM approved_knowledge k
+       WHERE k.id = $1
+       FOR UPDATE OF k`,
+      [id],
+    );
+    if (current.rowCount !== 1) {
+      const error = new Error("Knowledge fact not found");
+      error.status = 404;
+      throw error;
+    }
+    if (current.rows[0].status !== "active") {
+      const error = new Error("Only active knowledge can be reviewed");
+      error.status = 409;
+      throw error;
+    }
+    if (current.rows[0].has_open_verification) {
+      await client.query("COMMIT");
+      return { id, queued: false, alreadyOpen: true };
+    }
+
+    const queued = await client.query(
+      `UPDATE approved_knowledge
+       SET review_due_at = NOW(), verification_requested_at = NULL
+       WHERE id = $1
+       RETURNING id, review_due_at`,
+      [id],
+    );
+    await client.query("COMMIT");
+    return {
+      id: queued.rows[0].id,
+      reviewDueAt: queued.rows[0].review_due_at,
+      queued: true,
+      alreadyOpen: false,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
