@@ -5,7 +5,7 @@ import { polishResponse } from "./llm.services.js";
 import { resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
 import {
-  buildHawkWallSources,
+  buildKnowledgeSources,
   formatKnowledgeCandidates,
   isConfidentCandidate,
   retrieveKnowledgeCandidates,
@@ -163,6 +163,6 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   return {
     response: polished.response.trim(), matched: true, similarity, sourceType: "rag",
     knowledgeIds: selectedIds,
-    sources: buildHawkWallSources(confidentRows.filter(row => selectedIds.includes(Number(row.id)))),
+    sources: buildKnowledgeSources(confidentRows.filter(row => selectedIds.includes(Number(row.id)))),
   };
 };

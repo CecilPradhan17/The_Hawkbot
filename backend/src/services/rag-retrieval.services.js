@@ -28,9 +28,9 @@ export const buildHawkWallSources = candidates => {
   const sources = new Map();
   for (const candidate of candidates || []) {
     const postId = Number(candidate.source_post_id);
-    if (!Number.isInteger(postId) || sources.has(postId)) continue;
+    if (!Number.isInteger(postId) || postId <= 0 || sources.has(postId)) continue;
     const parentId = Number(candidate.source_parent_id);
-    const threadPostId = Number.isInteger(parentId) ? parentId : postId;
+    const threadPostId = Number.isInteger(parentId) && parentId > 0 ? parentId : postId;
     sources.set(postId, {
       type: "hawkwall",
       title: candidate.thread_title || "HawkWall discussion",
@@ -44,6 +44,23 @@ export const buildHawkWallSources = candidates => {
     });
   }
   return [...sources.values()];
+};
+
+export const buildKnowledgeSources = candidates => {
+  const sources = buildHawkWallSources(candidates);
+  const seenUrls = new Set(sources.map(source => source.url));
+  for (const candidate of candidates || []) {
+    const url = String(candidate.source_url || "").trim();
+    if (!/^https:\/\//i.test(url) || seenUrls.has(url)) continue;
+    seenUrls.add(url);
+    sources.push({
+      type: "official",
+      title: candidate.source_title || "Official ULM source",
+      url,
+      lastVerifiedAt: serializeTimestamp(candidate.last_verified_at || candidate.approved_at),
+    });
+  }
+  return sources;
 };
 
 /**
@@ -95,7 +112,8 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
        FROM vector_ranked v
        FULL OUTER JOIN text_ranked t ON t.id = v.id
      )
-     SELECT k.id, k.source_post_id, k.cleaned_content, k.raw_content,
+     SELECT k.id, k.source_post_id, k.source_url, k.source_title,
+            k.cleaned_content, k.raw_content,
             k.approved_at, k.last_verified_at,
             source.content AS source_post_content,
             (SELECT COUNT(*)::integer

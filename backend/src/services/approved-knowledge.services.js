@@ -3,6 +3,8 @@ import { calculateNextReviewAt } from "./knowledge-review.services.js";
 export const storeApprovedKnowledge = async ({
   db,
   sourcePostId,
+  sourceUrl = null,
+  sourceTitle = null,
   rawContent = null,
   chunks,
   generateEmbedding,
@@ -31,12 +33,12 @@ export const storeApprovedKnowledge = async ({
       const reviewDueAt = calculateNextReviewAt(reviewCategory, verifiedAt);
       const inserted = await client.query(
         `INSERT INTO approved_knowledge
-           (source_post_id, cleaned_content, raw_content, embedding, review_category,
-            last_verified_at, review_due_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+           (source_post_id, source_url, source_title, cleaned_content, raw_content, embedding,
+            review_category, last_verified_at, review_due_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id`,
-        [sourcePostId, content, rawContent, JSON.stringify(embedding), reviewCategory,
-          verifiedAt, reviewDueAt]
+        [sourcePostId, sourceUrl, sourceTitle, content, rawContent, JSON.stringify(embedding),
+          reviewCategory, verifiedAt, reviewDueAt]
       );
       stored.push({ id: inserted.rows[0].id, content, reviewCategory });
     }

@@ -82,12 +82,16 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
                   {source.approvalCount ?? 0} community approvals
                   {source.createdAt ? ` · ${getTimeAgo(source.createdAt)}` : ''}
                 </span>
-                <Link
-                  to={source.postId ? `/sources/hawkwall/${source.postId}` : source.url}
-                  className="font-semibold text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]"
-                >
-                  See source
-                </Link>
+                {Number.isInteger(Number(source.postId)) && Number(source.postId) > 0 ? (
+                  <Link
+                    to={`/sources/hawkwall/${source.postId}`}
+                    className="font-semibold text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]"
+                  >
+                    See source
+                  </Link>
+                ) : (
+                  <span className="font-medium text-slate-400">Discussion unavailable</span>
+                )}
               </div>
             </div>
           ) : (

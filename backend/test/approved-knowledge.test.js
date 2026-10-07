@@ -40,14 +40,30 @@ test("stores every atomic fact in one committed transaction", async () => {
     "BEGIN", "INSERT", "INSERT", "COMMIT", "RELEASE",
   ]);
   assert.equal(calls[1].params[0], 42);
-  assert.equal(calls[1].params[1], "first fact");
-  assert.equal(calls[1].params[4], "stable");
-  assert.ok(calls[1].params[5] instanceof Date);
-  assert.equal(calls[1].params[6], null);
-  assert.equal(calls[2].params[1], "second fact");
-  assert.equal(calls[2].params[4], "yearly");
-  assert.ok(calls[2].params[6]);
+  assert.equal(calls[1].params[3], "first fact");
+  assert.equal(calls[1].params[6], "stable");
+  assert.ok(calls[1].params[7] instanceof Date);
+  assert.equal(calls[1].params[8], null);
+  assert.equal(calls[2].params[3], "second fact");
+  assert.equal(calls[2].params[6], "yearly");
+  assert.ok(calls[2].params[8]);
   assert.match(calls[1].text, /review_category/);
+});
+
+test("stores official provenance for administrator-seeded knowledge", async () => {
+  const { db, calls } = createDb();
+  await storeApprovedKnowledge({
+    db,
+    sourcePostId: null,
+    sourceUrl: "https://www.ulm.edu/registrar/",
+    sourceTitle: "ULM Registrar",
+    rawContent: "Registrar fact",
+    chunks: [{ content: "Registrar fact", reviewCategory: "yearly" }],
+    generateEmbedding: async () => [0.1],
+  });
+  assert.equal(calls[1].params[1], "https://www.ulm.edu/registrar/");
+  assert.equal(calls[1].params[2], "ULM Registrar");
+  assert.match(calls[1].text, /source_url, source_title/);
 });
 
 test("rolls back all chunks when any insert fails", async () => {

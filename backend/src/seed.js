@@ -16,7 +16,7 @@
  * 4. If already exists: skip
  *
  * TO ADD NEW KNOWLEDGE:
- * - Add new strings to knowledge.json
+ * - Add new sourced records to knowledge.json
  * - Re-run: node src/seed.js
  *
  * TO UPDATE AN ENTRY:
@@ -59,9 +59,14 @@ const run = async () => {
   let inserted = 0;
   let skipped = 0;
 
-  for (const rawContent of entries) {
-    if (typeof rawContent !== "string" || !rawContent.trim()) {
-      console.warn("⚠️  Skipping invalid entry:", rawContent);
+  for (const entry of entries) {
+    const rawContent = typeof entry === "string" ? entry : entry?.content;
+    const sourceUrl = typeof entry === "object" ? entry?.sourceUrl : null;
+    const sourceTitle = typeof entry === "object" ? entry?.sourceTitle : null;
+    const reviewCategory = typeof entry === "object" ? entry?.reviewCategory : null;
+    if (typeof rawContent !== "string" || !rawContent.trim()
+        || !/^https:\/\//i.test(sourceUrl || "") || !sourceTitle) {
+      console.warn("⚠️  Skipping invalid or unsourced entry:", entry);
       skipped++;
       continue;
     }
@@ -69,11 +74,29 @@ const run = async () => {
     // Check if this raw content has already been seeded
     // We store the raw content in a separate column to track this
     const existing = await pool.query(
-      `SELECT id FROM approved_knowledge WHERE raw_content = $1`,
+      `SELECT id, embedding IS NOT NULL AS has_embedding
+       FROM approved_knowledge WHERE raw_content = $1 AND source_post_id IS NULL`,
       [rawContent.trim()]
     );
 
     if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE approved_knowledge
+         SET source_url = $2, source_title = $3, status = 'active',
+             review_category = COALESCE($4, review_category), last_verified_at = NOW()
+         WHERE raw_content = $1 AND source_post_id IS NULL`,
+        [rawContent.trim(), sourceUrl, sourceTitle, reviewCategory]
+      );
+      const missingEmbeddings = existing.rows.filter(row => !row.has_embedding);
+      if (missingEmbeddings.length > 0) {
+        const embedding = await generateEmbedding(rawContent.trim());
+        await pool.query(
+          `UPDATE approved_knowledge
+           SET embedding = $2
+           WHERE id = ANY($1::int[])`,
+          [missingEmbeddings.map(row => row.id), JSON.stringify(embedding)]
+        );
+      }
       console.log(`⏭️  Already exists, skipping: "${rawContent.substring(0, 60)}..."`);
       skipped++;
       continue;
@@ -94,7 +117,12 @@ const run = async () => {
         db: pool,
         sourcePostId: null,
         rawContent: rawContent.trim(),
-        chunks: knowledgeChunks,
+        sourceUrl,
+        sourceTitle,
+        chunks: knowledgeChunks.map(chunk => ({
+          ...chunk,
+          reviewCategory: reviewCategory || chunk.reviewCategory,
+        })),
         generateEmbedding,
       });
 

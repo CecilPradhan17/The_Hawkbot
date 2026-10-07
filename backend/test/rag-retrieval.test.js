@@ -5,6 +5,7 @@ import {
   RAG_CANDIDATE_LIMIT,
   RAG_SOURCE_POOL_LIMIT,
   buildHawkWallSources,
+  buildKnowledgeSources,
   formatKnowledgeCandidates,
   isConfidentCandidate,
   retrieveKnowledgeCandidates,
@@ -67,6 +68,40 @@ test("builds one inspectable HawkWall citation per selected source post", () => 
     approvalCount: 8,
     createdAt: "2026-09-01T12:00:00.000Z",
     lastVerifiedAt: "2026-10-01T12:00:00.000Z",
+  }]);
+});
+
+test("does not turn missing source IDs into links to post zero", () => {
+  assert.deepEqual(buildHawkWallSources([
+    { id: 1, source_post_id: null, cleaned_content: "Legacy fact without its original post." },
+  ]), []);
+
+  const [standalone] = buildHawkWallSources([
+    { id: 2, source_post_id: 75, source_parent_id: null, source_post_content: "Standalone source" },
+  ]);
+  assert.equal(standalone.postId, 75);
+  assert.equal(standalone.threadPostId, 75);
+  assert.equal(standalone.url, "/sources/hawkwall/75");
+});
+
+test("builds official citations for sourced administrator knowledge", () => {
+  assert.deepEqual(buildKnowledgeSources([
+    {
+      source_post_id: null,
+      source_url: "https://www.ulm.edu/registrar/",
+      source_title: "ULM Registrar",
+      last_verified_at: "2026-10-07T12:00:00.000Z",
+    },
+    {
+      source_post_id: null,
+      source_url: "https://www.ulm.edu/registrar/",
+      source_title: "duplicate",
+    },
+  ]), [{
+    type: "official",
+    title: "ULM Registrar",
+    url: "https://www.ulm.edu/registrar/",
+    lastVerifiedAt: "2026-10-07T12:00:00.000Z",
   }]);
 });
 
