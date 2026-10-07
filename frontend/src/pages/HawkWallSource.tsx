@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Header from '@/components/Header'
-import { getOnePost, type PostDetailResponse, type PostResponse } from '@/api/posts.api'
+import { getHawkWallSource, type HawkWallSourceResponse, type PostResponse } from '@/api/posts.api'
 import { getTimeAgo } from '@/utils/timeAgo'
 
 function StatusBadge({ status }: { status: PostResponse['status'] }) {
@@ -48,17 +48,21 @@ export default function HawkWallSource() {
   const navigate = useNavigate()
   const { threadId } = useParams()
   const [searchParams] = useSearchParams()
-  const [thread, setThread] = useState<PostDetailResponse | null>(null)
+  const [thread, setThread] = useState<HawkWallSourceResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const numericThreadId = Number(threadId)
   const highlightedPostId = Number(searchParams.get('source'))
+  const requestedSourcePostId = Number.isInteger(highlightedPostId) && highlightedPostId > 0
+    ? highlightedPostId
+    : numericThreadId
+  const invalidSource = !Number.isInteger(requestedSourcePostId) || requestedSourcePostId <= 0
 
   useEffect(() => {
-    if (!Number.isInteger(numericThreadId) || numericThreadId <= 0) return
-    getOnePost(numericThreadId)
+    if (invalidSource) return
+    getHawkWallSource(requestedSourcePostId)
       .then(setThread)
-      .catch(() => setError('This HawkWall source could not be loaded.'))
-  }, [numericThreadId])
+      .catch(error => setError(error instanceof Error ? error.message : 'This HawkWall source could not be loaded.'))
+  }, [invalidSource, requestedSourcePostId])
 
   return (
     <div className="min-h-screen bg-[#FAF3E1]">
@@ -80,15 +84,15 @@ export default function HawkWallSource() {
           </p>
         </div>
 
-        {!thread && !error && (
+        {!thread && !error && !invalidSource && (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500" role="status">
             Loading source discussion…
           </div>
         )}
 
-        {error && (
+        {(error || invalidSource) && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-            {error}
+            {invalidSource ? 'This source link is invalid.' : error}
           </div>
         )}
 
@@ -98,7 +102,7 @@ export default function HawkWallSource() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 {thread.post.type === 'question' ? 'Question' : 'Post'}
               </p>
-              <EvidenceCard post={thread.post} highlighted={thread.post.id === highlightedPostId} />
+              <EvidenceCard post={thread.post} highlighted={thread.post.id === thread.sourcePostId} />
             </section>
 
             {thread.post.type === 'question' && (
@@ -108,7 +112,7 @@ export default function HawkWallSource() {
                 </p>
                 <div className="space-y-3">
                   {(thread.answers ?? []).map(answer => (
-                    <EvidenceCard key={answer.id} post={answer} highlighted={answer.id === highlightedPostId} />
+                    <EvidenceCard key={answer.id} post={answer} highlighted={answer.id === thread.sourcePostId} />
                   ))}
                 </div>
               </section>

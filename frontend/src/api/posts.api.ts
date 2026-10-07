@@ -21,6 +21,10 @@ export interface PostDetailResponse {
   answers: PostResponse[] | null
 }
 
+export interface HawkWallSourceResponse extends PostDetailResponse {
+  sourcePostId: number
+}
+
 export interface PostsCursor {
   before: string
   beforeId: number
@@ -62,6 +66,10 @@ export function getPostsPage(cursor?: PostsCursor): Promise<PostsPageResponse> {
 
 export function getOnePost(data: number):Promise<PostDetailResponse> {
     return api.get<PostDetailResponse>(`/displayPost/${data}`)
+}
+
+export function getHawkWallSource(postId: number): Promise<HawkWallSourceResponse> {
+  return api.get<HawkWallSourceResponse>(`/chat/source/${postId}`)
 }
 
 export function deletePost(id: number): Promise<void> {
