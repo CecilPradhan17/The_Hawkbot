@@ -9,7 +9,7 @@ export interface AdminKnowledgeItem {
   content: string
   rawContent: string | null
   status: KnowledgeStatus
-  reviewCategory: ReviewCategory
+  reviewCategory: ReviewCategory | null
   lastVerifiedAt: string | null
   reviewDueAt: string | null
   verificationRequestedAt: string | null
@@ -36,7 +36,7 @@ interface RawAdminKnowledgeItem {
   content: string
   raw_content: string | null
   status: KnowledgeStatus
-  review_category: ReviewCategory
+  review_category: ReviewCategory | null
   last_verified_at: string | null
   review_due_at: string | null
   verification_requested_at: string | null
@@ -94,4 +94,21 @@ export async function getAdminKnowledge({
   })
   const result = await api.get<RawAdminKnowledgePage>(`/knowledge/admin?${query}`)
   return { ...result, items: result.items.map(normalizeItem) }
+}
+
+export async function updateAdminKnowledgeReviewCategory(
+  knowledgeId: number,
+  reviewCategory: ReviewCategory,
+): Promise<{ id: number; reviewCategory: ReviewCategory; reviewDueAt: string | null }> {
+  const result = await api.patch<{
+    id: number
+    review_category: ReviewCategory
+    review_due_at: string | null
+  }>(`/knowledge/admin/${knowledgeId}/review-category`, { reviewCategory })
+
+  return {
+    id: result.id,
+    reviewCategory: result.review_category,
+    reviewDueAt: result.review_due_at,
+  }
 }
