@@ -85,7 +85,8 @@ export const updateKnowledgeReviewCategory = async (
   try {
     await client.query("BEGIN");
     const current = await client.query(
-      `SELECT id, status, last_verified_at
+      `SELECT id, status, last_verified_at, review_due_at,
+              review_due_at IS NOT NULL AND review_due_at <= NOW() AS review_is_due
        FROM approved_knowledge
        WHERE id = $1
        FOR UPDATE`,
@@ -98,9 +99,11 @@ export const updateKnowledgeReviewCategory = async (
     }
 
     const fact = current.rows[0];
-    const reviewDueAt = fact.status === "active"
-      ? calculateNextReviewAt(reviewCategory, fact.last_verified_at)
-      : null;
+    const reviewDueAt = fact.status !== "active"
+      ? null
+      : fact.review_is_due
+        ? fact.review_due_at
+        : calculateNextReviewAt(reviewCategory, fact.last_verified_at);
     const updated = await client.query(
       `UPDATE approved_knowledge
        SET review_category = $1, review_due_at = $2

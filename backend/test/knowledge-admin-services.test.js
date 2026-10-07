@@ -102,14 +102,28 @@ test("searches indexed fact and raw text with a bounded query", async () => {
   assert.deepEqual(call.params.slice(2), [25, 0]);
 });
 
-const categoryUpdateDatabase = ({ status = "active", found = true } = {}) => {
+const categoryUpdateDatabase = ({
+  status = "active",
+  found = true,
+  reviewIsDue = false,
+  reviewDueAt = null,
+} = {}) => {
   const calls = [];
   const client = {
     async query(text, params) {
       calls.push({ text, params });
       if (text.includes("SELECT id, status")) {
         return found
-          ? { rowCount: 1, rows: [{ id: 7, status, last_verified_at: new Date("2026-09-01T15:00:00Z") }] }
+          ? {
+              rowCount: 1,
+              rows: [{
+                id: 7,
+                status,
+                last_verified_at: new Date("2026-09-01T15:00:00Z"),
+                review_due_at: reviewDueAt,
+                review_is_due: reviewIsDue,
+              }],
+            }
           : { rowCount: 0, rows: [] };
       }
       if (text.includes("UPDATE approved_knowledge")) {
@@ -142,6 +156,19 @@ test("keeps the due date empty for facts that already need correction", async ()
 
   const update = calls.find(({ text }) => text.includes("UPDATE approved_knowledge"));
   assert.deepEqual(update.params, ["frequent", null, 7]);
+});
+
+test("changing category preserves a manually queued or overdue review", async () => {
+  const dueAt = new Date("2026-10-06T14:00:00Z");
+  const { database, calls } = categoryUpdateDatabase({
+    reviewIsDue: true,
+    reviewDueAt: dueAt,
+  });
+
+  await updateKnowledgeReviewCategory(7, "yearly", database);
+
+  const update = calls.find(({ text }) => text.includes("UPDATE approved_knowledge"));
+  assert.deepEqual(update.params, ["yearly", dueAt, 7]);
 });
 
 test("rejects invalid category updates before opening a transaction", async () => {
