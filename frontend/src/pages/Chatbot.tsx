@@ -82,7 +82,10 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
                   {source.approvalCount ?? 0} community approvals
                   {source.createdAt ? ` · ${getTimeAgo(source.createdAt)}` : ''}
                 </span>
-                <Link to={source.url} className="font-semibold text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]">
+                <Link
+                  to={source.postId ? `/sources/hawkwall/${source.postId}` : source.url}
+                  className="font-semibold text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]"
+                >
                   See source
                 </Link>
               </div>

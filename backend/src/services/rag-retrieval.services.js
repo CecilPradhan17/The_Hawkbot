@@ -37,7 +37,7 @@ export const buildHawkWallSources = candidates => {
       excerpt: candidate.source_post_content || candidate.cleaned_content,
       postId,
       threadPostId,
-      url: `/sources/hawkwall/${threadPostId}?source=${postId}`,
+      url: `/sources/hawkwall/${postId}`,
       approvalCount: Number(candidate.source_approval_count) || 0,
       createdAt: serializeTimestamp(candidate.source_created_at),
       lastVerifiedAt: serializeTimestamp(candidate.last_verified_at || candidate.approved_at),

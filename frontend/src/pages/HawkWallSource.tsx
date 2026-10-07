@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import Header from '@/components/Header'
 import { getHawkWallSource, type HawkWallSourceResponse, type PostResponse } from '@/api/posts.api'
 import { getTimeAgo } from '@/utils/timeAgo'
@@ -47,14 +47,9 @@ function EvidenceCard({ post, highlighted }: { post: PostResponse; highlighted: 
 export default function HawkWallSource() {
   const navigate = useNavigate()
   const { threadId } = useParams()
-  const [searchParams] = useSearchParams()
   const [thread, setThread] = useState<HawkWallSourceResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const numericThreadId = Number(threadId)
-  const highlightedPostId = Number(searchParams.get('source'))
-  const requestedSourcePostId = Number.isInteger(highlightedPostId) && highlightedPostId > 0
-    ? highlightedPostId
-    : numericThreadId
+  const requestedSourcePostId = Number(threadId)
   const invalidSource = !Number.isInteger(requestedSourcePostId) || requestedSourcePostId <= 0
 
   useEffect(() => {

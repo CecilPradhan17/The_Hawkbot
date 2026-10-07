@@ -383,8 +383,8 @@ test("a grounded answer cites every selected HawkWall discussion and no unselect
     }),
   });
   assert.deepEqual(result.sources.map(source => source.url), [
-    "/sources/hawkwall/40?source=52",
-    "/sources/hawkwall/41?source=61",
+    "/sources/hawkwall/52",
+    "/sources/hawkwall/61",
   ]);
   assert.deepEqual(result.sources.map(source => source.approvalCount), [8, 6]);
 });
