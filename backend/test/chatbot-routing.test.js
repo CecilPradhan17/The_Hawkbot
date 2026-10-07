@@ -353,3 +353,35 @@ test("the AI may select only a resource from the backend catalog", async () => {
   assert.equal(result.sourceType, "official_resource");
   assert.equal(result.sources[0].url, resource.url);
 });
+
+test("a grounded answer cites every selected HawkWall discussion and no unselected candidate", async () => {
+  const result = await handleChatQuery("Where can I find campus jobs?", {
+    hoursHandler: async () => null,
+    resourceCatalog: async () => [],
+    embedding: async () => [0.1],
+    retriever: async () => [
+      {
+        id: 1, cleaned_content: "Use the employment portal.", similarity: 0.9,
+        source_post_id: 52, source_parent_id: 40, source_post_content: "Try the employment portal.",
+        thread_title: "How do students find campus jobs?", source_approval_count: 8,
+      },
+      {
+        id: 2, cleaned_content: "Ask individual departments.", similarity: 0.85,
+        source_post_id: 61, source_parent_id: 41, source_post_content: "Some departments post separately.",
+        thread_title: "Department job listings", source_approval_count: 6,
+      },
+      {
+        id: 3, cleaned_content: "Unselected result.", similarity: 0.8,
+        source_post_id: 70, source_post_content: "Do not cite this.",
+      },
+    ],
+    facilityCatalog: async () => [],
+    polisher: async () => ({
+      answerable: true,
+      response: "There are two reported paths.",
+      relevantCandidateIds: [1, 2],
+    }),
+  });
+  assert.deepEqual(result.sources.map(source => source.url), ["/posts?post=40", "/posts?post=41"]);
+  assert.deepEqual(result.sources.map(source => source.approvalCount), [8, 6]);
+});

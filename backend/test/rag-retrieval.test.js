@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   RAG_CANDIDATE_LIMIT,
   RAG_SOURCE_POOL_LIMIT,
+  buildHawkWallSources,
   formatKnowledgeCandidates,
   isConfidentCandidate,
   retrieveKnowledgeCandidates,
@@ -38,6 +39,35 @@ test("fuses exact vector and full-text candidates into a ten-result pool", async
   assert.match(captured.text, /source_post_id/);
   assert.match(captured.text, /approved_at/);
   assert.match(captured.text, /last_verified_at/);
+  assert.match(captured.text, /LEFT JOIN posts source/);
+  assert.match(captured.text, /LEFT JOIN posts parent/);
+});
+
+test("builds one inspectable HawkWall citation per selected source post", () => {
+  const sources = buildHawkWallSources([
+    {
+      id: 11,
+      source_post_id: 52,
+      source_parent_id: 40,
+      source_post_content: "Apply through the student employment portal.",
+      thread_title: "Where can I find an on-campus job?",
+      source_approval_count: 8,
+      source_created_at: "2026-09-01T12:00:00.000Z",
+      last_verified_at: "2026-10-01T12:00:00.000Z",
+    },
+    { id: 12, source_post_id: 52, source_parent_id: 40 },
+  ]);
+  assert.deepEqual(sources, [{
+    type: "hawkwall",
+    title: "Where can I find an on-campus job?",
+    excerpt: "Apply through the student employment portal.",
+    postId: 52,
+    threadPostId: 40,
+    url: "/posts?post=40",
+    approvalCount: 8,
+    createdAt: "2026-09-01T12:00:00.000Z",
+    lastVerifiedAt: "2026-10-01T12:00:00.000Z",
+  }]);
 });
 
 test("defines lifecycle metadata without automatically expiring knowledge", () => {

@@ -4,7 +4,12 @@ import { generateQueryEmbedding } from "./embedding.services.js";
 import { polishResponse } from "./llm.services.js";
 import { resolveHoursToolLookup, tryHandleHoursQuery } from "./hours-chat.services.js";
 import { tryHandleSmalltalk } from "./smalltalk.services.js";
-import { formatKnowledgeCandidates, isConfidentCandidate, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
+import {
+  buildHawkWallSources,
+  formatKnowledgeCandidates,
+  isConfidentCandidate,
+  retrieveKnowledgeCandidates,
+} from "./rag-retrieval.services.js";
 import { expandCampusPlaceAliases } from "./campus-place-alias.services.js";
 import { getFacilityDictionary } from "./hours-repository.services.js";
 import { diningMenuLinkResponse, tryHandleDiningMenuLink } from "./dining-menu-link.services.js";
@@ -158,5 +163,6 @@ export const handleChatQuery = async (userMessage, dependencies = {}) => {
   return {
     response: polished.response.trim(), matched: true, similarity, sourceType: "rag",
     knowledgeIds: selectedIds,
+    sources: buildHawkWallSources(confidentRows.filter(row => selectedIds.includes(Number(row.id)))),
   };
 };

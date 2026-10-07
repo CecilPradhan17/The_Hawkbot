@@ -29,15 +29,23 @@ export default function PostDetailModal({
   const isAnswer = post.type === 'answer'
 
   const [parentQuestion, setParentQuestion] = useState<PostDetailResponse | null>(null)
-  const [parentLoading, setParentLoading] = useState(false)
+  const [parentLoadFailedFor, setParentLoadFailedFor] = useState<number | null>(null)
+  const parentLoading = isAnswer
+    && Boolean(post.parent_id)
+    && parentQuestion?.post.id !== post.parent_id
+    && parentLoadFailedFor !== post.parent_id
 
   useEffect(() => {
     if (isAnswer && post.parent_id) {
-      setParentLoading(true)
       getOnePost(post.parent_id)
-        .then(data => setParentQuestion(data))
-        .catch(err => console.error('Failed to fetch parent question:', err))
-        .finally(() => setParentLoading(false))
+        .then(data => {
+          setParentQuestion(data)
+          setParentLoadFailedFor(null)
+        })
+        .catch(err => {
+          console.error('Failed to fetch parent question:', err)
+          setParentLoadFailedFor(post.parent_id)
+        })
     }
   }, [isAnswer, post.parent_id])
 
@@ -112,7 +120,7 @@ export default function PostDetailModal({
           </div>
 
           {/* Voting — posts and answers only */}
-          {!isQuestion && (
+          {!isQuestion && post.status === 'pending' && (
             <div className="flex items-center gap-4 py-4 border-y border-slate-200 mb-6">
               <button
                 onClick={() => onVote(post.id, 1)}
@@ -181,7 +189,7 @@ export default function PostDetailModal({
                         </div>
                       </div>
                       <p className="text-slate-700 text-sm">{reply.content}</p>
-                      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
+                      {reply.status === 'pending' && <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
                         <button
                           onClick={() => onVote(reply.id, 1)}
                           className={`px-2 py-0.5 rounded text-xs active:scale-95 transition-all
@@ -203,7 +211,7 @@ export default function PostDetailModal({
                         >
                           HawkNah
                         </button>
-                      </div>
+                      </div>}
                     </div>
                   ))}
                 </div>
@@ -214,7 +222,7 @@ export default function PostDetailModal({
 
         {/* Actions */}
         <div className="flex gap-3 mt-6 flex-shrink-0 border-t border-slate-100 pt-4">
-          {isQuestion && onAnswerQuestion && (
+          {isQuestion && post.status === 'pending' && onAnswerQuestion && (
             <button
               onClick={() => {
                 onClose()
@@ -226,7 +234,7 @@ export default function PostDetailModal({
               Give Answer
             </button>
           )}
-          {isOwner && onDelete && (
+          {isOwner && post.status === 'pending' && onDelete && (
             <button
               onClick={() => {
                 onDelete(post.id)

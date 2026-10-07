@@ -10,10 +10,12 @@ import PostListSkeleton from '@/components/posts/PostListSkeleton'
 import PostDetailModal from '@/components/posts/PostDetailModal'
 import { useHawkwallFeed } from '@/context/useHawkwallFeed'
 import HawkwallChatPrompt from '@/components/HawkwallChatPrompt'
+import { useSearchParams } from 'react-router-dom'
 
 const FEED_FRESHNESS_MS = 120_000
 
 export default function Posts() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { userId } = useAuth()
   const {
     posts,
@@ -42,6 +44,27 @@ export default function Posts() {
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const initialLoadStarted = useRef(false)
   const pageRequestInFlight = useRef(false)
+  const openedDeepLinkRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const requestedPost = searchParams.get('post')
+    if (!requestedPost || openedDeepLinkRef.current === requestedPost) return
+    const postId = Number(requestedPost)
+    if (!Number.isInteger(postId) || postId <= 0) return
+    openedDeepLinkRef.current = requestedPost
+
+    void getOnePost(postId)
+      .then(data => {
+        if (data.post.type === 'question') {
+          setRepliesMap(previous => ({ ...previous, [data.post.id]: data.answers ?? [] }))
+        }
+        setSelectedPost(data.post)
+      })
+      .catch(error => {
+        console.error('Failed to open linked HawkWall post:', error)
+        setRefreshError('That HawkWall discussion could not be opened.')
+      })
+  }, [searchParams, setRepliesMap])
 
   const refreshPosts = useCallback(async () => {
     const hasCachedFeed = lastFetchedAt > 0
@@ -159,7 +182,22 @@ export default function Posts() {
       null
     if (!post) return
     if (post.type === 'question') await ensureRepliesFetched(post.id)
+    openedDeepLinkRef.current = String(id)
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous)
+      next.set('post', String(id))
+      return next
+    })
     setSelectedPost(post)
+  }
+
+  const handleCloseSelectedPost = () => {
+    setSelectedPost(null)
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous)
+      next.delete('post')
+      return next
+    }, { replace: true })
   }
 
   const handlePostCreated = (newPost: PostResponse) => {
@@ -387,7 +425,7 @@ export default function Posts() {
         <PostDetailModal
           post={selectedPost}
           replies={repliesMap[selectedPost.id] ?? []}
-          onClose={() => setSelectedPost(null)}
+          onClose={handleCloseSelectedPost}
           onVote={handleVote}
           onDelete={handleDelete}
           onAnswerQuestion={handleAnswerFromDetail}

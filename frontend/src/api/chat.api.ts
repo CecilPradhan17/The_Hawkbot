@@ -13,8 +13,14 @@ export interface ChatResponse {
 }
 
 export interface ChatSource {
+  type?: 'official' | 'hawkwall'
   title: string
   url: string
+  excerpt?: string
+  postId?: number
+  threadPostId?: number
+  approvalCount?: number
+  createdAt?: string | null
   lastVerifiedAt?: string | null
 }
 

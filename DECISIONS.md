@@ -22,6 +22,28 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-10-06 — RAG answers preserve inspectable HawkWall provenance
+
+**Context:** Hawkbot could select several approved facts, but returned only a synthesized
+answer and internal knowledge IDs. Students could not inspect the community evidence or
+see when multiple discussions contributed to an answer.
+
+**Decision:** Return one structured HawkWall citation per selected source post, including
+its thread, excerpt, approval count, and verification date. Citation links open the
+original approved question and its complete moderated reply history. Retrieval still
+filters relevance; citations include every source the grounded answer actually selects,
+not every nearest-neighbor candidate.
+
+**Alternatives considered:** Link only the top-ranked fact, or show all ten retrieved
+candidates. The former hides corroboration and disagreement; the latter exposes noisy
+results the answer did not use.
+
+**Trade-offs:** This makes provenance visible but does not yet classify contradictions.
+Conflict grouping remains a separate response-composition layer.
+
+**Resume/interview angle:** Added end-to-end evidence lineage from vector retrieval to a
+deep-linked community discussion while preserving moderation state and closed voting.
+
 ## 2026-10-01 — Official resources are a curated directory, not scraped knowledge
 
 **Context:** Hawkbot needs to help with information that has not yet been contributed

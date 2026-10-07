@@ -26,15 +26,15 @@
 
 import pool from "../db.js";
 
-export const displayOnePostFromDB = async (id, userId) => {
-  const postRes = await pool.query(
+export const displayOnePostFromDB = async (id, userId, database = pool) => {
+  const postRes = await database.query(
     `SELECT p.*,
             pv.vote AS user_vote
      FROM posts p
      LEFT JOIN post_votes pv
        ON pv.post_id = p.id AND pv.user_id = $2
      WHERE p.id = $1
-       AND p.status = 'pending'`,
+       AND p.status IN ('pending', 'approved')`,
     [id, userId]
   );
 
@@ -46,14 +46,14 @@ export const displayOnePostFromDB = async (id, userId) => {
     return { post };
   }
 
-  const answersRes = await pool.query(
+  const answersRes = await database.query(
     `SELECT p.*,
             pv.vote AS user_vote
      FROM posts p
      LEFT JOIN post_votes pv
        ON pv.post_id = p.id AND pv.user_id = $2
      WHERE p.parent_id = $1
-       AND p.status = 'pending'
+       AND p.status IN ('pending', 'approved', 'disapproved')
      ORDER BY p.created_at ASC`,
     [id, userId]
   );

@@ -24,6 +24,28 @@ export const formatKnowledgeCandidates = candidates => JSON.stringify(
   2,
 );
 
+export const buildHawkWallSources = candidates => {
+  const sources = new Map();
+  for (const candidate of candidates || []) {
+    const postId = Number(candidate.source_post_id);
+    if (!Number.isInteger(postId) || sources.has(postId)) continue;
+    const parentId = Number(candidate.source_parent_id);
+    const threadPostId = Number.isInteger(parentId) ? parentId : postId;
+    sources.set(postId, {
+      type: "hawkwall",
+      title: candidate.thread_title || "HawkWall discussion",
+      excerpt: candidate.source_post_content || candidate.cleaned_content,
+      postId,
+      threadPostId,
+      url: `/posts?post=${threadPostId}`,
+      approvalCount: Number(candidate.source_approval_count) || 0,
+      createdAt: serializeTimestamp(candidate.source_created_at),
+      lastVerifiedAt: serializeTimestamp(candidate.last_verified_at || candidate.approved_at),
+    });
+  }
+  return [...sources.values()];
+};
+
 /**
  * Uses an exact cosine-distance scan while Hawkbot's knowledge base is small.
  * Adding zero to the distance expression intentionally prevents PostgreSQL
@@ -75,12 +97,21 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
      )
      SELECT k.id, k.source_post_id, k.cleaned_content, k.raw_content,
             k.approved_at, k.last_verified_at,
+            source.content AS source_post_content,
+            (SELECT COUNT(*)::integer
+             FROM post_votes source_vote
+             WHERE source_vote.post_id = source.id AND source_vote.vote = 1) AS source_approval_count,
+            source.created_at AS source_created_at,
+            source.parent_id AS source_parent_id,
+            COALESCE(parent.content, source.content) AS thread_title,
             CASE WHEN k.embedding IS NULL THEN NULL
                  ELSE 1 - (k.embedding <=> $1::vector)
             END AS similarity,
             fused.vector_rank, fused.text_rank, fused.retrieval_score
      FROM fused
      JOIN approved_knowledge k ON k.id = fused.id AND k.status = 'active'
+     LEFT JOIN posts source ON source.id = k.source_post_id
+     LEFT JOIN posts parent ON parent.id = source.parent_id
      ORDER BY fused.retrieval_score DESC,
               CASE WHEN k.embedding IS NULL THEN NULL ELSE k.embedding <=> $1::vector END
      LIMIT $4`,

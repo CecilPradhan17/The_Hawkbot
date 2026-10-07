@@ -4,6 +4,7 @@ import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   DAILY_CHAT_LIMIT,
   MAX_CHAT_MESSAGE_LENGTH,
@@ -11,6 +12,7 @@ import {
   getStoredChatUsage,
   saveChatUsage,
 } from '@/utils/chatSession'
+import { getTimeAgo } from '@/utils/timeAgo'
 
 interface Message {
   id: number
@@ -36,8 +38,24 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
       <>
         {content}
         <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2 text-xs text-slate-500">
-          <span>Official source:</span>
-          {sources.map(source => (
+          <span>Sources:</span>
+          {sources.map(source => source.type === 'hawkwall' ? (
+            <div key={`${source.url}-${source.postId ?? ''}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-slate-600">
+              <p className="font-medium text-slate-700">{source.title}</p>
+              {source.excerpt && source.excerpt !== source.title && (
+                <p className="mt-1 line-clamp-2">{source.excerpt}</p>
+              )}
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span>
+                  {source.approvalCount ?? 0} community approvals
+                  {source.createdAt ? ` · ${getTimeAgo(source.createdAt)}` : ''}
+                </span>
+                <Link to={source.url} className="font-semibold text-[#1B5E8A] underline underline-offset-2 hover:text-[#164d72]">
+                  View discussion
+                </Link>
+              </div>
+            </div>
+          ) : (
             <a
               key={source.url}
               href={source.url}
