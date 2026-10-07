@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import {
   getAdminKnowledge,
+  updateAdminKnowledgeReviewCategory,
   type AdminKnowledgeItem,
   type KnowledgeStatusFilter,
+  type ReviewCategory,
 } from '@/api/knowledge-admin.api'
 
 const PAGE_SIZE = 25
@@ -35,7 +37,35 @@ const formatDate = (value: string | null) => {
   }).format(new Date(value))
 }
 
-function KnowledgeCard({ item }: { item: AdminKnowledgeItem }) {
+function KnowledgeCard({
+  item,
+  onCategoryUpdate,
+}: {
+  item: AdminKnowledgeItem
+  onCategoryUpdate: (knowledgeId: number, category: ReviewCategory) => Promise<void>
+}) {
+  const [selectedCategory, setSelectedCategory] = useState<ReviewCategory | ''>(item.reviewCategory ?? '')
+  const [savingCategory, setSavingCategory] = useState(false)
+  const [categoryMessage, setCategoryMessage] = useState('')
+
+  useEffect(() => {
+    setSelectedCategory(item.reviewCategory ?? '')
+  }, [item.reviewCategory])
+
+  const saveCategory = async () => {
+    if (!selectedCategory || selectedCategory === item.reviewCategory) return
+    setSavingCategory(true)
+    setCategoryMessage('')
+    try {
+      await onCategoryUpdate(item.id, selectedCategory)
+      setCategoryMessage('Review category saved.')
+    } catch (saveError) {
+      setCategoryMessage(saveError instanceof Error ? saveError.message : 'Could not save the review category.')
+    } finally {
+      setSavingCategory(false)
+    }
+  }
+
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -43,7 +73,7 @@ function KnowledgeCard({ item }: { item: AdminKnowledgeItem }) {
           {statusLabel(item.status)}
         </span>
         <span className="rounded-full bg-[#8A244B]/10 px-2.5 py-1 text-xs font-bold capitalize text-[#8A244B]">
-          {item.reviewCategory} review
+          {item.reviewCategory ? `${item.reviewCategory} review` : 'Review unassigned'}
         </span>
         <span className="ml-auto text-xs font-semibold text-slate-400">Fact #{item.id}</span>
       </div>
@@ -66,6 +96,42 @@ function KnowledgeCard({ item }: { item: AdminKnowledgeItem }) {
           <dd className="mt-0.5 capitalize text-slate-800">{item.latestVerificationStatus ?? 'None'}</dd>
         </div>
       </dl>
+
+      <div className="mt-4 rounded-xl border border-slate-200 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex-1 text-sm font-semibold text-slate-700">
+            Review category
+            <select
+              value={selectedCategory}
+              disabled={savingCategory}
+              onChange={event => {
+                setSelectedCategory(event.target.value as ReviewCategory | '')
+                setCategoryMessage('')
+              }}
+              className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
+            >
+              <option value="" disabled>Choose a category</option>
+              <option value="stable">Stable — no automatic review</option>
+              <option value="yearly">Yearly — review after one year</option>
+              <option value="term">Term — review for a new semester</option>
+              <option value="frequent">Frequent — review after 90 days</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => void saveCategory()}
+            disabled={!selectedCategory || selectedCategory === item.reviewCategory || savingCategory}
+            className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {savingCategory ? 'Saving…' : 'Save category'}
+          </button>
+        </div>
+        {categoryMessage && (
+          <p role="status" className={`mt-2 text-sm font-medium ${categoryMessage === 'Review category saved.' ? 'text-emerald-700' : 'text-red-700'}`}>
+            {categoryMessage}
+          </p>
+        )}
+      </div>
 
       {(item.sourcePostId || item.sourceContent) && (
         <details className="mt-4 rounded-xl border border-slate-200 p-3">
@@ -128,6 +194,13 @@ export default function KnowledgeAdmin() {
   const selectStatus = (nextStatus: KnowledgeStatusFilter) => {
     setStatus(nextStatus)
     setOffset(0)
+  }
+
+  const updateReviewCategory = async (knowledgeId: number, reviewCategory: ReviewCategory) => {
+    const updated = await updateAdminKnowledgeReviewCategory(knowledgeId, reviewCategory)
+    setItems(current => current.map(item => item.id === knowledgeId
+      ? { ...item, reviewCategory: updated.reviewCategory, reviewDueAt: updated.reviewDueAt }
+      : item))
   }
 
   const firstShown = total === 0 ? 0 : offset + 1
@@ -203,7 +276,9 @@ export default function KnowledgeAdmin() {
 
         {!error && !loading && items.length > 0 && (
           <section aria-label="Knowledge facts" className="mt-4 space-y-4">
-            {items.map(item => <KnowledgeCard key={item.id} item={item} />)}
+            {items.map(item => (
+              <KnowledgeCard key={item.id} item={item} onCategoryUpdate={updateReviewCategory} />
+            ))}
           </section>
         )}
 
