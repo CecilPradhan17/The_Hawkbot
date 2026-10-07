@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import {
   getAdminKnowledge,
@@ -226,6 +226,8 @@ function KnowledgeCard({
 
 export default function KnowledgeAdmin() {
   const [status, setStatus] = useState<KnowledgeStatusFilter>('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [items, setItems] = useState<AdminKnowledgeItem[]>([])
   const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
@@ -236,7 +238,12 @@ export default function KnowledgeAdmin() {
     setLoading(true)
     setError('')
     try {
-      const result = await getAdminKnowledge({ status, limit: PAGE_SIZE, offset })
+      const result = await getAdminKnowledge({
+        status,
+        search: appliedSearch,
+        limit: PAGE_SIZE,
+        offset,
+      })
       setItems(result.items)
       setTotal(result.total)
     } catch (loadError) {
@@ -244,7 +251,7 @@ export default function KnowledgeAdmin() {
     } finally {
       setLoading(false)
     }
-  }, [offset, status])
+  }, [appliedSearch, offset, status])
 
   useEffect(() => {
     void loadKnowledge()
@@ -253,6 +260,23 @@ export default function KnowledgeAdmin() {
   const selectStatus = (nextStatus: KnowledgeStatusFilter) => {
     setStatus(nextStatus)
     setOffset(0)
+  }
+
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextSearch = searchInput.trim()
+    setOffset(0)
+    if (nextSearch === appliedSearch && offset === 0) {
+      void loadKnowledge()
+      return
+    }
+    setAppliedSearch(nextSearch)
+  }
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setOffset(0)
+    if (appliedSearch) setAppliedSearch('')
   }
 
   const updateReviewCategory = async (knowledgeId: number, reviewCategory: ReviewCategory) => {
@@ -315,9 +339,44 @@ export default function KnowledgeAdmin() {
           ))}
         </nav>
 
+        <form onSubmit={submitSearch} className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex sm:items-end sm:gap-3">
+          <label className="block flex-1 text-sm font-semibold text-slate-700">
+            Search knowledge
+            <input
+              type="search"
+              value={searchInput}
+              maxLength={200}
+              onChange={event => setSearchInput(event.target.value)}
+              placeholder="Try library, tutoring, parking…"
+              className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20"
+            />
+          </label>
+          <div className="mt-3 flex gap-2 sm:mt-0">
+            <button
+              type="submit"
+              disabled={loading}
+              className="min-h-11 flex-1 rounded-lg bg-[#8A244B] px-5 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+            >
+              Search
+            </button>
+            {(searchInput || appliedSearch) && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                disabled={loading}
+                className="min-h-11 flex-1 rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 transition hover:border-[#8A244B] hover:text-[#8A244B] disabled:opacity-50 sm:flex-none"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </form>
+
         <div className="mt-5 flex items-center justify-between text-sm text-slate-600">
           <p aria-live="polite">
-            {loading ? 'Loading knowledge…' : `${total} ${total === 1 ? 'fact' : 'facts'}`}
+            {loading
+              ? 'Loading knowledge…'
+              : `${total} ${total === 1 ? 'fact' : 'facts'}${appliedSearch ? ` matching “${appliedSearch}”` : ''}`}
           </p>
           {!loading && total > 0 && <p>Showing {firstShown}–{lastShown}</p>}
         </div>
