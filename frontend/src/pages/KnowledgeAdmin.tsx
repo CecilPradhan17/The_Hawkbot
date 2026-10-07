@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import {
   getAdminKnowledge,
+  queueAdminKnowledgeReview,
   updateAdminKnowledgeReviewCategory,
   type AdminKnowledgeItem,
   type KnowledgeStatusFilter,
@@ -40,13 +41,17 @@ const formatDate = (value: string | null) => {
 function KnowledgeCard({
   item,
   onCategoryUpdate,
+  onQueueReview,
 }: {
   item: AdminKnowledgeItem
   onCategoryUpdate: (knowledgeId: number, category: ReviewCategory) => Promise<void>
+  onQueueReview: (knowledgeId: number) => Promise<{ queued: boolean; alreadyOpen: boolean }>
 }) {
   const [selectedCategory, setSelectedCategory] = useState<ReviewCategory | ''>(item.reviewCategory ?? '')
   const [savingCategory, setSavingCategory] = useState(false)
   const [categoryMessage, setCategoryMessage] = useState('')
+  const [queueingReview, setQueueingReview] = useState(false)
+  const [reviewMessage, setReviewMessage] = useState('')
 
   useEffect(() => {
     setSelectedCategory(item.reviewCategory ?? '')
@@ -66,6 +71,26 @@ function KnowledgeCard({
     }
   }
 
+  const hasOpenReview = item.latestVerificationStatus === 'open'
+  const isQueuedForReview = !hasOpenReview
+    && item.reviewDueAt !== null
+    && new Date(item.reviewDueAt).getTime() <= Date.now()
+
+  const queueReview = async () => {
+    setQueueingReview(true)
+    setReviewMessage('')
+    try {
+      const result = await onQueueReview(item.id)
+      setReviewMessage(result.alreadyOpen
+        ? 'A HawkWall verification is already open.'
+        : 'Queued for the next verification run.')
+    } catch (queueError) {
+      setReviewMessage(queueError instanceof Error ? queueError.message : 'Could not queue this fact for review.')
+    } finally {
+      setQueueingReview(false)
+    }
+  }
+
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -77,6 +102,40 @@ function KnowledgeCard({
         </span>
         <span className="ml-auto text-xs font-semibold text-slate-400">Fact #{item.id}</span>
       </div>
+
+      {item.status === 'active' && (
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold text-slate-800">Community verification</p>
+            <p className="mt-0.5 text-sm text-slate-600">
+              {hasOpenReview
+                ? 'This fact is currently being checked on HawkWall.'
+                : isQueuedForReview
+                  ? 'This fact will be posted by the next scheduled verification run.'
+                  : 'Queue this fact to be checked again by the HawkWall community.'}
+            </p>
+            {reviewMessage && (
+              <p role="status" className={`mt-1 text-sm font-medium ${reviewMessage.startsWith('Could not') ? 'text-red-700' : 'text-emerald-700'}`}>
+                {reviewMessage}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => void queueReview()}
+            disabled={queueingReview || hasOpenReview || isQueuedForReview}
+            className="min-h-11 shrink-0 rounded-lg border-2 border-[#8A244B] bg-white px-4 py-2 font-bold text-[#8A244B] transition hover:bg-[#8A244B]/5 active:scale-[0.98] disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-500 disabled:opacity-70"
+          >
+            {queueingReview
+              ? 'Queueing…'
+              : hasOpenReview
+                ? 'Review open'
+                : isQueuedForReview
+                  ? 'Review queued'
+                  : 'Queue review'}
+          </button>
+        </div>
+      )}
 
       <p className="mt-4 whitespace-pre-wrap text-base font-medium leading-7 text-slate-800">{item.content}</p>
 
@@ -203,6 +262,16 @@ export default function KnowledgeAdmin() {
       : item))
   }
 
+  const queueReview = async (knowledgeId: number) => {
+    const result = await queueAdminKnowledgeReview(knowledgeId)
+    if (result.queued && result.reviewDueAt) {
+      setItems(current => current.map(item => item.id === knowledgeId
+        ? { ...item, reviewDueAt: result.reviewDueAt ?? item.reviewDueAt }
+        : item))
+    }
+    return result
+  }
+
   const firstShown = total === 0 ? 0 : offset + 1
   const lastShown = Math.min(offset + items.length, total)
 
@@ -277,7 +346,12 @@ export default function KnowledgeAdmin() {
         {!error && !loading && items.length > 0 && (
           <section aria-label="Knowledge facts" className="mt-4 space-y-4">
             {items.map(item => (
-              <KnowledgeCard key={item.id} item={item} onCategoryUpdate={updateReviewCategory} />
+              <KnowledgeCard
+                key={item.id}
+                item={item}
+                onCategoryUpdate={updateReviewCategory}
+                onQueueReview={queueReview}
+              />
             ))}
           </section>
         )}
