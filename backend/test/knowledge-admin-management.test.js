@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { correctKnowledgeForAdmin } from "../src/services/knowledge-admin-management.services.js";
+import {
+  archiveKnowledgeForAdmin,
+  correctKnowledgeForAdmin,
+} from "../src/services/knowledge-admin-management.services.js";
 
 const correctionHarness = ({ status = "active" } = {}) => {
   const calls = [];
@@ -107,4 +110,81 @@ test("validates corrections before generating embeddings or opening storage", as
   }), /Corrected knowledge/);
   assert.equal(embedded, false);
   assert.equal(stored, false);
+});
+
+const archiveHarness = ({ status = "active", found = true } = {}) => {
+  const calls = [];
+  const client = {
+    async query(text, params) {
+      calls.push({ text, params });
+      if (text.includes("SELECT id, status")) {
+        return found
+          ? { rowCount: 1, rows: [{ id: 7, status }] }
+          : { rowCount: 0, rows: [] };
+      }
+      if (text.includes("UPDATE knowledge_verifications")) {
+        return { rows: [{ post_id: 30 }] };
+      }
+      if (text.includes("UPDATE knowledge_correction_questions")) {
+        return { rows: [{ question_post_id: 40 }] };
+      }
+      return { rows: [] };
+    },
+    release() { calls.push({ text: "RELEASE" }); },
+  };
+  return { database: { async connect() { return client; } }, calls };
+};
+
+test("archives knowledge without deleting it and closes obsolete workflows", async () => {
+  const { database, calls } = archiveHarness();
+  const archivedAt = new Date("2026-10-07T16:00:00Z");
+  const result = await archiveKnowledgeForAdmin({
+    knowledgeId: 7,
+    adminUserId: 3,
+    note: "This service is no longer offered.",
+  }, { database, now: archivedAt });
+
+  assert.deepEqual(result, { id: 7, status: "archived", archivedAt });
+  const archive = calls.find(({ text }) => text.includes("SET status = 'archived'"));
+  assert.deepEqual(archive.params, [7]);
+  assert.equal(calls.filter(({ text }) => text.includes("UPDATE posts SET status = 'closed'")).length, 2);
+  const audit = calls.find(({ text }) => text.includes("INSERT INTO knowledge_admin_actions"));
+  assert.deepEqual(audit.params, [7, 3, "This service is no longer offered.", archivedAt]);
+  assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["COMMIT", "RELEASE"]);
+});
+
+test("archives needs-update knowledge and cancels its correction request", async () => {
+  const { database, calls } = archiveHarness({ status: "needs_update" });
+  await archiveKnowledgeForAdmin({
+    knowledgeId: 7,
+    adminUserId: 3,
+    note: "The outdated fact should not be replaced.",
+  }, { database });
+
+  const correction = calls.find(({ text }) => text.includes("UPDATE knowledge_correction_questions"));
+  assert.match(correction.text, /status = 'cancelled'/);
+});
+
+test("refuses to archive historical knowledge and rolls back", async () => {
+  const { database, calls } = archiveHarness({ status: "replaced" });
+  await assert.rejects(archiveKnowledgeForAdmin({
+    knowledgeId: 7,
+    adminUserId: 3,
+    note: "Do not mutate historical records.",
+  }, { database }), (error) => (
+    error.status === 409 && error.message === "Only active or needs-update knowledge can be archived"
+  ));
+  assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["ROLLBACK", "RELEASE"]);
+});
+
+test("validates archive requests before opening a transaction", async () => {
+  let connected = false;
+  await assert.rejects(archiveKnowledgeForAdmin({
+    knowledgeId: 7,
+    adminUserId: 3,
+    note: "",
+  }, {
+    database: { async connect() { connected = true; } },
+  }), /Archive note/);
+  assert.equal(connected, false);
 });
