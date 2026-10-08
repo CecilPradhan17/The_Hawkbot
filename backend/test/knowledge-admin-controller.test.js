@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  archiveKnowledge,
+  correctKnowledge,
   editKnowledgeReviewCategory,
   getKnowledgeForAdmin,
   requestKnowledgeReview,
@@ -46,4 +48,38 @@ test("review controller forwards invalid knowledge IDs", async () => {
   assert.equal(nextCalls.length, 1);
   assert.equal(nextCalls[0].status, 400);
   assert.equal(nextCalls[0].message, "Invalid knowledge ID");
+});
+
+test("correction controller uses the authenticated administrator and validates content", async () => {
+  const nextCalls = [];
+  await correctKnowledge(
+    {
+      params: { knowledgeId: "7" },
+      user: { id: 3 },
+      body: { content: "No", reviewCategory: "yearly", note: "Correction reason" },
+    },
+    { status() { throw new Error("response should not be sent"); } },
+    (error) => nextCalls.push(error),
+  );
+
+  assert.equal(nextCalls.length, 1);
+  assert.equal(nextCalls[0].status, 400);
+  assert.match(nextCalls[0].message, /Corrected knowledge/);
+});
+
+test("archive controller uses the authenticated administrator and requires a note", async () => {
+  const nextCalls = [];
+  await archiveKnowledge(
+    {
+      params: { knowledgeId: "7" },
+      user: { id: 3 },
+      body: { note: "" },
+    },
+    { json() { throw new Error("response should not be sent"); } },
+    (error) => nextCalls.push(error),
+  );
+
+  assert.equal(nextCalls.length, 1);
+  assert.equal(nextCalls[0].status, 400);
+  assert.match(nextCalls[0].message, /Archive note/);
 });
