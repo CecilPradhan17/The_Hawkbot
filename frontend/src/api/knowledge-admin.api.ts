@@ -1,6 +1,6 @@
 import { api } from './api'
 
-export type KnowledgeStatus = 'active' | 'needs_update' | 'replaced'
+export type KnowledgeStatus = 'active' | 'needs_update' | 'replaced' | 'archived'
 export type KnowledgeStatusFilter = KnowledgeStatus | 'all'
 export type ReviewCategory = 'stable' | 'yearly' | 'term' | 'frequent'
 

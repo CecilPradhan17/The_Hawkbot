@@ -1,7 +1,7 @@
 import pool from "../db.js";
 import { calculateNextReviewAt } from "./knowledge-review.services.js";
 
-const VALID_STATUSES = new Set(["all", "active", "needs_update", "replaced"]);
+const VALID_STATUSES = new Set(["all", "active", "needs_update", "replaced", "archived"]);
 const VALID_REVIEW_CATEGORIES = new Set(["stable", "yearly", "term", "frequent"]);
 
 export const listKnowledgeForAdmin = async (

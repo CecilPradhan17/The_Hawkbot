@@ -15,18 +15,21 @@ const FILTERS: { value: KnowledgeStatusFilter; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'needs_update', label: 'Needs update' },
   { value: 'replaced', label: 'Replaced' },
+  { value: 'archived', label: 'Archived' },
 ]
 
 const statusLabel = (status: AdminKnowledgeItem['status']) => ({
   active: 'Active',
   needs_update: 'Needs update',
   replaced: 'Replaced',
+  archived: 'Archived',
 })[status]
 
 const statusClasses = (status: AdminKnowledgeItem['status']) => ({
   active: 'bg-emerald-100 text-emerald-800',
   needs_update: 'bg-amber-100 text-amber-900',
   replaced: 'bg-slate-200 text-slate-700',
+  archived: 'bg-rose-100 text-rose-800',
 })[status]
 
 const formatDate = (value: string | null) => {
@@ -218,6 +221,13 @@ function KnowledgeCard({
         <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
           <p className="font-bold">Replacement{item.supersededById ? ` fact #${item.supersededById}` : ''}</p>
           <p className="mt-1">{item.replacementContent || 'Replacement details are unavailable.'}</p>
+        </div>
+      )}
+
+      {item.status === 'archived' && (
+        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+          <p className="font-bold">Archived knowledge</p>
+          <p className="mt-1">This fact is preserved for history but is no longer available to Hawkbot's answers.</p>
         </div>
       )}
     </article>

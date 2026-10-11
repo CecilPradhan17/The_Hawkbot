@@ -62,6 +62,21 @@ test("rejects unsupported knowledge statuses before querying", async () => {
   assert.equal(queried, false);
 });
 
+test("allows administrators to filter archived knowledge", async () => {
+  let params;
+  const database = {
+    async query(_text, queryParams) {
+      params = queryParams;
+      return { rows: [] };
+    },
+  };
+
+  const result = await listKnowledgeForAdmin({ status: "archived" }, database);
+
+  assert.equal(params[0], "archived");
+  assert.deepEqual(result, { items: [], total: 0, limit: 50, offset: 0 });
+});
+
 test("caps the page size and prevents negative offsets", async () => {
   let params;
   const database = {
