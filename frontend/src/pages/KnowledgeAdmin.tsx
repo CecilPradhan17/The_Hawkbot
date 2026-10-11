@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import {
+  archiveAdminKnowledge,
   correctAdminKnowledge,
   getAdminKnowledge,
   queueAdminKnowledgeReview,
@@ -44,11 +45,13 @@ const formatDate = (value: string | null) => {
 
 function KnowledgeCard({
   item,
+  onArchive,
   onCategoryUpdate,
   onCorrect,
   onQueueReview,
 }: {
   item: AdminKnowledgeItem
+  onArchive: (knowledgeId: number, note: string) => Promise<void>
   onCategoryUpdate: (knowledgeId: number, category: ReviewCategory) => Promise<void>
   onCorrect: (knowledgeId: number, content: string, category: ReviewCategory, note: string) => Promise<void>
   onQueueReview: (knowledgeId: number) => Promise<{ queued: boolean; alreadyOpen: boolean }>
@@ -64,6 +67,11 @@ function KnowledgeCard({
   const [correctionNote, setCorrectionNote] = useState('')
   const [correcting, setCorrecting] = useState(false)
   const [correctionMessage, setCorrectionMessage] = useState('')
+  const [showArchive, setShowArchive] = useState(false)
+  const [archiveNote, setArchiveNote] = useState('')
+  const [archiveConfirmed, setArchiveConfirmed] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [archiveMessage, setArchiveMessage] = useState('')
 
   useEffect(() => {
     setSelectedCategory(item.reviewCategory ?? '')
@@ -122,6 +130,27 @@ function KnowledgeCard({
       setCorrectionMessage(correctionError instanceof Error ? correctionError.message : 'Could not correct this fact.')
     } finally {
       setCorrecting(false)
+    }
+  }
+
+  const closeArchive = () => {
+    setShowArchive(false)
+    setArchiveNote('')
+    setArchiveConfirmed(false)
+    setArchiveMessage('')
+  }
+
+  const submitArchive = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!archiveConfirmed) return
+    setArchiving(true)
+    setArchiveMessage('')
+    try {
+      await onArchive(item.id, archiveNote.trim())
+    } catch (archiveError) {
+      setArchiveMessage(archiveError instanceof Error ? archiveError.message : 'Could not archive this fact.')
+    } finally {
+      setArchiving(false)
     }
   }
 
@@ -269,6 +298,87 @@ function KnowledgeCard({
                   className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {correcting ? 'Saving correction…' : 'Save corrected fact'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {(item.status === 'active' || item.status === 'needs_update') && (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+          {!showArchive ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-red-900">Remove this fact from Hawkbot?</p>
+                <p className="mt-0.5 text-sm text-red-800">
+                  Archive it when the information should no longer be used and does not need a replacement.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchive(true)}
+                className="min-h-11 shrink-0 rounded-lg border-2 border-red-700 bg-white px-4 py-2 font-bold text-red-700 transition hover:bg-red-100 active:scale-[0.98]"
+              >
+                Archive fact
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={submitArchive} className="space-y-3">
+              <div>
+                <p className="font-bold text-red-900">Archive fact #{item.id}</p>
+                <p className="mt-0.5 text-sm text-red-800">
+                  The fact will remain in admin history, but Hawkbot will stop using it in answers.
+                </p>
+              </div>
+              <label className="block text-sm font-semibold text-red-900">
+                Reason for archiving
+                <textarea
+                  required
+                  minLength={3}
+                  maxLength={1000}
+                  rows={2}
+                  value={archiveNote}
+                  disabled={archiving}
+                  placeholder="For example: This service is no longer offered."
+                  onChange={event => {
+                    setArchiveNote(event.target.value)
+                    setArchiveMessage('')
+                  }}
+                  className="mt-1 w-full rounded-lg border border-red-300 bg-white px-3 py-2 font-normal leading-6 text-slate-800 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/20 disabled:opacity-60"
+                />
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-red-200 bg-white p-3 text-sm text-red-900">
+                <input
+                  type="checkbox"
+                  checked={archiveConfirmed}
+                  disabled={archiving}
+                  onChange={event => {
+                    setArchiveConfirmed(event.target.checked)
+                    setArchiveMessage('')
+                  }}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-red-700"
+                />
+                <span>I understand that Hawkbot will no longer use this fact in its answers.</span>
+              </label>
+              {archiveMessage && (
+                <p role="alert" className="text-sm font-medium text-red-700">{archiveMessage}</p>
+              )}
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeArchive}
+                  disabled={archiving}
+                  className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 font-bold text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={archiving || !archiveConfirmed || archiveNote.trim().length < 3}
+                  className="min-h-11 rounded-lg bg-red-700 px-4 py-2 font-bold text-white transition hover:bg-red-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {archiving ? 'Archiving…' : 'Confirm archive'}
                 </button>
               </div>
             </form>
@@ -450,6 +560,11 @@ export default function KnowledgeAdmin() {
     await loadKnowledge()
   }
 
+  const archiveKnowledge = async (knowledgeId: number, note: string) => {
+    await archiveAdminKnowledge(knowledgeId, note)
+    await loadKnowledge()
+  }
+
   const firstShown = total === 0 ? 0 : offset + 1
   const lastShown = Math.min(offset + items.length, total)
 
@@ -562,6 +677,7 @@ export default function KnowledgeAdmin() {
               <KnowledgeCard
                 key={item.id}
                 item={item}
+                onArchive={archiveKnowledge}
                 onCategoryUpdate={updateReviewCategory}
                 onCorrect={correctKnowledge}
                 onQueueReview={queueReview}
