@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import {
+  correctAdminKnowledge,
   getAdminKnowledge,
   queueAdminKnowledgeReview,
   updateAdminKnowledgeReviewCategory,
@@ -44,10 +45,12 @@ const formatDate = (value: string | null) => {
 function KnowledgeCard({
   item,
   onCategoryUpdate,
+  onCorrect,
   onQueueReview,
 }: {
   item: AdminKnowledgeItem
   onCategoryUpdate: (knowledgeId: number, category: ReviewCategory) => Promise<void>
+  onCorrect: (knowledgeId: number, content: string, category: ReviewCategory, note: string) => Promise<void>
   onQueueReview: (knowledgeId: number) => Promise<{ queued: boolean; alreadyOpen: boolean }>
 }) {
   const [selectedCategory, setSelectedCategory] = useState<ReviewCategory | ''>(item.reviewCategory ?? '')
@@ -55,6 +58,12 @@ function KnowledgeCard({
   const [categoryMessage, setCategoryMessage] = useState('')
   const [queueingReview, setQueueingReview] = useState(false)
   const [reviewMessage, setReviewMessage] = useState('')
+  const [showCorrection, setShowCorrection] = useState(false)
+  const [correctedContent, setCorrectedContent] = useState(item.content)
+  const [correctionCategory, setCorrectionCategory] = useState<ReviewCategory | ''>(item.reviewCategory ?? '')
+  const [correctionNote, setCorrectionNote] = useState('')
+  const [correcting, setCorrecting] = useState(false)
+  const [correctionMessage, setCorrectionMessage] = useState('')
 
   useEffect(() => {
     setSelectedCategory(item.reviewCategory ?? '')
@@ -91,6 +100,28 @@ function KnowledgeCard({
       setReviewMessage(queueError instanceof Error ? queueError.message : 'Could not queue this fact for review.')
     } finally {
       setQueueingReview(false)
+    }
+  }
+
+  const closeCorrection = () => {
+    setShowCorrection(false)
+    setCorrectedContent(item.content)
+    setCorrectionCategory(item.reviewCategory ?? '')
+    setCorrectionNote('')
+    setCorrectionMessage('')
+  }
+
+  const submitCorrection = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!correctionCategory) return
+    setCorrecting(true)
+    setCorrectionMessage('')
+    try {
+      await onCorrect(item.id, correctedContent.trim(), correctionCategory, correctionNote.trim())
+    } catch (correctionError) {
+      setCorrectionMessage(correctionError instanceof Error ? correctionError.message : 'Could not correct this fact.')
+    } finally {
+      setCorrecting(false)
     }
   }
 
@@ -141,6 +172,109 @@ function KnowledgeCard({
       )}
 
       <p className="mt-4 whitespace-pre-wrap text-base font-medium leading-7 text-slate-800">{item.content}</p>
+
+      {(item.status === 'active' || item.status === 'needs_update') && (
+        <div className="mt-4 rounded-xl border border-[#8A244B]/25 bg-[#8A244B]/5 p-3">
+          {!showCorrection ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-800">Is this fact incorrect?</p>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  Replace it with corrected knowledge while preserving the original in history.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCorrection(true)}
+                className="min-h-11 shrink-0 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98]"
+              >
+                Correct fact
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={submitCorrection} className="space-y-3">
+              <div>
+                <p className="font-bold text-slate-800">Correct fact #{item.id}</p>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  Saving creates a new active fact and keeps this version as replaced history.
+                </p>
+              </div>
+              <label className="block text-sm font-semibold text-slate-700">
+                Correct information
+                <textarea
+                  required
+                  minLength={5}
+                  maxLength={2000}
+                  rows={4}
+                  value={correctedContent}
+                  disabled={correcting}
+                  onChange={event => {
+                    setCorrectedContent(event.target.value)
+                    setCorrectionMessage('')
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal leading-6 outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Review category
+                <select
+                  required
+                  value={correctionCategory}
+                  disabled={correcting}
+                  onChange={event => {
+                    setCorrectionCategory(event.target.value as ReviewCategory | '')
+                    setCorrectionMessage('')
+                  }}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
+                >
+                  <option value="" disabled>Choose a category</option>
+                  <option value="stable">Stable — no automatic review</option>
+                  <option value="yearly">Yearly — review after one year</option>
+                  <option value="term">Term — review for a new semester</option>
+                  <option value="frequent">Frequent — review after 90 days</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Reason for correction
+                <textarea
+                  required
+                  minLength={3}
+                  maxLength={1000}
+                  rows={2}
+                  value={correctionNote}
+                  disabled={correcting}
+                  placeholder="For example: Updated from the current official notice."
+                  onChange={event => {
+                    setCorrectionNote(event.target.value)
+                    setCorrectionMessage('')
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal leading-6 outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+                />
+              </label>
+              {correctionMessage && (
+                <p role="alert" className="text-sm font-medium text-red-700">{correctionMessage}</p>
+              )}
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeCorrection}
+                  disabled={correcting}
+                  className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 font-bold text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={correcting || !correctionCategory || correctedContent.trim().length < 5 || correctionNote.trim().length < 3}
+                  className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {correcting ? 'Saving correction…' : 'Save corrected fact'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       <dl className="mt-5 grid gap-3 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
         <div>
@@ -306,6 +440,16 @@ export default function KnowledgeAdmin() {
     return result
   }
 
+  const correctKnowledge = async (
+    knowledgeId: number,
+    content: string,
+    reviewCategory: ReviewCategory,
+    note: string,
+  ) => {
+    await correctAdminKnowledge(knowledgeId, { content, reviewCategory, note })
+    await loadKnowledge()
+  }
+
   const firstShown = total === 0 ? 0 : offset + 1
   const lastShown = Math.min(offset + items.length, total)
 
@@ -419,6 +563,7 @@ export default function KnowledgeAdmin() {
                 key={item.id}
                 item={item}
                 onCategoryUpdate={updateReviewCategory}
+                onCorrect={correctKnowledge}
                 onQueueReview={queueReview}
               />
             ))}
