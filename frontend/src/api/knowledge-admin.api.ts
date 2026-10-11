@@ -31,6 +31,21 @@ export interface AdminKnowledgePage {
   offset: number
 }
 
+export interface KnowledgeCorrectionResult {
+  replacedKnowledgeId: number
+  replacement: {
+    id: number
+    content: string
+    reviewCategory: ReviewCategory
+  }
+}
+
+export interface KnowledgeArchiveResult {
+  id: number
+  status: 'archived'
+  archivedAt: string
+}
+
 interface RawAdminKnowledgeItem {
   id: number
   content: string
@@ -123,4 +138,22 @@ export function queueAdminKnowledgeReview(knowledgeId: number): Promise<{
   reviewDueAt?: string
 }> {
   return api.post(`/knowledge/admin/${knowledgeId}/review`, {})
+}
+
+export function correctAdminKnowledge(
+  knowledgeId: number,
+  correction: {
+    content: string
+    reviewCategory: ReviewCategory
+    note: string
+  },
+): Promise<KnowledgeCorrectionResult> {
+  return api.post(`/knowledge/admin/${knowledgeId}/correct`, correction)
+}
+
+export function archiveAdminKnowledge(
+  knowledgeId: number,
+  note: string,
+): Promise<KnowledgeArchiveResult> {
+  return api.post(`/knowledge/admin/${knowledgeId}/archive`, { note })
 }
