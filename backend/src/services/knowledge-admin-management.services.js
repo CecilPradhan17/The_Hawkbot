@@ -1,6 +1,7 @@
 import pool from "../db.js";
 import { generateDocumentEmbedding } from "./embedding.services.js";
 import { storeApprovedKnowledge } from "./approved-knowledge.services.js";
+import { curateKnowledge } from "./llm.services.js";
 
 const REVIEW_CATEGORIES = new Set(["stable", "yearly", "term", "frequent"]);
 
@@ -31,6 +32,30 @@ const normalizeOptionalHttpsUrl = value => {
   } catch {
     throw requestError("Source URL must be a valid HTTPS URL");
   }
+};
+
+export const improveKnowledgeForAdmin = async ({ content }, dependencies = {}) => {
+  const sourceContent = String(content || "").trim();
+  if (sourceContent.length < 5 || sourceContent.length > 10000) {
+    throw requestError("Source material must be between 5 and 10000 characters");
+  }
+
+  const curator = dependencies.curator || curateKnowledge;
+  const curated = await curator({ type: "post", content: sourceContent });
+  const suggestions = (Array.isArray(curated) ? curated : [])
+    .map(suggestion => ({
+      content: String(suggestion?.content || "").trim().replace(/\s+/g, " "),
+      reviewCategory: REVIEW_CATEGORIES.has(suggestion?.reviewCategory)
+        ? suggestion.reviewCategory
+        : "frequent",
+    }))
+    .filter(suggestion => suggestion.content.length >= 5 && suggestion.content.length <= 2000)
+    .slice(0, 12);
+
+  if (suggestions.length === 0) {
+    throw requestError("AI could not produce usable knowledge suggestions", 502);
+  }
+  return { suggestions };
 };
 
 export const createKnowledgeForAdmin = async (

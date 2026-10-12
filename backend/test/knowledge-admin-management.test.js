@@ -4,7 +4,48 @@ import {
   archiveKnowledgeForAdmin,
   correctKnowledgeForAdmin,
   createKnowledgeForAdmin,
+  improveKnowledgeForAdmin,
 } from "../src/services/knowledge-admin-management.services.js";
+
+test("returns optional AI suggestions without storing knowledge", async () => {
+  const curatorCalls = [];
+  const result = await improveKnowledgeForAdmin({
+    content: "  The tutoring center is in Walker Hall and offers evening tutoring.  ",
+  }, {
+    curator: async input => {
+      curatorCalls.push(input);
+      return [
+        { content: "The tutoring center is in Walker Hall.", reviewCategory: "stable" },
+        { content: "The tutoring center offers evening tutoring.", reviewCategory: "term" },
+      ];
+    },
+  });
+
+  assert.deepEqual(curatorCalls, [{
+    type: "post",
+    content: "The tutoring center is in Walker Hall and offers evening tutoring.",
+  }]);
+  assert.deepEqual(result, {
+    suggestions: [
+      { content: "The tutoring center is in Walker Hall.", reviewCategory: "stable" },
+      { content: "The tutoring center offers evening tutoring.", reviewCategory: "term" },
+    ],
+  });
+});
+
+test("does not call AI for invalid improvement input", async () => {
+  let curated = false;
+  await assert.rejects(improveKnowledgeForAdmin({ content: "No" }, {
+    curator: async () => { curated = true; return []; },
+  }), (error) => error.status === 400 && error.message === "Source material must be between 5 and 10000 characters");
+  assert.equal(curated, false);
+});
+
+test("rejects an AI improvement with no usable suggestions", async () => {
+  await assert.rejects(improveKnowledgeForAdmin({ content: "Some valid source material." }, {
+    curator: async () => [{ content: "", reviewCategory: "stable" }],
+  }), (error) => error.status === 502 && error.message === "AI could not produce usable knowledge suggestions");
+});
 
 test("creates sourced embedded knowledge and records the administrator", async () => {
   const calls = [];
