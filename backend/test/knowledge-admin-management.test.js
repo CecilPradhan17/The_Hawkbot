@@ -94,7 +94,7 @@ test("creates sourced embedded knowledge and records the administrator", async (
   assert.match(calls[0].text, /'created'/);
   assert.deepEqual(calls[0].params, [101, 3, "Source: ULM Registrar website", verifiedAt]);
   assert.match(databaseCalls[0].text, /status IN \('active', 'needs_update'\)/);
-  assert.deepEqual(databaseCalls[0].params, ["The Registrar is located in Sandel Hall."]);
+  assert.deepEqual(databaseCalls[0].params, ["The Registrar is located in Sandel Hall.", null]);
 });
 
 test("rejects duplicate active knowledge before embedding or storage", async () => {
@@ -109,7 +109,7 @@ test("rejects duplicate active knowledge before embedding or storage", async () 
   }, {
     database: {
       async query(_text, params) {
-        assert.deepEqual(params, ["THE REGISTRAR IS LOCATED IN SANDEL HALL."]);
+        assert.deepEqual(params, ["THE REGISTRAR IS LOCATED IN SANDEL HALL.", null]);
         return { rows: [{ id: 44 }] };
       },
     },
@@ -180,6 +180,13 @@ const correctionHarness = ({ status = "active" } = {}) => {
 test("creates an embedded replacement and preserves an audit trail", async () => {
   const { calls, storageCalls, storage, verifiedAt } = correctionHarness();
   const embeddingGenerator = async () => [0.1];
+  const duplicateQueries = [];
+  const database = {
+    async query(text, params) {
+      duplicateQueries.push({ text, params });
+      return { rows: [] };
+    },
+  };
   const result = await correctKnowledgeForAdmin({
     knowledgeId: 7,
     adminUserId: 3,
@@ -188,13 +195,13 @@ test("creates an embedded replacement and preserves an audit trail", async () =>
     note: "Updated from the current library notice.",
     sourceTitle: "  ULM Library website  ",
     sourceUrl: "https://www.ulm.edu/library",
-  }, { database: "database", embeddingGenerator, storage });
+  }, { database, embeddingGenerator, storage });
 
   assert.deepEqual(result, {
     replacedKnowledgeId: 7,
     replacement: { id: 99, content: "The Library opens at 7:30 AM.", reviewCategory: "term" },
   });
-  assert.equal(storageCalls[0].db, "database");
+  assert.equal(storageCalls[0].db, database);
   assert.equal(storageCalls[0].sourcePostId, null);
   assert.equal(storageCalls[0].sourceTitle, "ULM Library website");
   assert.equal(storageCalls[0].sourceUrl, "https://www.ulm.edu/library");
@@ -204,6 +211,8 @@ test("creates an embedded replacement and preserves an audit trail", async () =>
     content: "The Library opens at 7:30 AM.",
     reviewCategory: "term",
   }]);
+  assert.match(duplicateQueries[0].text, /id <> \$2/);
+  assert.deepEqual(duplicateQueries[0].params, ["The Library opens at 7:30 AM.", 7]);
 
   const replace = calls.find(({ text }) => text.includes("SET status = 'replaced'"));
   assert.deepEqual(replace.params, [99, 7]);
@@ -226,7 +235,7 @@ test("allows an administrator to replace knowledge already needing an update", a
     note: "Corrected after community feedback.",
     sourceTitle: "ULM official notice",
     sourceUrl: "",
-  }, { storage, embeddingGenerator: async () => [0.1] }));
+  }, { storage, embeddingGenerator: async () => [0.1], duplicateFinder: async () => null }));
 });
 
 test("refuses to replace historical knowledge", async () => {
@@ -239,9 +248,36 @@ test("refuses to replace historical knowledge", async () => {
     note: "Attempted historical edit.",
     sourceTitle: "ULM official notice",
     sourceUrl: "",
-  }, { storage, embeddingGenerator: async () => [0.1] }), (error) => (
+  }, { storage, embeddingGenerator: async () => [0.1], duplicateFinder: async () => null }), (error) => (
     error.status === 409 && error.message === "Only active or needs-update knowledge can be corrected"
   ));
+});
+
+test("rejects a correction that duplicates another active fact before embedding or storage", async () => {
+  let embedded = false;
+  let stored = false;
+  const finderCalls = [];
+  await assert.rejects(correctKnowledgeForAdmin({
+    knowledgeId: 7,
+    adminUserId: 3,
+    content: "The Library opens at 7:30 AM.",
+    reviewCategory: "term",
+    note: "Updated from the current library notice.",
+    sourceTitle: "ULM Library website",
+    sourceUrl: "https://www.ulm.edu/library",
+  }, {
+    database: "database",
+    duplicateFinder: async input => { finderCalls.push(input); return 44; },
+    embeddingGenerator: async () => { embedded = true; return [0.1]; },
+    storage: async () => { stored = true; },
+  }), (error) => error.status === 409 && error.message === "This knowledge already exists as fact #44");
+  assert.deepEqual(finderCalls, [{
+    database: "database",
+    content: "The Library opens at 7:30 AM.",
+    excludeId: 7,
+  }]);
+  assert.equal(embedded, false);
+  assert.equal(stored, false);
 });
 
 test("validates corrections before generating embeddings or opening storage", async () => {

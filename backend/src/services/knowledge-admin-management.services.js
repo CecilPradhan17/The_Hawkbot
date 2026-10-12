@@ -34,6 +34,19 @@ const normalizeOptionalHttpsUrl = value => {
   }
 };
 
+const findDuplicateKnowledgeId = async ({ database, content, excludeId = null }) => {
+  const result = await database.query(
+    `SELECT id
+     FROM approved_knowledge
+     WHERE status IN ('active', 'needs_update')
+       AND LOWER(BTRIM(cleaned_content)) = LOWER($1)
+       AND ($2::integer IS NULL OR id <> $2)
+     LIMIT 1`,
+    [content, excludeId],
+  );
+  return result.rows[0]?.id ?? null;
+};
+
 export const improveKnowledgeForAdmin = async ({ content }, dependencies = {}) => {
   const sourceContent = String(content || "").trim();
   if (sourceContent.length < 5 || sourceContent.length > 10000) {
@@ -79,16 +92,10 @@ export const createKnowledgeForAdmin = async (
   const database = dependencies.database || pool;
   const embeddingGenerator = dependencies.embeddingGenerator || generateDocumentEmbedding;
   const storage = dependencies.storage || storeApprovedKnowledge;
-  const duplicate = await database.query(
-    `SELECT id
-     FROM approved_knowledge
-     WHERE status IN ('active', 'needs_update')
-       AND LOWER(BTRIM(cleaned_content)) = LOWER($1)
-     LIMIT 1`,
-    [knowledgeContent],
-  );
-  if (duplicate.rows[0]) {
-    throw requestError(`This knowledge already exists as fact #${duplicate.rows[0].id}`, 409);
+  const duplicateFinder = dependencies.duplicateFinder || findDuplicateKnowledgeId;
+  const duplicateId = await duplicateFinder({ database, content: knowledgeContent });
+  if (duplicateId) {
+    throw requestError(`This knowledge already exists as fact #${duplicateId}`, 409);
   }
   const stored = await storage({
     db: database,
@@ -138,6 +145,11 @@ export const correctKnowledgeForAdmin = async (
   const database = dependencies.database || pool;
   const embeddingGenerator = dependencies.embeddingGenerator || generateDocumentEmbedding;
   const storage = dependencies.storage || storeApprovedKnowledge;
+  const duplicateFinder = dependencies.duplicateFinder || findDuplicateKnowledgeId;
+  const duplicateId = await duplicateFinder({ database, content: correctedContent, excludeId: id });
+  if (duplicateId) {
+    throw requestError(`This knowledge already exists as fact #${duplicateId}`, 409);
+  }
 
   const stored = await storage({
     db: database,
