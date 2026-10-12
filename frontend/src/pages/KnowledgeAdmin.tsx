@@ -5,10 +5,12 @@ import {
   correctAdminKnowledge,
   createAdminKnowledge,
   getAdminKnowledge,
+  improveAdminKnowledge,
   queueAdminKnowledgeReview,
   updateAdminKnowledgeReviewCategory,
   type AdminKnowledgeItem,
   type KnowledgeStatusFilter,
+  type KnowledgeSuggestion,
   type ReviewCategory,
 } from '@/api/knowledge-admin.api'
 
@@ -61,6 +63,12 @@ function AddKnowledgePanel({
   const [sourceUrl, setSourceUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [improving, setImproving] = useState(false)
+  const [suggestions, setSuggestions] = useState<KnowledgeSuggestion[]>([])
+  const [savingSuggestionIndex, setSavingSuggestionIndex] = useState<number | null>(null)
+  const [improvementError, setImprovementError] = useState('')
+  const busy = saving || improving || savingSuggestionIndex !== null
+  const sourceUrlValid = !sourceUrl.trim() || sourceUrl.trim().startsWith('https://')
 
   const reset = () => {
     setContent('')
@@ -68,6 +76,8 @@ function AddKnowledgePanel({
     setSourceTitle('')
     setSourceUrl('')
     setError('')
+    setSuggestions([])
+    setImprovementError('')
   }
 
   const cancel = () => {
@@ -93,6 +103,47 @@ function AddKnowledgePanel({
       setError(createError instanceof Error ? createError.message : 'Could not add this knowledge.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const improve = async () => {
+    if (content.trim().length < 5) return
+    setImproving(true)
+    setImprovementError('')
+    try {
+      const result = await improveAdminKnowledge(content.trim())
+      setSuggestions(result.suggestions)
+    } catch (improveError) {
+      setImprovementError(improveError instanceof Error ? improveError.message : 'Could not improve this knowledge.')
+    } finally {
+      setImproving(false)
+    }
+  }
+
+  const updateSuggestion = (index: number, update: Partial<KnowledgeSuggestion>) => {
+    setSuggestions(current => current.map((suggestion, suggestionIndex) => (
+      suggestionIndex === index ? { ...suggestion, ...update } : suggestion
+    )))
+    setImprovementError('')
+  }
+
+  const saveSuggestion = async (index: number) => {
+    const suggestion = suggestions[index]
+    if (!suggestion) return
+    setSavingSuggestionIndex(index)
+    setImprovementError('')
+    try {
+      await onCreate({
+        content: suggestion.content.trim(),
+        reviewCategory: suggestion.reviewCategory,
+        sourceTitle: sourceTitle.trim(),
+        sourceUrl: sourceUrl.trim(),
+      })
+      setSuggestions(current => current.filter((_, suggestionIndex) => suggestionIndex !== index))
+    } catch (saveError) {
+      setImprovementError(saveError instanceof Error ? saveError.message : 'Could not add this suggestion.')
+    } finally {
+      setSavingSuggestionIndex(null)
     }
   }
 
@@ -133,7 +184,7 @@ function AddKnowledgePanel({
           maxLength={2000}
           rows={4}
           value={content}
-          disabled={saving}
+          disabled={busy}
           placeholder="Example: The Registrar is located in Sandel Hall."
           onChange={event => {
             setContent(event.target.value)
@@ -144,13 +195,30 @@ function AddKnowledgePanel({
         <span className="mt-1 block text-xs font-normal text-slate-500">{content.length}/2000 characters</span>
       </label>
 
+      <div className="flex flex-col gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-bold text-violet-950">Optional AI assistance</p>
+          <p className="mt-0.5 text-sm text-violet-800">
+            Uses one AI call to suggest atomic wording. Nothing is saved until you approve a suggestion.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void improve()}
+          disabled={busy || content.trim().length < 5}
+          className="min-h-11 shrink-0 rounded-lg border-2 border-violet-700 bg-white px-4 py-2 font-bold text-violet-800 transition hover:bg-violet-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {improving ? 'Improving…' : 'Improve with AI'}
+        </button>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold text-slate-700">
           Review category
           <select
             required
             value={reviewCategory}
-            disabled={saving}
+            disabled={busy}
             onChange={event => {
               setReviewCategory(event.target.value as ReviewCategory | '')
               setError('')
@@ -172,7 +240,7 @@ function AddKnowledgePanel({
             minLength={3}
             maxLength={200}
             value={sourceTitle}
-            disabled={saving}
+            disabled={busy}
             placeholder="Example: ULM Registrar website"
             onChange={event => {
               setSourceTitle(event.target.value)
@@ -190,7 +258,7 @@ function AddKnowledgePanel({
           pattern="https://.*"
           maxLength={2000}
           value={sourceUrl}
-          disabled={saving}
+          disabled={busy}
           placeholder="https://www.ulm.edu/..."
           onChange={event => {
             setSourceUrl(event.target.value)
@@ -200,20 +268,81 @@ function AddKnowledgePanel({
         />
       </label>
 
+      {suggestions.length > 0 && (
+        <section aria-label="Unsaved AI suggestions" className="space-y-3 rounded-xl border border-violet-200 bg-violet-50 p-3">
+          <div>
+            <h3 className="font-bold text-violet-950">Unsaved AI suggestions</h3>
+            <p className="mt-0.5 text-sm text-violet-800">
+              Check every detail. Edit or discard suggestions, then add only the facts you approve.
+            </p>
+          </div>
+          {suggestions.map((suggestion, index) => (
+            <div key={index} className="space-y-3 rounded-xl border border-violet-200 bg-white p-3">
+              <label className="block text-sm font-semibold text-slate-700">
+                Suggested fact {index + 1}
+                <textarea
+                  minLength={5}
+                  maxLength={2000}
+                  rows={3}
+                  value={suggestion.content}
+                  disabled={busy}
+                  onChange={event => updateSuggestion(index, { content: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal leading-6 outline-none transition focus:border-violet-600 focus:ring-2 focus:ring-violet-600/20 disabled:opacity-60"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Suggested review category
+                <select
+                  value={suggestion.reviewCategory}
+                  disabled={busy}
+                  onChange={event => updateSuggestion(index, { reviewCategory: event.target.value as ReviewCategory })}
+                  className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
+                >
+                  <option value="stable">Stable — no automatic review</option>
+                  <option value="yearly">Yearly — review after one year</option>
+                  <option value="term">Term — review for a new semester</option>
+                  <option value="frequent">Frequent — review after 90 days</option>
+                </select>
+              </label>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSuggestions(current => current.filter((_, suggestionIndex) => suggestionIndex !== index))}
+                  disabled={busy}
+                  className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 font-bold text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveSuggestion(index)}
+                  disabled={busy || suggestion.content.trim().length < 5 || sourceTitle.trim().length < 3 || !sourceUrlValid}
+                  className="min-h-11 rounded-lg bg-violet-700 px-4 py-2 font-bold text-white transition hover:bg-violet-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {savingSuggestionIndex === index ? 'Adding suggestion…' : 'Add this fact'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {improvementError && <p role="alert" className="text-sm font-medium text-red-700">{improvementError}</p>}
+
       {error && <p role="alert" className="text-sm font-medium text-red-700">{error}</p>}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button
           type="button"
           onClick={cancel}
-          disabled={saving}
+          disabled={busy}
           className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 font-bold text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={saving || content.trim().length < 5 || !reviewCategory || sourceTitle.trim().length < 3}
+          disabled={busy || content.trim().length < 5 || !reviewCategory || sourceTitle.trim().length < 3 || !sourceUrlValid}
           className="min-h-11 rounded-lg bg-[#8A244B] px-5 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? 'Adding knowledge…' : 'Add to Hawkbot'}
