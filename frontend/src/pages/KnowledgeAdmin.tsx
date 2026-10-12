@@ -3,6 +3,7 @@ import Header from '@/components/Header'
 import {
   archiveAdminKnowledge,
   correctAdminKnowledge,
+  createAdminKnowledge,
   getAdminKnowledge,
   queueAdminKnowledgeReview,
   updateAdminKnowledgeReviewCategory,
@@ -41,6 +42,185 @@ const formatDate = (value: string | null) => {
     day: 'numeric',
     year: 'numeric',
   }).format(new Date(value))
+}
+
+function AddKnowledgePanel({
+  onCreate,
+}: {
+  onCreate: (knowledge: {
+    content: string
+    reviewCategory: ReviewCategory
+    sourceTitle: string
+    sourceUrl: string
+  }) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [content, setContent] = useState('')
+  const [reviewCategory, setReviewCategory] = useState<ReviewCategory | ''>('')
+  const [sourceTitle, setSourceTitle] = useState('')
+  const [sourceUrl, setSourceUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const reset = () => {
+    setContent('')
+    setReviewCategory('')
+    setSourceTitle('')
+    setSourceUrl('')
+    setError('')
+  }
+
+  const cancel = () => {
+    reset()
+    setOpen(false)
+  }
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!reviewCategory) return
+    setSaving(true)
+    setError('')
+    try {
+      await onCreate({
+        content: content.trim(),
+        reviewCategory,
+        sourceTitle: sourceTitle.trim(),
+        sourceUrl: sourceUrl.trim(),
+      })
+      reset()
+      setOpen(false)
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : 'Could not add this knowledge.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="mt-6 rounded-2xl border border-[#8A244B]/20 bg-white p-4 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <div>
+          <h2 className="font-bold text-slate-800">Add verified knowledge</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Add one sourced, self-contained fact directly to Hawkbot.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-3 min-h-11 w-full rounded-lg bg-[#8A244B] px-5 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] sm:mt-0 sm:w-auto"
+        >
+          Add knowledge
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-6 space-y-4 rounded-2xl border-2 border-[#8A244B]/30 bg-white p-4 shadow-sm sm:p-5">
+      <div>
+        <h2 className="text-xl font-bold text-slate-800">Add verified knowledge</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Enter one atomic fact. Hawkbot stores this wording exactly and generates an embedding when you save.
+        </p>
+      </div>
+
+      <label className="block text-sm font-semibold text-slate-700">
+        Knowledge fact
+        <textarea
+          required
+          minLength={5}
+          maxLength={2000}
+          rows={4}
+          value={content}
+          disabled={saving}
+          placeholder="Example: The Registrar is located in Sandel Hall."
+          onChange={event => {
+            setContent(event.target.value)
+            setError('')
+          }}
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal leading-6 outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+        />
+        <span className="mt-1 block text-xs font-normal text-slate-500">{content.length}/2000 characters</span>
+      </label>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm font-semibold text-slate-700">
+          Review category
+          <select
+            required
+            value={reviewCategory}
+            disabled={saving}
+            onChange={event => {
+              setReviewCategory(event.target.value as ReviewCategory | '')
+              setError('')
+            }}
+            className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
+          >
+            <option value="" disabled>Choose a category</option>
+            <option value="stable">Stable — no automatic review</option>
+            <option value="yearly">Yearly — review after one year</option>
+            <option value="term">Term — review for a new semester</option>
+            <option value="frequent">Frequent — review after 90 days</option>
+          </select>
+        </label>
+
+        <label className="block text-sm font-semibold text-slate-700">
+          Source label
+          <input
+            required
+            minLength={3}
+            maxLength={200}
+            value={sourceTitle}
+            disabled={saving}
+            placeholder="Example: ULM Registrar website"
+            onChange={event => {
+              setSourceTitle(event.target.value)
+              setError('')
+            }}
+            className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+          />
+        </label>
+      </div>
+
+      <label className="block text-sm font-semibold text-slate-700">
+        Source URL <span className="font-normal text-slate-500">(optional, HTTPS only)</span>
+        <input
+          type="url"
+          pattern="https://.*"
+          maxLength={2000}
+          value={sourceUrl}
+          disabled={saving}
+          placeholder="https://www.ulm.edu/..."
+          onChange={event => {
+            setSourceUrl(event.target.value)
+            setError('')
+          }}
+          className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+        />
+      </label>
+
+      {error && <p role="alert" className="text-sm font-medium text-red-700">{error}</p>}
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={saving}
+          className="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 font-bold text-slate-700 transition hover:border-slate-400 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving || content.trim().length < 5 || !reviewCategory || sourceTitle.trim().length < 3}
+          className="min-h-11 rounded-lg bg-[#8A244B] px-5 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? 'Adding knowledge…' : 'Add to Hawkbot'}
+        </button>
+      </div>
+    </form>
+  )
 }
 
 function KnowledgeCard({
@@ -572,6 +752,18 @@ export default function KnowledgeAdmin() {
     await loadKnowledge()
   }
 
+  const createKnowledge = async (knowledge: {
+    content: string
+    reviewCategory: ReviewCategory
+    sourceTitle: string
+    sourceUrl: string
+  }) => {
+    setActionMessage('')
+    const result = await createAdminKnowledge(knowledge)
+    setActionMessage(`Fact #${result.created.id} was added and is now available to Hawkbot.`)
+    await loadKnowledge()
+  }
+
   const firstShown = total === 0 ? 0 : offset + 1
   const lastShown = Math.min(offset + items.length, total)
 
@@ -596,6 +788,8 @@ export default function KnowledgeAdmin() {
             {loading ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
+
+        <AddKnowledgePanel onCreate={createKnowledge} />
 
         <nav aria-label="Knowledge status" className="mt-6 flex gap-2 overflow-x-auto pb-1">
           {FILTERS.map(filter => (
