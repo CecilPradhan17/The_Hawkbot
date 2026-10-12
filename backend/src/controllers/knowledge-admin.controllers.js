@@ -7,6 +7,7 @@ import {
   archiveKnowledgeForAdmin,
   correctKnowledgeForAdmin,
   createKnowledgeForAdmin,
+  improveKnowledgeForAdmin,
 } from "../services/knowledge-admin-management.services.js";
 
 export async function getKnowledgeForAdmin(req, res, next) {
@@ -54,6 +55,15 @@ export async function createKnowledge(req, res, next) {
       sourceUrl: req.body.sourceUrl,
     });
     res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function improveKnowledge(req, res, next) {
+  try {
+    const result = await improveKnowledgeForAdmin({ content: req.body.content });
+    res.json(result);
   } catch (error) {
     next(error);
   }

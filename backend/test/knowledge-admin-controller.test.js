@@ -6,6 +6,7 @@ import {
   createKnowledge,
   editKnowledgeReviewCategory,
   getKnowledgeForAdmin,
+  improveKnowledge,
   requestKnowledgeReview,
 } from "../src/controllers/knowledge-admin.controllers.js";
 
@@ -71,6 +72,19 @@ test("creation controller uses the authenticated administrator and validates kno
   assert.equal(nextCalls.length, 1);
   assert.equal(nextCalls[0].status, 400);
   assert.match(nextCalls[0].message, /Knowledge must be between/);
+});
+
+test("optional improvement controller rejects invalid source material", async () => {
+  const nextCalls = [];
+  await improveKnowledge(
+    { body: { content: "No" } },
+    { json() { throw new Error("response should not be sent"); } },
+    (error) => nextCalls.push(error),
+  );
+
+  assert.equal(nextCalls.length, 1);
+  assert.equal(nextCalls[0].status, 400);
+  assert.match(nextCalls[0].message, /Source material must be between/);
 });
 
 test("correction controller uses the authenticated administrator and validates content", async () => {
