@@ -3,7 +3,75 @@ import assert from "node:assert/strict";
 import {
   archiveKnowledgeForAdmin,
   correctKnowledgeForAdmin,
+  createKnowledgeForAdmin,
 } from "../src/services/knowledge-admin-management.services.js";
+
+test("creates sourced embedded knowledge and records the administrator", async () => {
+  const calls = [];
+  const verifiedAt = new Date("2026-10-12T15:00:00Z");
+  const storageCalls = [];
+  const storage = async options => {
+    storageCalls.push(options);
+    const stored = [{ id: 101, content: options.chunks[0].content, reviewCategory: options.chunks[0].reviewCategory }];
+    await options.afterStore({
+      client: { async query(text, params) { calls.push({ text, params }); } },
+      stored,
+      verifiedAt,
+    });
+    return stored;
+  };
+  const embeddingGenerator = async () => [0.1];
+
+  const result = await createKnowledgeForAdmin({
+    adminUserId: 3,
+    content: "  The Registrar is located in Sandel Hall.  ",
+    reviewCategory: "stable",
+    sourceTitle: "  ULM Registrar website  ",
+    sourceUrl: "https://www.ulm.edu/registrar",
+  }, { database: "database", embeddingGenerator, storage });
+
+  assert.deepEqual(result, {
+    created: { id: 101, content: "The Registrar is located in Sandel Hall.", reviewCategory: "stable" },
+  });
+  assert.deepEqual(storageCalls[0], {
+    db: "database",
+    sourcePostId: null,
+    sourceUrl: "https://www.ulm.edu/registrar",
+    sourceTitle: "ULM Registrar website",
+    rawContent: "The Registrar is located in Sandel Hall.",
+    chunks: [{ content: "The Registrar is located in Sandel Hall.", reviewCategory: "stable" }],
+    generateEmbedding: embeddingGenerator,
+    afterStore: storageCalls[0].afterStore,
+  });
+  assert.match(calls[0].text, /'created'/);
+  assert.deepEqual(calls[0].params, [101, 3, "Source: ULM Registrar website", verifiedAt]);
+});
+
+for (const [name, override, message] of [
+  ["administrator", { adminUserId: 0 }, "Invalid administrator ID"],
+  ["content", { content: "No" }, "Knowledge must be between 5 and 2000 characters"],
+  ["review category", { reviewCategory: "weekly" }, "Invalid review category"],
+  ["source label", { sourceTitle: "?" }, "Source label must be between 3 and 200 characters"],
+  ["source URL", { sourceUrl: "http://example.com" }, "Source URL must be a valid HTTPS URL"],
+]) {
+  test(`validates the admin-created knowledge ${name} before embedding or storage`, async () => {
+    let embedded = false;
+    let stored = false;
+    await assert.rejects(createKnowledgeForAdmin({
+      adminUserId: 3,
+      content: "The Registrar is located in Sandel Hall.",
+      reviewCategory: "stable",
+      sourceTitle: "ULM Registrar website",
+      sourceUrl: "",
+      ...override,
+    }, {
+      embeddingGenerator: async () => { embedded = true; return [0.1]; },
+      storage: async () => { stored = true; },
+    }), new RegExp(message));
+    assert.equal(embedded, false);
+    assert.equal(stored, false);
+  });
+}
 
 const correctionHarness = ({ status = "active" } = {}) => {
   const calls = [];

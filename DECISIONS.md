@@ -22,6 +22,31 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-10-12 — AI-assisted admin knowledge requires human approval
+
+**Context:** The owner needs to add official knowledge directly without routing it
+through community voting. An LLM can improve retrieval quality by splitting source
+material into self-contained facts, but silently saving rewritten text could alter a
+name, date, condition, or other authoritative detail.
+
+**Decision:** Treat AI curation as an optional preview step. The model may suggest
+atomic wording and review categories, but an administrator must inspect and approve
+the final facts before any embedding or database write occurs. Directly submitted
+facts are stored exactly as approved, with source metadata and an administrator audit
+record.
+
+**Alternatives considered:** Automatically curate and save every submission, or skip
+AI assistance entirely. Automatic saving is faster but makes model mistakes durable;
+skipping curation preserves fidelity but makes long, multi-topic entries harder to
+retrieve accurately.
+
+**Trade-offs:** Adding knowledge takes one additional review step and optional AI use
+adds a small per-submission cost. In exchange, the model cannot silently publish campus
+claims, while administrators still get help producing retrieval-friendly atomic facts.
+
+**Resume/interview angle:** Designed a human-in-the-loop ingestion workflow that uses
+LLMs for structured assistance without surrendering editorial control or provenance.
+
 ## 2026-10-06 — Chat history is tab-scoped and evidence opens outside the feed
 
 **Context:** Following a HawkWall citation unmounted the chat and lost its local

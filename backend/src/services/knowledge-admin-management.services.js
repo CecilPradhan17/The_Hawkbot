@@ -20,6 +20,61 @@ const closePosts = async (client, rows, key) => {
   }
 };
 
+const normalizeOptionalHttpsUrl = value => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  if (normalized.length > 2000) throw requestError("Source URL must be 2000 characters or fewer");
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== "https:") throw new Error("Unsupported protocol");
+    return parsed.toString();
+  } catch {
+    throw requestError("Source URL must be a valid HTTPS URL");
+  }
+};
+
+export const createKnowledgeForAdmin = async (
+  { adminUserId, content, reviewCategory, sourceTitle, sourceUrl },
+  dependencies = {},
+) => {
+  const adminId = Number(adminUserId);
+  const knowledgeContent = String(content || "").trim().replace(/\s+/g, " ");
+  const knowledgeSourceTitle = String(sourceTitle || "").trim().replace(/\s+/g, " ");
+  const knowledgeSourceUrl = normalizeOptionalHttpsUrl(sourceUrl);
+
+  if (!Number.isInteger(adminId) || adminId <= 0) throw requestError("Invalid administrator ID");
+  if (knowledgeContent.length < 5 || knowledgeContent.length > 2000) {
+    throw requestError("Knowledge must be between 5 and 2000 characters");
+  }
+  if (!REVIEW_CATEGORIES.has(reviewCategory)) throw requestError("Invalid review category");
+  if (knowledgeSourceTitle.length < 3 || knowledgeSourceTitle.length > 200) {
+    throw requestError("Source label must be between 3 and 200 characters");
+  }
+
+  const database = dependencies.database || pool;
+  const embeddingGenerator = dependencies.embeddingGenerator || generateDocumentEmbedding;
+  const storage = dependencies.storage || storeApprovedKnowledge;
+  const stored = await storage({
+    db: database,
+    sourcePostId: null,
+    sourceUrl: knowledgeSourceUrl,
+    sourceTitle: knowledgeSourceTitle,
+    rawContent: knowledgeContent,
+    chunks: [{ content: knowledgeContent, reviewCategory }],
+    generateEmbedding: embeddingGenerator,
+    afterStore: async ({ client, stored: inserted, verifiedAt }) => {
+      await client.query(
+        `INSERT INTO knowledge_admin_actions
+           (knowledge_id, replacement_knowledge_id, admin_user_id, action, note, created_at)
+         VALUES ($1, NULL, $2, 'created', $3, $4)`,
+        [inserted[0].id, adminId, `Source: ${knowledgeSourceTitle}`, verifiedAt],
+      );
+    },
+  });
+
+  return { created: stored[0] };
+};
+
 export const correctKnowledgeForAdmin = async (
   { knowledgeId, adminUserId, content, reviewCategory, note },
   dependencies = {},

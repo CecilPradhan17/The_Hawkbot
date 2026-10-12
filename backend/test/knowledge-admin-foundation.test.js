@@ -6,6 +6,10 @@ const migration = readFileSync(
   new URL("../migrations/023_add_knowledge_admin_actions.sql", import.meta.url),
   "utf8",
 );
+const creationMigration = readFileSync(
+  new URL("../migrations/028_allow_created_knowledge_admin_actions.sql", import.meta.url),
+  "utf8",
+);
 
 test("adds an archived knowledge status without changing active retrieval semantics", () => {
   assert.match(migration, /'active', 'needs_update', 'replaced', 'archived'/);
@@ -28,4 +32,9 @@ test("records auditable correction and archive actions", () => {
 
 test("prevents deleting facts that are part of the admin audit trail", () => {
   assert.match(migration, /approved_knowledge\(id\) ON DELETE RESTRICT/);
+});
+
+test("allows audited administrator-created knowledge without replacement lineage", () => {
+  assert.match(creationMigration, /'created', 'corrected', 'archived'/);
+  assert.match(creationMigration, /action = 'created' AND replacement_knowledge_id IS NULL/);
 });
