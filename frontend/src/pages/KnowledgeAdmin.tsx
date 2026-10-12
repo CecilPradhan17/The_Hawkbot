@@ -489,6 +489,7 @@ export default function KnowledgeAdmin() {
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
 
   const loadKnowledge = useCallback(async () => {
     setLoading(true)
@@ -558,12 +559,16 @@ export default function KnowledgeAdmin() {
     reviewCategory: ReviewCategory,
     note: string,
   ) => {
-    await correctAdminKnowledge(knowledgeId, { content, reviewCategory, note })
+    setActionMessage('')
+    const result = await correctAdminKnowledge(knowledgeId, { content, reviewCategory, note })
+    setActionMessage(`Fact #${knowledgeId} was corrected. Replacement fact #${result.replacement.id} is now active.`)
     await loadKnowledge()
   }
 
   const archiveKnowledge = async (knowledgeId: number, note: string) => {
+    setActionMessage('')
     await archiveAdminKnowledge(knowledgeId, note)
+    setActionMessage(`Fact #${knowledgeId} was archived and removed from Hawkbot answers.`)
     await loadKnowledge()
   }
 
@@ -651,6 +656,23 @@ export default function KnowledgeAdmin() {
           </p>
           {!loading && total > 0 && <p>Showing {firstShown}–{lastShown}</p>}
         </div>
+
+        {actionMessage && (
+          <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+            <div>
+              <p className="font-bold">Knowledge updated</p>
+              <p className="mt-1 text-sm">{actionMessage}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionMessage('')}
+              aria-label="Dismiss success message"
+              className="min-h-10 shrink-0 rounded-lg px-3 py-2 text-sm font-bold text-emerald-900 transition hover:bg-emerald-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
