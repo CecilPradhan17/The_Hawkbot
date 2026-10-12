@@ -54,6 +54,15 @@ export interface KnowledgeCreationResult {
   }
 }
 
+export interface KnowledgeSuggestion {
+  content: string
+  reviewCategory: ReviewCategory
+}
+
+export interface KnowledgeImprovementResult {
+  suggestions: KnowledgeSuggestion[]
+}
+
 interface RawAdminKnowledgeItem {
   id: number
   content: string
@@ -155,6 +164,10 @@ export function createAdminKnowledge(knowledge: {
   sourceUrl?: string
 }): Promise<KnowledgeCreationResult> {
   return api.post('/knowledge/admin', knowledge)
+}
+
+export function improveAdminKnowledge(content: string): Promise<KnowledgeImprovementResult> {
+  return api.post('/knowledge/admin/improve', { content })
 }
 
 export function correctAdminKnowledge(
