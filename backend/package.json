@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "test": "node --test",
     "eval:retrieval": "node src/evaluate-rag-retrieval.js",
+    "backfill:evidence": "node src/backfill-evidence-embeddings.js",
     "review:knowledge": "node src/run-knowledge-review.js"
   },
   "repository": {

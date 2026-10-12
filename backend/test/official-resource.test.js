@@ -29,6 +29,8 @@ test("groups official-resource aliases and matches whole phrases", () => {
 
 test("recognizes navigation wording without treating every factual question as navigation", () => {
   assert.equal(isResourceNavigationRequest("Where can I find the financial aid website?"), true);
+  assert.equal(isResourceNavigationRequest("Where can I get a new student ID card?"), false);
+  assert.equal(isResourceNavigationRequest("How do I find on campus jobs?"), false);
   assert.equal(isResourceNavigationRequest("When is the financial aid deadline?"), false);
 });
 
@@ -65,5 +67,5 @@ test("routes natural campus-job wording to the validated career resource", () =>
     matchOfficialResource("How do I find on campus jobs?", [career])?.slug,
     "career-development",
   );
-  assert.equal(isResourceNavigationRequest("How do I find on campus jobs?"), true);
+  assert.equal(isResourceNavigationRequest("How do I find on campus jobs?"), false);
 });

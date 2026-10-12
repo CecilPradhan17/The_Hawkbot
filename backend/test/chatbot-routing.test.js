@@ -318,8 +318,8 @@ test("rejects an answer that cites a candidate outside the retrieved pool", asyn
   assert.equal(result.sourceType, "fallback");
 });
 
-test("a direct resource request skips embeddings and returns a validated official link", async () => {
-  const fail = async () => { throw new Error("RAG should not run"); };
+test("a direct resource request uses unified selection instead of bypassing RAG", async () => {
+  let embedded = false;
   const resource = {
     resourceId: 12, slug: "employee-directory", name: "ULM employee directory",
     description: "Faculty and staff contacts", url: "https://ulmapps.ulm.edu/search/index.php?tab=1",
@@ -328,9 +328,49 @@ test("a direct resource request skips embeddings and returns a validated officia
   const result = await handleChatQuery("Where can I find my professor's email?", {
     hoursHandler: async () => null,
     resourceCatalog: async () => [resource],
-    embedding: fail,
+    embedding: async () => { embedded = true; return [0.1]; },
+    retriever: async () => [],
+    facilityCatalog: async () => [],
+    polisher: async (_query, _knowledge, options) => {
+      assert.deepEqual(options.officialResources, [resource]);
+      return {
+        action: "answer", answerable: true, response: "Search the official directory.",
+        relevantCandidateIds: [], officialResourceIds: [12],
+      };
+    },
   });
-  assert.equal(result.sourceType, "official_resource");
+  assert.equal(embedded, true);
+  assert.equal(result.sourceType, "unified");
+  assert.equal(result.sources[0].url, resource.url);
+});
+
+test("a request for a physical service keeps the RAG answer and its official source", async () => {
+  const resource = {
+    resourceId: 21, slug: "warhawk-id", name: "ULM Warhawk ID Services",
+    url: "https://www.ulm.edu/warhawkcard/id-card-info.html",
+    responseText: "Visit Warhawk ID Services.", aliases: ["student id card"], priority: 90,
+  };
+  const result = await handleChatQuery("Where can I get a new student ID card?", {
+    hoursHandler: async () => null,
+    resourceCatalog: async () => [resource],
+    embedding: async () => [0.1],
+    retriever: async () => [{
+      id: 8,
+      cleaned_content: "Warhawk ID Services issues new and replacement student ID cards.",
+      similarity: 0.9,
+      source_url: resource.url,
+      source_title: resource.name,
+    }],
+    facilityCatalog: async () => [],
+    polisher: async () => ({
+      answerable: true,
+      response: "Get the card through Warhawk ID Services.",
+      relevantCandidateIds: [8],
+    }),
+  });
+  assert.equal(result.sourceType, "rag");
+  assert.match(result.response, /Warhawk ID Services/);
+  assert.equal(result.sources[0].type, "official");
   assert.equal(result.sources[0].url, resource.url);
 });
 
@@ -347,10 +387,13 @@ test("the AI may select only a resource from the backend catalog", async () => {
     facilityCatalog: async () => [],
     polisher: async (_query, _knowledge, options) => {
       assert.deepEqual(options.officialResources, [resource]);
-      return { answerable: false, response: "", officialResourceId: 20 };
+      return {
+        action: "answer", answerable: true, response: "Use the library website.",
+        relevantCandidateIds: [], officialResourceIds: [20],
+      };
     },
   });
-  assert.equal(result.sourceType, "official_resource");
+  assert.equal(result.sourceType, "unified");
   assert.equal(result.sources[0].url, resource.url);
 });
 
@@ -387,4 +430,96 @@ test("a grounded answer cites every selected HawkWall discussion and no unselect
     "/sources/hawkwall/61",
   ]);
   assert.deepEqual(result.sources.map(source => source.approvalCount), [8, 6]);
+});
+
+test("one grounded answer can select both an official resource and HawkWall evidence", async () => {
+  const official = {
+    resourceId: 12,
+    name: "ULM Career Development and Handshake",
+    description: "Jobs, internships, and campus employment guidance",
+    url: "https://www.ulm.edu/careerdevelopment/careerservices/handshake.html",
+    lastVerifiedAt: "2026-10-01T00:00:00.000Z",
+  };
+  const result = await handleChatQuery("Where can I find an on-campus job?", {
+    hoursHandler: async () => null,
+    aliasExpander: async query => query,
+    embedding: async () => [0.1],
+    unifiedRetriever: async () => ({
+      knowledge: [{
+        id: 31,
+        cleaned_content: "Some departments advertise student jobs directly.",
+        similarity: 0.9,
+        source_post_id: 82,
+        source_parent_id: 70,
+        source_post_content: "Ask departments about positions that are not listed centrally.",
+        thread_title: "Finding jobs on campus",
+        source_approval_count: 7,
+      }],
+      officialResources: [official],
+      facilities: [],
+    }),
+    polisher: async (_query, _knowledge, options) => {
+      assert.deepEqual(options.candidateIds, [31]);
+      assert.deepEqual(options.officialResources, [official]);
+      return {
+        action: "answer",
+        answerable: true,
+        response: "Use Handshake, and also check directly with departments.",
+        relevantCandidateIds: [31],
+        officialResourceIds: [12],
+      };
+    },
+  });
+
+  assert.equal(result.sourceType, "unified");
+  assert.deepEqual(result.knowledgeIds, [31]);
+  assert.deepEqual(result.sources.map(source => source.type), ["official", "hawkwall"]);
+  assert.deepEqual(result.sources.map(source => source.url), [
+    official.url,
+    "/sources/hawkwall/82",
+  ]);
+});
+
+test("a mixed hours question continues to one synthesis call with structured and HawkWall evidence", async () => {
+  const hoursEvidence = {
+    response: "The Activity Center closes at 9:00 PM.",
+    matched: true,
+    sourceType: "hours",
+  };
+  let synthesisCalls = 0;
+  const result = await handleChatQuery("When does the AC close, and is it crowded after six?", {
+    hoursHandler: async () => hoursEvidence,
+    diningMenuHandler: async () => null,
+    aliasExpander: async query => query,
+    embedding: async () => [0.1],
+    unifiedRetriever: async () => ({
+      knowledge: [{
+        id: 44,
+        cleaned_content: "Students report that the Activity Center is busiest after 6 PM.",
+        similarity: 0.91,
+        source_post_id: 91,
+        source_post_content: "It gets busy after six on weekdays.",
+        thread_title: "Activity Center crowding",
+      }],
+      officialResources: [],
+      facilities: [{ facilityId: 3, facilityName: "Activity Center" }],
+    }),
+    polisher: async (_query, _knowledge, options) => {
+      synthesisCalls += 1;
+      assert.equal(options.structuredEvidence, hoursEvidence);
+      return {
+        action: "answer",
+        answerable: true,
+        response: "It closes at 9 PM, and students say it is busiest after six.",
+        relevantCandidateIds: [44],
+        officialResourceIds: [],
+      };
+    },
+  });
+
+  assert.equal(synthesisCalls, 1);
+  assert.equal(result.action, "answer");
+  assert.match(result.response, /closes at 9 PM/);
+  assert.deepEqual(result.knowledgeIds, [44]);
+  assert.equal(result.sources[0].url, "/sources/hawkwall/91");
 });

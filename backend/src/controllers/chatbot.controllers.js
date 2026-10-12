@@ -1,13 +1,14 @@
 import { handleChatQuery } from "../services/chatbot.services.js";
 import { reportKnowledgeOutdated } from "../services/knowledge-feedback.services.js";
 import { getApprovedHawkWallSource } from "../services/hawkwall-source.services.js";
+import { sanitizeChatContext } from "../services/chat-context.services.js";
 
 /**
  * PURPOSE:
  * Handles incoming chatbot queries from the frontend.
  *
  * ROUTE: POST /api/chat
- * BODY: { message: string }
+ * BODY: { message: string, recentTurns?: ChatTurn[], clarification?: object }
  * RESPONSE: { response: string, matched: boolean }
  *
  * USED BY:
@@ -15,7 +16,7 @@ import { getApprovedHawkWallSource } from "../services/hawkwall-source.services.
  */
 export const handleChat = async (req, res, next) => {
   try {
-    const { message } = req.body;
+    const { message, recentTurns, clarification } = req.body;
 
     if (!message || typeof message !== "string" || !message.trim()) {
       const error = new Error("Message is required");
@@ -29,7 +30,8 @@ export const handleChat = async (req, res, next) => {
       return next(error);
     }
 
-    const result = await handleChatQuery(message.trim());
+    const context = sanitizeChatContext({ recentTurns, clarification });
+    const result = await handleChatQuery(message.trim(), {}, context);
 
     res.status(200).json(result);
   } catch (err) {

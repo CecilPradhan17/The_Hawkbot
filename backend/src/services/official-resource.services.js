@@ -13,8 +13,11 @@ const hasPhrase = (message, phrase) => ` ${message} `.includes(` ${phrase} `);
 
 export const isResourceNavigationRequest = message => {
   const text = normalize(message);
-  return /\b(?:where|find|access|website|webpage|site|link|portal|page|contact|email|phone|map|directory)\b/.test(text)
-    || /\bhow (?:do|can) i\b/.test(text);
+  // Only bypass RAG when the requested answer is itself a digital/contact resource.
+  // Broad wording such as "where can I get an ID" or "how do I find a job" asks
+  // for instructions, not merely a link, and must retain the grounded RAG answer.
+  return /\b(?:website|webpage|site|link|portal|page|email|phone|map|directory)\b/.test(text)
+    || /\bcontact (?:information|info|details|page)\b/.test(text);
 };
 
 export const buildOfficialResourceCatalog = rows => {

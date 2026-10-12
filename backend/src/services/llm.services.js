@@ -137,6 +137,10 @@ export const polishResponse = async (userQuery, knowledge, options = {}) => {
   const currentDate = options.currentDate || new Date().toISOString().slice(0, 10);
   const candidateIds = Array.isArray(options.candidateIds) ? options.candidateIds.map(Number) : [];
   const officialResources = Array.isArray(options.officialResources) ? options.officialResources : [];
+  const recentTurns = Array.isArray(options.recentTurns) ? options.recentTurns : [];
+  const allowClarification = options.allowClarification === true;
+  const structuredEvidence = options.structuredEvidence || null;
+  const diningEvidence = options.diningEvidence || null;
   const prompt = `You are a helpful university campus assistant chatbot.
 A student asked: "${userQuery}"
 
@@ -145,28 +149,33 @@ First select only the candidate IDs that directly answer the student's question.
 Decide whether those selected candidates fully support an answer.
 ${RAG_FRESHNESS_INSTRUCTION}
 Set answerable to false when the knowledge is merely related but does not contain the requested fact.
-When answerable is true, respond conversationally and helpfully in 1-2 sentences using only the selected candidates.
+When answerable is true, respond conversationally and helpfully using only selected candidates and provided structured evidence.
 Do not use unselected candidates and do not add information that is not provided.
-When answerable is false, return an empty response and an empty relevantCandidateIds array. Do not write an apology or suggest another source.
+You may select both community knowledge and official resources in the same answer. Select every source materially used, including useful alternatives or conflicting reports, but do not select merely related sources.
+${allowClarification ? "If the evidence supports multiple materially different interpretations and one short question would resolve them, set action to clarify and ask that question. Do not clarify just because evidence is incomplete." : "Do not ask another clarification question. Give the best supported answer, state alternatives, or mark the question unanswerable."}
+When unanswerable, set action to answer, answerable to false, and return empty selections.
 
-${officialResources.length ? `You can request open_official_resource when one listed official resource is the best place for the student to get information that is not fully answered by campus knowledge. Select only a resource ID from the catalog. Do not claim to have read or retrieved information from the linked page.
+${officialResources.length ? `Official resource candidates are destinations the backend has verified. You may recommend one or more of them, but do not claim to have read the linked pages. Select only IDs that directly help answer the request.
 
-Official resource catalog: ${JSON.stringify(officialResources.map(resource => ({
+Official resource candidates: ${JSON.stringify(officialResources.map(resource => ({
     resourceId: resource.resourceId,
     name: resource.name,
     description: resource.description,
-    aliases: resource.aliases,
   })))}` : "No official resource link tool is available for this request."}
 
 Request open_schulze_menu when the student is asking what food, dishes, or menu items are currently or subsequently available at Schulze Dining Hall, the dining hall, or the cafeteria. Do not request it for operating-hours, location, meal-plan, or general dining questions. Never answer a menu question from campus knowledge.
 
 ${allowHoursTool ? `You can request lookup_hours when the question asks about a listed facility's schedule, opening, closing, or availability. Structured hours have priority over campus knowledge. Infer obvious misspellings, singular/plural differences, abbreviations, and conversational references from the facility catalog, but never invent a facility ID. If multiple facilities are plausible, do not call the tool. Resolve relative dates using the campus date ${currentDate}.
 
-Facility catalog: ${JSON.stringify(facilities)}` : "No hours lookup tool is available for this request."}
+Facility candidates: ${JSON.stringify(facilities.map(facility => ({ facilityId: facility.facilityId, facilityName: facility.facilityName, description: facility.description || "" })))}` : "No hours lookup tool is available for this request."}
+
+${structuredEvidence ? `Authoritative structured hours result: ${JSON.stringify(structuredEvidence)}` : ""}
+${diningEvidence ? `Verified dining destination: ${JSON.stringify(diningEvidence)}` : ""}
+${recentTurns.length ? `Recent conversation (context only, never factual evidence): ${JSON.stringify(recentTurns)}` : ""}
 
 Knowledge: "${knowledge}"`;
 
-  const tools = [{
+  const tools = [...(!diningEvidence ? [{
     type: "function",
     function: {
       name: "open_schulze_menu",
@@ -176,24 +185,6 @@ Knowledge: "${knowledge}"`;
         type: "object",
         properties: {},
         required: [],
-        additionalProperties: false,
-      },
-    },
-  }, ...(officialResources.length ? [{
-    type: "function",
-    function: {
-      name: "open_official_resource",
-      description: "Direct the student to one validated official university resource from the provided catalog.",
-      strict: true,
-      parameters: {
-        type: "object",
-        properties: {
-          resourceId: {
-            type: "integer",
-            enum: officialResources.map(resource => resource.resourceId),
-          },
-        },
-        required: ["resourceId"],
         additionalProperties: false,
       },
     },
@@ -228,7 +219,7 @@ Knowledge: "${knowledge}"`;
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.4,
-    max_tokens: 150,
+    max_tokens: 350,
     ...(tools.length ? { tools, tool_choice: "auto" } : {}),
     response_format: {
       type: "json_schema",
@@ -238,14 +229,19 @@ Knowledge: "${knowledge}"`;
         schema: {
           type: "object",
           properties: {
+            action: { type: "string", enum: ["answer", "clarify"] },
             answerable: { type: "boolean" },
             response: { type: "string" },
             relevantCandidateIds: {
               type: "array",
               items: { type: "integer" },
             },
+            officialResourceIds: {
+              type: "array",
+              items: { type: "integer" },
+            },
           },
-          required: ["answerable", "response", "relevantCandidateIds"],
+          required: ["action", "answerable", "response", "relevantCandidateIds", "officialResourceIds"],
           additionalProperties: false,
         },
       },
@@ -254,15 +250,6 @@ Knowledge: "${knowledge}"`;
 
   const menuToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "open_schulze_menu");
   if (menuToolCall) return { answerable: false, response: "", diningMenuLink: true };
-
-  const resourceToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "open_official_resource");
-  if (resourceToolCall) {
-    try {
-      return { answerable: false, response: "", officialResourceId: JSON.parse(resourceToolCall.function.arguments).resourceId };
-    } catch {
-      return { answerable: false, response: "" };
-    }
-  }
 
   const hoursToolCall = response.choices[0].message.tool_calls?.find(call => call.function?.name === "lookup_hours");
   if (hoursToolCall) {
@@ -275,8 +262,29 @@ Knowledge: "${knowledge}"`;
 
   try {
     const result = JSON.parse(response.choices[0].message.content);
-    return normalizeGroundedResponse(result, candidateIds);
+    const allowedResources = new Set(officialResources.map(resource => Number(resource.resourceId)));
+    const submittedResourceIds = [...new Set((result.officialResourceIds || []).map(Number))];
+    const resourceSelectionValid = submittedResourceIds.every(id => Number.isInteger(id) && allowedResources.has(id));
+    const resourceIds = resourceSelectionValid ? submittedResourceIds : [];
+    const submittedKnowledgeIds = [...new Set((result.relevantCandidateIds || []).map(Number))];
+    const allowedKnowledge = new Set(candidateIds);
+    const knowledgeSelectionValid = submittedKnowledgeIds.every(id => Number.isInteger(id) && allowedKnowledge.has(id));
+    if (result.action === "clarify" && allowClarification && typeof result.response === "string" && result.response.trim()) {
+      return { action: "clarify", answerable: false, response: result.response.trim(), relevantCandidateIds: [], officialResourceIds: [] };
+    }
+    const grounded = normalizeGroundedResponse(result, candidateIds);
+    const text = typeof result.response === "string" ? result.response.trim() : "";
+    const selectedKnowledge = grounded.relevantCandidateIds || [];
+    const supported = selectedKnowledge.length > 0 || resourceIds.length > 0 || structuredEvidence || diningEvidence;
+    const validSelections = knowledgeSelectionValid && resourceSelectionValid;
+    return {
+      action: "answer",
+      answerable: result.answerable === true && Boolean(text) && Boolean(supported) && validSelections,
+      response: result.answerable === true && supported && validSelections ? text : "",
+      relevantCandidateIds: selectedKnowledge,
+      officialResourceIds: resourceIds,
+    };
   } catch {
-    return { answerable: false, response: "", relevantCandidateIds: [] };
+    return { action: "answer", answerable: false, response: "", relevantCandidateIds: [], officialResourceIds: [] };
   }
 };

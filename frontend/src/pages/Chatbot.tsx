@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { reportOutdatedKnowledge, sendChatMessage, type ChatSource } from '@/api/chat.api'
+import {
+  reportOutdatedKnowledge,
+  sendChatMessage,
+  type ChatAction,
+  type ChatClarificationState,
+  type ChatSource,
+  type ChatTurn,
+} from '@/api/chat.api'
 import Header from '@/components/Header'
 import { useAuth } from '@/context/AuthContext'
 import AskQuestionModal from '@/components/posts/AskQuestionModal'
@@ -23,6 +30,7 @@ interface Message {
   postedToHawkwall?: boolean
   knowledgeIds?: number[]
   sources?: ChatSource[]
+  action?: ChatAction
   outdatedState?: 'sending' | 'reported' | 'error'
 }
 
@@ -32,33 +40,86 @@ interface QuestionDraft {
 }
 
 const chatStorageKey = (userId: number) => `hawkbot-chat-messages:${userId}`
+const CHAT_SESSION_VERSION = 2
+const MAX_RECENT_CHAT_TURNS = 8
 
-function loadChatMessages(userId: number | null): Message[] {
-  if (userId === null) return []
+interface StoredChatSession {
+  version: typeof CHAT_SESSION_VERSION
+  messages: Message[]
+  clarification: ChatClarificationState | null
+}
+
+const emptyChatSession = (): StoredChatSession => ({
+  version: CHAT_SESSION_VERSION,
+  messages: [],
+  clarification: null,
+})
+
+function isMessage(value: unknown): value is Message {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<Message>
+  return typeof candidate.id === 'number'
+    && (candidate.role === 'user' || candidate.role === 'bot')
+    && typeof candidate.content === 'string'
+}
+
+function isClarificationState(value: unknown): value is ChatClarificationState {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<ChatClarificationState>
+  return typeof candidate.originalQuery === 'string'
+    && Number.isInteger(candidate.count)
+    && Number(candidate.count) >= 0
+    && Array.isArray(candidate.exchanges)
+    && candidate.exchanges.every(exchange => Boolean(exchange)
+      && typeof exchange === 'object'
+      && typeof exchange.question === 'string'
+      && (exchange.answer === undefined || typeof exchange.answer === 'string'))
+}
+
+function loadChatSession(userId: number | null): StoredChatSession {
+  if (userId === null) return emptyChatSession()
   try {
     const stored = sessionStorage.getItem(chatStorageKey(userId))
-    if (!stored) return []
+    if (!stored) return emptyChatSession()
     const parsed: unknown = JSON.parse(stored)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((message): message is Message => {
-      if (!message || typeof message !== 'object') return false
-      const candidate = message as Partial<Message>
-      return typeof candidate.id === 'number'
-        && (candidate.role === 'user' || candidate.role === 'bot')
-        && typeof candidate.content === 'string'
-    })
+
+    // Versions before conversational memory stored only the rendered messages.
+    if (Array.isArray(parsed)) {
+      return { ...emptyChatSession(), messages: parsed.filter(isMessage) }
+    }
+
+    if (!parsed || typeof parsed !== 'object') return emptyChatSession()
+    const candidate = parsed as Partial<StoredChatSession>
+    if (candidate.version !== CHAT_SESSION_VERSION || !Array.isArray(candidate.messages)) {
+      return emptyChatSession()
+    }
+
+    return {
+      version: CHAT_SESSION_VERSION,
+      messages: candidate.messages.filter(isMessage),
+      clarification: isClarificationState(candidate.clarification) ? candidate.clarification : null,
+    }
   } catch {
-    return []
+    return emptyChatSession()
   }
 }
 
-function saveChatMessages(userId: number | null, messages: Message[]) {
+function saveChatSession(
+  userId: number | null,
+  messages: Message[],
+  clarification: ChatClarificationState | null,
+) {
   if (userId === null) return
   try {
     const stableMessages = messages.map(message => message.outdatedState === 'sending'
       ? { ...message, outdatedState: undefined }
       : message)
-    sessionStorage.setItem(chatStorageKey(userId), JSON.stringify(stableMessages))
+    const session: StoredChatSession = {
+      version: CHAT_SESSION_VERSION,
+      messages: stableMessages,
+      clarification,
+    }
+    sessionStorage.setItem(chatStorageKey(userId), JSON.stringify(session))
   } catch {
     // Storage can be unavailable in private browsing or when its quota is exhausted.
   }
@@ -169,7 +230,9 @@ export default function Chatbot() {
   const initialMessage = typeof (location.state as { initialMessage?: unknown } | null)?.initialMessage === 'string'
     ? (location.state as { initialMessage: string }).initialMessage
     : ''
-  const [messages, setMessages] = useState<Message[]>(() => loadChatMessages(userId))
+  const [initialSession] = useState(() => loadChatSession(userId))
+  const [messages, setMessages] = useState<Message[]>(initialSession.messages)
+  const [clarification, setClarification] = useState<ChatClarificationState | null>(initialSession.clarification)
   const [greeting] = useState(() => getRandomChatGreeting(username))
   const [input, setInput] = useState(initialMessage)
   const [loading, setLoading] = useState(false)
@@ -188,8 +251,8 @@ export default function Chatbot() {
   }, [])
 
   useEffect(() => {
-    saveChatMessages(userId, messages)
-  }, [messages, userId])
+    saveChatSession(userId, messages, clarification)
+  }, [clarification, messages, userId])
 
   useEffect(() => {
     if (!initialMessagePending.current) return
@@ -223,7 +286,23 @@ export default function Chatbot() {
     setLoading(true)
 
     try {
-      const data = await sendChatMessage({ message: trimmed })
+      const recentTurns: ChatTurn[] = messages
+        .filter(message => !message.isError)
+        .slice(-MAX_RECENT_CHAT_TURNS)
+        .map(message => ({
+          role: message.role === 'bot' ? 'assistant' : 'user',
+          content: message.content,
+          action: message.role === 'bot' ? message.action : undefined,
+        }))
+      const data = await sendChatMessage({
+        message: trimmed,
+        ...(recentTurns.length ? { recentTurns } : {}),
+        ...(clarification ? { clarification } : {}),
+      })
+
+      setClarification(data.action === 'clarify' && data.clarification
+        ? data.clarification
+        : null)
 
       if (!isAdmin) {
         setMessagesUsed(prev => {
@@ -245,6 +324,7 @@ export default function Chatbot() {
           draftQuestion: data.matched ? undefined : trimmed,
           knowledgeIds: data.knowledgeIds,
           sources: data.sources,
+          action: data.action,
         },
       ])
     } catch (err: unknown) {
