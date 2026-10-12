@@ -33,23 +33,32 @@ export default defineConfig({
         // ('index.html'), which registers a NavigationRoute ahead of our
         // own runtimeCaching rules and would swallow every navigation
         // before the app-shell rule below ever runs. Disable it so
-        // navigations go through our explicit StaleWhileRevalidate rule.
+        // navigations go through our explicit NetworkFirst rule.
         navigateFallback: undefined,
         // Hashed JS/CSS/icons are precached by default (globPatterns below)
         // — precached assets are served cache-first with revision-based
         // invalidation on the next SW update, so no separate runtime rule
-        // is needed for them. HTML is excluded from precache on purpose:
-        // it's handled by the navigation rule instead so the shell can be
-        // revalidated on every load rather than only on a new SW install.
+        // is needed for them. HTML is excluded from precache on purpose.
+        // Navigations prefer the network so an old shell never points at
+        // hashed assets removed by a newer deployment. The cached shell is
+        // retained only as an offline fallback.
         globPatterns: ['**/*.{js,css,ico,png,svg,webmanifest}'],
         runtimeCaching: [
           {
-            // HTML app shell: serve the cached shell instantly, revalidate
-            // against the network in the background on every navigation.
+            // HTML app shell: fetch the current deployment first. Serving stale
+            // HTML before revalidation can reference JS/CSS hashes that no
+            // longer exist and leave the app on a blank screen.
             urlPattern: ({ request }) => request.mode === 'navigate',
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             options: {
-              cacheName: 'html-app-shell',
+              cacheName: 'html-app-shell-v2',
+              networkTimeoutSeconds: 5,
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+              expiration: {
+                maxEntries: 1,
+              },
             },
           },
           {
