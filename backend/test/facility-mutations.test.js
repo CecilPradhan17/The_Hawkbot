@@ -15,7 +15,7 @@ function updateDatabase({ missing = false, failOnAlias = false } = {}) {
       if (normalized.startsWith("UPDATE facilities")) {
         return missing
           ? { rowCount: 0, rows: [] }
-          : { rowCount: 1, rows: [{ id: params[1], name: params[0], active: true }] };
+          : { rowCount: 1, rows: [{ id: params[2], name: params[0], active: true }] };
       }
       return { rowCount: 0, rows: [] };
     },
@@ -26,10 +26,17 @@ function updateDatabase({ missing = false, failOnAlias = false } = {}) {
 
 test("updates a facility and replaces aliases without changing its schedule", async () => {
   const database = updateDatabase();
-  const result = await updateFacility(4, { name: "Activity Center", aliases: ["AC", "The AC"] }, database);
+  let embeddedText;
+  const result = await updateFacility(
+    4,
+    { name: "Activity Center", aliases: ["AC", "The AC"] },
+    database,
+    { embedding: async text => { embeddedText = text; return [0.3]; } },
+  );
   assert.deepEqual(result.aliases, ["Activity Center", "AC", "The AC"]);
+  assert.equal(embeddedText, "Activity Center. AC. The AC");
   assert.equal(database.calls[0].sql, "BEGIN");
-  assert.deepEqual(database.calls[1].params, ["Activity Center", 4]);
+  assert.deepEqual(database.calls[1].params, ["Activity Center", "[0.3]", 4]);
   assert.equal(database.calls.some(call => call.sql.includes("facility_schedules")), false);
   assert.equal(database.calls.at(-1).sql, "COMMIT");
   assert.equal(database.client.released, true);
@@ -38,7 +45,7 @@ test("updates a facility and replaces aliases without changing its schedule", as
 test("rolls back a failed facility edit", async () => {
   const database = updateDatabase({ failOnAlias: true });
   await assert.rejects(
-    () => updateFacility(4, { name: "Activity Center", aliases: ["AC"] }, database),
+    () => updateFacility(4, { name: "Activity Center", aliases: ["AC"] }, database, { embedding: async () => [0.3] }),
     /alias failure/
   );
   assert.equal(database.calls.at(-1).sql, "ROLLBACK");
@@ -48,7 +55,7 @@ test("rolls back a failed facility edit", async () => {
 test("returns not found when editing a missing facility", async () => {
   const database = updateDatabase({ missing: true });
   await assert.rejects(
-    () => updateFacility(999, { name: "Missing", aliases: [] }, database),
+    () => updateFacility(999, { name: "Missing", aliases: [] }, database, { embedding: async () => [0.3] }),
     error => error.status === 404
   );
   assert.equal(database.calls.some(call => call.sql.startsWith("DELETE FROM facility_aliases")), false);

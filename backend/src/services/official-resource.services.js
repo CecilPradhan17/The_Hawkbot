@@ -1,4 +1,5 @@
 import pool from "../db.js";
+import { createEvidenceEmbedding } from "./evidence-embedding.services.js";
 
 const normalize = value => String(value || "")
   .normalize("NFKC")
@@ -91,3 +92,56 @@ export const officialResourceResponse = resource => ({
     lastVerifiedAt: resource.lastVerifiedAt || null,
   }],
 });
+
+/**
+ * Shared write boundary for future resource administration/imports. Keeping
+ * embedding generation here prevents resource metadata and retrieval vectors
+ * from drifting apart.
+ */
+export async function upsertOfficialResource(input, database = pool, dependencies = {}) {
+  const slug = normalize(input?.slug).replace(/\s+/g, "-");
+  const name = String(input?.name || "").trim();
+  const description = String(input?.description || "").trim();
+  const url = String(input?.url || "").trim();
+  const responseText = String(input?.responseText || "").trim();
+  const aliases = [...new Set((input?.aliases || []).map(normalize).filter(Boolean))];
+  if (!slug || !name || !description || !responseText || !/^https:\/\//i.test(url)) {
+    const error = new Error("Valid resource slug, name, description, HTTPS URL, and response text are required");
+    error.status = 400;
+    throw error;
+  }
+  const embedding = await createEvidenceEmbedding({
+    type: "official_resource", name, description, aliases,
+  }, dependencies);
+  const client = await database.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `INSERT INTO official_resources
+        (slug, name, description, url, response_text, requires_login, priority, active, embedding, last_verified_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8::vector, NOW(), NOW())
+       ON CONFLICT (slug) DO UPDATE SET
+         name = EXCLUDED.name, description = EXCLUDED.description, url = EXCLUDED.url,
+         response_text = EXCLUDED.response_text, requires_login = EXCLUDED.requires_login,
+         priority = EXCLUDED.priority, active = TRUE, embedding = EXCLUDED.embedding,
+         last_verified_at = NOW(), updated_at = NOW()
+       RETURNING id`,
+      [slug, name, description, url, responseText, Boolean(input.requiresLogin), Number(input.priority) || 0, JSON.stringify(embedding)],
+    );
+    const resourceId = Number(result.rows[0].id);
+    await client.query("DELETE FROM official_resource_aliases WHERE resource_id = $1", [resourceId]);
+    for (const alias of aliases) {
+      await client.query(
+        "INSERT INTO official_resource_aliases (resource_id, normalized_alias) VALUES ($1, $2)",
+        [resourceId, alias],
+      );
+    }
+    await client.query("COMMIT");
+    return { resourceId, slug, name, description, url, aliases };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}

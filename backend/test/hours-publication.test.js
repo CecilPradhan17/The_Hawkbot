@@ -28,8 +28,15 @@ test("normalizes aliases without unsafe substring transformations", () => {
 
 test("creates a facility and de-duplicates aliases", async () => {
   const database = fakeDatabase();
-  const result = await createFacility({ name: "Activity Center", aliases: ["AC", "ac"] }, database);
+  let embeddedText;
+  const result = await createFacility(
+    { name: "Activity Center", aliases: ["AC", "ac"] },
+    database,
+    { embedding: async text => { embeddedText = text; return [0.1, 0.2]; } },
+  );
   assert.deepEqual(result.aliases, ["Activity Center", "ac"]);
+  assert.equal(embeddedText, "Activity Center. ac");
+  assert.deepEqual(database.calls[1].params, ["Activity Center", "[0.1,0.2]"]);
   assert.equal(database.calls.filter(call => call.sql.startsWith("INSERT INTO facility_aliases")).length, 2);
   assert.equal(database.calls.at(-1).sql, "COMMIT");
   assert.equal(database.client.released, true);
@@ -68,4 +75,3 @@ test("does not delete anything when the facility is missing", async () => {
   assert.equal(database.calls.some(call => call.sql.startsWith("DELETE FROM facility_schedules")), false);
   assert.equal(database.calls.at(-1).sql, "ROLLBACK");
 });
-

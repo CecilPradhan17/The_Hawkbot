@@ -1,5 +1,6 @@
 import pool from "../db.js";
 import { validateSchedule } from "./hours-validation.services.js";
+import { createEvidenceEmbedding } from "./evidence-embedding.services.js";
 
 export const normalizeAlias = (value = "") => value
   .normalize("NFKC")
@@ -46,14 +47,19 @@ async function addIntervals(client, table, foreignKey, parentId, intervals) {
   }
 }
 
-export async function createFacility(input, database = pool) {
+export async function createFacility(input, database = pool, dependencies = {}) {
   const facility = cleanFacilityInput(input);
+  const embedding = await createEvidenceEmbedding({
+    type: "facility",
+    name: facility.name,
+    aliases: facility.aliases.map(alias => alias.display),
+  }, dependencies);
   const client = await database.connect();
   try {
     await client.query("BEGIN");
     const result = await client.query(
-      "INSERT INTO facilities (name) VALUES ($1) RETURNING id, name, active",
-      [facility.name]
+      "INSERT INTO facilities (name, embedding) VALUES ($1, $2::vector) RETURNING id, name, active",
+      [facility.name, JSON.stringify(embedding)]
     );
     for (const alias of facility.aliases) {
       await client.query(
@@ -73,15 +79,20 @@ export async function createFacility(input, database = pool) {
   }
 }
 
-export async function updateFacility(facilityId, input, database = pool) {
+export async function updateFacility(facilityId, input, database = pool, dependencies = {}) {
   if (!Number.isInteger(facilityId) || facilityId <= 0) throw httpError("Facility not found", 404);
   const facility = cleanFacilityInput(input);
+  const embedding = await createEvidenceEmbedding({
+    type: "facility",
+    name: facility.name,
+    aliases: facility.aliases.map(alias => alias.display),
+  }, dependencies);
   const client = await database.connect();
   try {
     await client.query("BEGIN");
     const result = await client.query(
-      "UPDATE facilities SET name = $1, updated_at = NOW() WHERE id = $2 AND active = TRUE RETURNING id, name, active",
-      [facility.name, facilityId]
+      "UPDATE facilities SET name = $1, embedding = $2::vector, updated_at = NOW() WHERE id = $3 AND active = TRUE RETURNING id, name, active",
+      [facility.name, JSON.stringify(embedding), facilityId]
     );
     if (result.rowCount === 0) throw httpError("Facility not found", 404);
     await client.query("DELETE FROM facility_aliases WHERE facility_id = $1", [facilityId]);
@@ -180,4 +191,3 @@ export async function publishSchedule(schedule, database = pool) {
     client.release();
   }
 }
-
