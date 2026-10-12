@@ -6,6 +6,7 @@ import {
 import {
   archiveKnowledgeForAdmin,
   correctKnowledgeForAdmin,
+  createKnowledgeForAdmin,
 } from "../services/knowledge-admin-management.services.js";
 
 export async function getKnowledgeForAdmin(req, res, next) {
@@ -38,6 +39,21 @@ export async function requestKnowledgeReview(req, res, next) {
   try {
     const result = await queueKnowledgeReview(req.params.knowledgeId);
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createKnowledge(req, res, next) {
+  try {
+    const result = await createKnowledgeForAdmin({
+      adminUserId: req.user.id,
+      content: req.body.content,
+      reviewCategory: req.body.reviewCategory,
+      sourceTitle: req.body.sourceTitle,
+      sourceUrl: req.body.sourceUrl,
+    });
+    res.status(201).json(result);
   } catch (error) {
     next(error);
   }

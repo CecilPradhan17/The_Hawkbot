@@ -2,6 +2,7 @@ import express from "express";
 import {
   archiveKnowledge,
   correctKnowledge,
+  createKnowledge,
   editKnowledgeReviewCategory,
   getKnowledgeForAdmin,
   requestKnowledgeReview,
@@ -13,6 +14,7 @@ const router = express.Router();
 
 router.use(requireAuth, requireHoursAdmin);
 router.get("/", getKnowledgeForAdmin);
+router.post("/", createKnowledge);
 router.patch("/:knowledgeId/review-category", editKnowledgeReviewCategory);
 router.post("/:knowledgeId/review", requestKnowledgeReview);
 router.post("/:knowledgeId/correct", correctKnowledge);

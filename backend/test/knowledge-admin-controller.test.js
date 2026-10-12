@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   archiveKnowledge,
   correctKnowledge,
+  createKnowledge,
   editKnowledgeReviewCategory,
   getKnowledgeForAdmin,
   requestKnowledgeReview,
@@ -48,6 +49,28 @@ test("review controller forwards invalid knowledge IDs", async () => {
   assert.equal(nextCalls.length, 1);
   assert.equal(nextCalls[0].status, 400);
   assert.equal(nextCalls[0].message, "Invalid knowledge ID");
+});
+
+test("creation controller uses the authenticated administrator and validates knowledge", async () => {
+  const nextCalls = [];
+  await createKnowledge(
+    {
+      user: { id: 3 },
+      body: {
+        adminUserId: 999,
+        content: "No",
+        reviewCategory: "stable",
+        sourceTitle: "ULM Registrar website",
+        sourceUrl: "",
+      },
+    },
+    { status() { throw new Error("response should not be sent"); } },
+    (error) => nextCalls.push(error),
+  );
+
+  assert.equal(nextCalls.length, 1);
+  assert.equal(nextCalls[0].status, 400);
+  assert.match(nextCalls[0].message, /Knowledge must be between/);
 });
 
 test("correction controller uses the authenticated administrator and validates content", async () => {
