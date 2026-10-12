@@ -27,6 +27,15 @@ test("routes Schulze menu questions to the official dining page", async () => {
   }
 });
 
+test("routes an explicit Schulze serving question without depending on facility aliases", async () => {
+  const result = await tryHandleDiningMenuLink("What is Schulze serving today?", {
+    dictionary: async () => [],
+  });
+
+  assert.equal(result?.sourceType, "dining_link");
+  assert.equal(result?.sources[0].url, SCHULZE_MENU_URL);
+});
+
 test("leaves dining hours and unrelated food questions to existing routing", async () => {
   for (const question of [
     "When does Schulze close?",
