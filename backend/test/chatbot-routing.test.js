@@ -101,6 +101,32 @@ test("uses an alias-expanded copy for retrieval but preserves the original quest
   assert.equal(result.sourceType, "rag");
 });
 
+test("does not pollute a short self-contained retrieval query with persisted chat history", async () => {
+  let retrievedQuery;
+  const query = "where can i get on campus jobs?";
+  const result = await handleChatQuery(query, {
+    hoursHandler: async () => null,
+    aliasExpander: async value => value,
+    embedding: async () => [0.1],
+    retriever: async (_embedding, value) => {
+      retrievedQuery = value;
+      return [{ id: 9, cleaned_content: "Students can find jobs through Handshake.", similarity: 0.9 }];
+    },
+    hoursToolContext: async () => null,
+    polisher: async () => ({
+      action: "answer", answerable: true, response: "Use Handshake.", relevantCandidateIds: [9],
+    }),
+  }, {
+    recentTurns: [
+      { role: "user", content: "Where is the Honors Lounge?" },
+      { role: "assistant", content: "It is in Strauss Hall." },
+    ],
+  });
+
+  assert.equal(retrievedQuery, query);
+  assert.equal(result.response, "Use Handshake.");
+});
+
 test("continues with the original query when alias expansion is unavailable", async () => {
   let embeddedQuery;
   const originalError = console.error;

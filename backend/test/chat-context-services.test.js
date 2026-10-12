@@ -82,6 +82,14 @@ test("uses bounded recent context only for context-dependent follow-ups", () => 
     buildContextualQuery("How do I apply for federal financial aid at ULM this semester?", context),
     "How do I apply for federal financial aid at ULM this semester?",
   );
+  assert.equal(
+    buildContextualQuery("where can i get on campus jobs?", context),
+    "where can i get on campus jobs?",
+  );
+  assert.equal(
+    buildContextualQuery("what is Fant-Ewing Coliseum?", context),
+    "what is Fant-Ewing Coliseum?",
+  );
 });
 
 test("never creates a third clarification for the same unresolved request", () => {

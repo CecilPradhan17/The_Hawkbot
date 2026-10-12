@@ -27,7 +27,7 @@ test("official-resource retrieval is hybrid, bounded, and returns the orchestrat
   });
 
   assert.equal(OFFICIAL_RESOURCE_LIMIT, 3);
-  assert.deepEqual(captured.values, [JSON.stringify([0.1, 0.2]), "on-campus jobs", 3]);
+  assert.deepEqual(captured.values, [JSON.stringify([0.1, 0.2]), "on campus jobs", 3]);
   assert.match(captured.text, /official_resources/);
   assert.match(captured.text, /official_resource_aliases/);
   assert.match(captured.text, /embedding <=> \$1::vector/);
@@ -45,6 +45,14 @@ test("official-resource retrieval is hybrid, bounded, and returns the orchestrat
     lastVerifiedAt: "2026-10-01T00:00:00.000Z",
     similarity: 0.81,
   }]);
+});
+
+test("official-resource retrieval does not interpret name hyphens as exclusions", async () => {
+  let params;
+  await retrieveOfficialResourceCandidates([0.1], "Fant-Ewing information", {
+    database: { query: async (_sql, values) => { params = values; return { rows: [] }; } },
+  });
+  assert.equal(params[1], "Fant Ewing information");
 });
 
 test("facility retrieval is hybrid, bounded, and does not expose aliases", async () => {

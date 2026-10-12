@@ -9,6 +9,14 @@ export const RAG_CANDIDATE_LIMIT = 10;
 export const RAG_SOURCE_POOL_LIMIT = 20;
 export const RAG_SIMILARITY_THRESHOLD = 0.50;
 
+// websearch_to_tsquery treats a hyphen as a NOT operator. Campus names such
+// as "Fant-Ewing" must remain ordinary searchable words instead of becoming
+// an exclusion query ("Fant" AND NOT "Ewing").
+export const normalizeLexicalQuery = value => String(value || "")
+  .replace(/[\p{Pd}\u2212]+/gu, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
 export const isConfidentCandidate = candidate =>
   Number(candidate?.similarity) >= RAG_SIMILARITY_THRESHOLD
   || candidate?.text_rank !== null && candidate?.text_rank !== undefined;
@@ -133,7 +141,7 @@ export async function retrieveKnowledgeCandidates(queryEmbedding, queryText, dep
      ORDER BY fused.retrieval_score DESC,
               CASE WHEN k.embedding IS NULL THEN NULL ELSE k.embedding <=> $1::vector END
      LIMIT $4`,
-    [JSON.stringify(queryEmbedding), String(queryText || ""), sourceLimit, limit]
+    [JSON.stringify(queryEmbedding), normalizeLexicalQuery(queryText), sourceLimit, limit]
   );
   return result.rows;
 }

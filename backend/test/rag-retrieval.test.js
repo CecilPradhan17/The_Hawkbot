@@ -8,6 +8,7 @@ import {
   buildKnowledgeSources,
   formatKnowledgeCandidates,
   isConfidentCandidate,
+  normalizeLexicalQuery,
   retrieveKnowledgeCandidates,
 } from "../src/services/rag-retrieval.services.js";
 
@@ -136,6 +137,16 @@ test("accepts either a strong vector match or a full-text match", () => {
   assert.equal(isConfidentCandidate({ similarity: 0.7, text_rank: null }), true);
   assert.equal(isConfidentCandidate({ similarity: 0.2, text_rank: "1" }), true);
   assert.equal(isConfidentCandidate({ similarity: 0.2, text_rank: null }), false);
+});
+
+test("normalizes hyphenated campus names before web-style full-text search", async () => {
+  let values;
+  await retrieveKnowledgeCandidates([0.5], "what is Fant-Ewing Coliseum", {
+    database: { query: async (_text, params) => { values = params; return { rows: [] }; } },
+  });
+
+  assert.equal(normalizeLexicalQuery("Fant-Ewing – Coliseum"), "Fant Ewing Coliseum");
+  assert.equal(values[1], "what is Fant Ewing Coliseum");
 });
 
 test("provides a concurrent GIN index for the full-text retrieval expression", () => {

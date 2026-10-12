@@ -33,9 +33,12 @@ export const sanitizeChatContext = input => {
 const isContextDependent = message => {
   const text = String(message || "").trim().toLowerCase();
   if (!text) return false;
-  return text.split(/\s+/).length <= 7
-    || /^(?:and|also|what about|how about|when|where|why|how much|does it|is it|are they|can i|tomorrow|today)\b/.test(text)
-    || /\b(?:it|that|they|them|there|tomorrow|then|same)\b/.test(text);
+  // Short does not mean contextual. Queries such as "what is Fant-Ewing
+  // Coliseum?" and "where can I get on-campus jobs?" are concise but fully
+  // self-contained. Only carry prior turns when the wording actually refers
+  // back to something that is missing from the current message.
+  return /^(?:and|also|then|what about|how about)\b/.test(text)
+    || /\b(?:it|that|they|them|those|these|there|tomorrow|then|same)\b/.test(text);
 };
 
 export const buildContextualQuery = (message, context = {}) => {

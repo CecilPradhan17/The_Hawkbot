@@ -1,5 +1,5 @@
 import pool from "../db.js";
-import { retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
+import { normalizeLexicalQuery, retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 
 export const OFFICIAL_RESOURCE_LIMIT = 3;
 export const FACILITY_LIMIT = 3;
@@ -41,7 +41,7 @@ export async function retrieveOfficialResourceCandidates(queryEmbedding, queryTe
      ORDER BY (CASE WHEN text_score > 0 THEN 1 ELSE 0 END) DESC,
               text_score DESC, similarity DESC NULLS LAST, priority DESC
      LIMIT $3`,
-    [JSON.stringify(queryEmbedding), String(queryText || ""), limit],
+    [JSON.stringify(queryEmbedding), normalizeLexicalQuery(queryText), limit],
   );
   return rows.map(row => ({
     resourceId: Number(row.id), slug: row.slug, name: row.name,
@@ -76,7 +76,7 @@ export async function retrieveFacilityCandidates(queryEmbedding, queryText, depe
      ORDER BY (CASE WHEN text_score > 0 THEN 1 ELSE 0 END) DESC,
               text_score DESC, similarity DESC NULLS LAST
      LIMIT $3`,
-    [JSON.stringify(queryEmbedding), String(queryText || ""), limit],
+    [JSON.stringify(queryEmbedding), normalizeLexicalQuery(queryText), limit],
   );
   return rows.map(row => ({
     facilityId: Number(row.id), facilityName: row.name, description: row.description || "",
