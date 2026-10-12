@@ -14,6 +14,8 @@ export interface AdminKnowledgeItem {
   reviewDueAt: string | null
   verificationRequestedAt: string | null
   sourcePostId: number | null
+  sourceTitle: string | null
+  sourceUrl: string | null
   sourceContent: string | null
   sourceType: string | null
   supersededById: number | null
@@ -73,6 +75,8 @@ interface RawAdminKnowledgeItem {
   review_due_at: string | null
   verification_requested_at: string | null
   source_post_id: number | null
+  source_title: string | null
+  source_url: string | null
   source_content: string | null
   source_type: string | null
   superseded_by_id: number | null
@@ -100,6 +104,8 @@ const normalizeItem = (item: RawAdminKnowledgeItem): AdminKnowledgeItem => ({
   reviewDueAt: item.review_due_at,
   verificationRequestedAt: item.verification_requested_at,
   sourcePostId: item.source_post_id,
+  sourceTitle: item.source_title,
+  sourceUrl: item.source_url,
   sourceContent: item.source_content,
   sourceType: item.source_type,
   supersededById: item.superseded_by_id,

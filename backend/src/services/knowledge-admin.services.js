@@ -20,7 +20,8 @@ export const listKnowledgeForAdmin = async (
   const result = await database.query(
     `SELECT k.id, k.cleaned_content AS content, k.raw_content,
             k.status, k.review_category, k.last_verified_at, k.review_due_at,
-            k.verification_requested_at, k.source_post_id, source.content AS source_content,
+            k.verification_requested_at, k.source_post_id, k.source_title, k.source_url,
+            source.content AS source_content,
             source.type AS source_type, k.superseded_by_id,
             replacement.cleaned_content AS replacement_content,
             verification.status AS latest_verification_status,

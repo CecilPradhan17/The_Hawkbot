@@ -44,6 +44,8 @@ test("lists knowledge with pagination metadata", async () => {
   assert.deepEqual(calls[0].params, ["active", "", 20, 10]);
   assert.match(calls[0].text, /knowledge_verifications/);
   assert.match(calls[0].text, /knowledge_correction_questions/);
+  assert.match(calls[0].text, /k\.source_title/);
+  assert.match(calls[0].text, /k\.source_url/);
 });
 
 test("rejects unsupported knowledge statuses before querying", async () => {

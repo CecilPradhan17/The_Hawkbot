@@ -761,6 +761,23 @@ function KnowledgeCard({
         </details>
       )}
 
+      {(item.sourceTitle || item.sourceUrl) && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+          <p className="font-bold text-slate-900">Official source</p>
+          <p className="mt-1">{item.sourceTitle || 'Official source'}</p>
+          {item.sourceUrl && (
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex min-h-10 items-center font-semibold text-[#8A244B] underline decoration-[#8A244B]/40 underline-offset-4 hover:decoration-[#8A244B]"
+            >
+              Open source
+            </a>
+          )}
+        </div>
+      )}
+
       {item.status === 'needs_update' && (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <p className="font-bold">Correction workflow</p>
