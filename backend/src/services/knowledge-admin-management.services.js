@@ -79,6 +79,17 @@ export const createKnowledgeForAdmin = async (
   const database = dependencies.database || pool;
   const embeddingGenerator = dependencies.embeddingGenerator || generateDocumentEmbedding;
   const storage = dependencies.storage || storeApprovedKnowledge;
+  const duplicate = await database.query(
+    `SELECT id
+     FROM approved_knowledge
+     WHERE status IN ('active', 'needs_update')
+       AND LOWER(BTRIM(cleaned_content)) = LOWER($1)
+     LIMIT 1`,
+    [knowledgeContent],
+  );
+  if (duplicate.rows[0]) {
+    throw requestError(`This knowledge already exists as fact #${duplicate.rows[0].id}`, 409);
+  }
   const stored = await storage({
     db: database,
     sourcePostId: null,

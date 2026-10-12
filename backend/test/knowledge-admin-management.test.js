@@ -49,6 +49,13 @@ test("rejects an AI improvement with no usable suggestions", async () => {
 
 test("creates sourced embedded knowledge and records the administrator", async () => {
   const calls = [];
+  const databaseCalls = [];
+  const database = {
+    async query(text, params) {
+      databaseCalls.push({ text, params });
+      return { rows: [] };
+    },
+  };
   const verifiedAt = new Date("2026-10-12T15:00:00Z");
   const storageCalls = [];
   const storage = async options => {
@@ -69,13 +76,13 @@ test("creates sourced embedded knowledge and records the administrator", async (
     reviewCategory: "stable",
     sourceTitle: "  ULM Registrar website  ",
     sourceUrl: "https://www.ulm.edu/registrar",
-  }, { database: "database", embeddingGenerator, storage });
+  }, { database, embeddingGenerator, storage });
 
   assert.deepEqual(result, {
     created: { id: 101, content: "The Registrar is located in Sandel Hall.", reviewCategory: "stable" },
   });
   assert.deepEqual(storageCalls[0], {
-    db: "database",
+    db: database,
     sourcePostId: null,
     sourceUrl: "https://www.ulm.edu/registrar",
     sourceTitle: "ULM Registrar website",
@@ -86,6 +93,31 @@ test("creates sourced embedded knowledge and records the administrator", async (
   });
   assert.match(calls[0].text, /'created'/);
   assert.deepEqual(calls[0].params, [101, 3, "Source: ULM Registrar website", verifiedAt]);
+  assert.match(databaseCalls[0].text, /status IN \('active', 'needs_update'\)/);
+  assert.deepEqual(databaseCalls[0].params, ["The Registrar is located in Sandel Hall."]);
+});
+
+test("rejects duplicate active knowledge before embedding or storage", async () => {
+  let embedded = false;
+  let stored = false;
+  await assert.rejects(createKnowledgeForAdmin({
+    adminUserId: 3,
+    content: "  THE REGISTRAR IS LOCATED IN SANDEL HALL.  ",
+    reviewCategory: "stable",
+    sourceTitle: "ULM Registrar website",
+    sourceUrl: "https://www.ulm.edu/registrar",
+  }, {
+    database: {
+      async query(_text, params) {
+        assert.deepEqual(params, ["THE REGISTRAR IS LOCATED IN SANDEL HALL."]);
+        return { rows: [{ id: 44 }] };
+      },
+    },
+    embeddingGenerator: async () => { embedded = true; return [0.1]; },
+    storage: async () => { stored = true; },
+  }), (error) => error.status === 409 && error.message === "This knowledge already exists as fact #44");
+  assert.equal(embedded, false);
+  assert.equal(stored, false);
 });
 
 for (const [name, override, message] of [
