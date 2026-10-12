@@ -963,7 +963,7 @@ export default function KnowledgeAdmin() {
               value={searchInput}
               maxLength={200}
               onChange={event => setSearchInput(event.target.value)}
-              placeholder="Try library, tutoring, parking…"
+              placeholder="Try library, tutoring, or a source name…"
               className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20"
             />
           </label>

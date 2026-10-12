@@ -51,7 +51,9 @@ export const listKnowledgeForAdmin = async (
          $2 = '' OR
          to_tsvector(
            'english',
-           COALESCE(k.cleaned_content, '') || ' ' || COALESCE(k.raw_content, '')
+           COALESCE(k.cleaned_content, '') || ' ' ||
+           COALESCE(k.raw_content, '') || ' ' ||
+           COALESCE(k.source_title, '')
          ) @@ websearch_to_tsquery('english', $2)
        )
      ORDER BY k.id DESC

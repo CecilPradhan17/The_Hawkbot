@@ -97,7 +97,7 @@ test("caps the page size and prevents negative offsets", async () => {
   assert.deepEqual(result, { items: [], total: 0, limit: 100, offset: 0 });
 });
 
-test("searches indexed fact and raw text with a bounded query", async () => {
+test("searches fact text and official source labels with a bounded query", async () => {
   let call;
   const database = {
     async query(text, params) {
@@ -113,6 +113,7 @@ test("searches indexed fact and raw text with a bounded query", async () => {
 
   assert.match(call.text, /websearch_to_tsquery/);
   assert.match(call.text, /COALESCE\(k\.raw_content/);
+  assert.match(call.text, /COALESCE\(k\.source_title/);
   assert.equal(call.params[0], "active");
   assert.equal(call.params[1].length, 200);
   assert.equal(call.params[1].startsWith("library"), true);
