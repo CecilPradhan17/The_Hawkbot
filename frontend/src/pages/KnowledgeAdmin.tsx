@@ -403,41 +403,43 @@ function KnowledgeCard({
         </div>
       </dl>
 
-      <div className="mt-4 rounded-xl border border-slate-200 p-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="flex-1 text-sm font-semibold text-slate-700">
-            Review category
-            <select
-              value={selectedCategory}
-              disabled={savingCategory}
-              onChange={event => {
-                setSelectedCategory(event.target.value as ReviewCategory | '')
-                setCategoryMessage('')
-              }}
-              className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
+      {(item.status === 'active' || item.status === 'needs_update') && (
+        <div className="mt-4 rounded-xl border border-slate-200 p-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="flex-1 text-sm font-semibold text-slate-700">
+              Review category
+              <select
+                value={selectedCategory}
+                disabled={savingCategory}
+                onChange={event => {
+                  setSelectedCategory(event.target.value as ReviewCategory | '')
+                  setCategoryMessage('')
+                }}
+                className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
+              >
+                <option value="" disabled>Choose a category</option>
+                <option value="stable">Stable — no automatic review</option>
+                <option value="yearly">Yearly — review after one year</option>
+                <option value="term">Term — review for a new semester</option>
+                <option value="frequent">Frequent — review after 90 days</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void saveCategory()}
+              disabled={!selectedCategory || selectedCategory === item.reviewCategory || savingCategory}
+              className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <option value="" disabled>Choose a category</option>
-              <option value="stable">Stable — no automatic review</option>
-              <option value="yearly">Yearly — review after one year</option>
-              <option value="term">Term — review for a new semester</option>
-              <option value="frequent">Frequent — review after 90 days</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => void saveCategory()}
-            disabled={!selectedCategory || selectedCategory === item.reviewCategory || savingCategory}
-            className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {savingCategory ? 'Saving…' : 'Save category'}
-          </button>
+              {savingCategory ? 'Saving…' : 'Save category'}
+            </button>
+          </div>
+          {categoryMessage && (
+            <p role="status" className={`mt-2 text-sm font-medium ${categoryMessage === 'Review category saved.' ? 'text-emerald-700' : 'text-red-700'}`}>
+              {categoryMessage}
+            </p>
+          )}
         </div>
-        {categoryMessage && (
-          <p role="status" className={`mt-2 text-sm font-medium ${categoryMessage === 'Review category saved.' ? 'text-emerald-700' : 'text-red-700'}`}>
-            {categoryMessage}
-          </p>
-        )}
-      </div>
+      )}
 
       {(item.sourcePostId || item.sourceContent) && (
         <details className="mt-4 rounded-xl border border-slate-200 p-3">
