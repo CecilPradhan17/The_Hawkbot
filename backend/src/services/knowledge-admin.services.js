@@ -3,6 +3,7 @@ import { calculateNextReviewAt } from "./knowledge-review.services.js";
 
 const VALID_STATUSES = new Set(["all", "active", "needs_update", "replaced", "archived"]);
 const VALID_REVIEW_CATEGORIES = new Set(["stable", "yearly", "term", "frequent"]);
+const EDITABLE_STATUSES = new Set(["active", "needs_update"]);
 
 export const listKnowledgeForAdmin = async (
   { status = "all", search = "", limit = 50, offset = 0 } = {},
@@ -99,6 +100,11 @@ export const updateKnowledgeReviewCategory = async (
     }
 
     const fact = current.rows[0];
+    if (!EDITABLE_STATUSES.has(fact.status)) {
+      const error = new Error("Historical knowledge cannot be changed");
+      error.status = 409;
+      throw error;
+    }
     const reviewDueAt = fact.status !== "active"
       ? null
       : fact.review_is_due

@@ -207,6 +207,20 @@ test("rolls back category updates when the fact does not exist", async () => {
   assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["ROLLBACK", "RELEASE"]);
 });
 
+for (const status of ["replaced", "archived"]) {
+  test(`refuses to change the category of ${status} knowledge`, async () => {
+    const { database, calls } = categoryUpdateDatabase({ status });
+
+    await assert.rejects(
+      updateKnowledgeReviewCategory(7, "stable", database),
+      (error) => error.status === 409 && error.message === "Historical knowledge cannot be changed",
+    );
+
+    assert.equal(calls.some(({ text }) => text.includes("UPDATE approved_knowledge")), false);
+    assert.deepEqual(calls.slice(-2).map(({ text }) => text), ["ROLLBACK", "RELEASE"]);
+  });
+}
+
 const reviewQueueDatabase = ({ status = "active", hasOpenVerification = false } = {}) => {
   const calls = [];
   const client = {
