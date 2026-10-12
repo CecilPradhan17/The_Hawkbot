@@ -77,6 +77,8 @@ export async function correctKnowledge(req, res, next) {
       content: req.body.content,
       reviewCategory: req.body.reviewCategory,
       note: req.body.note,
+      sourceTitle: req.body.sourceTitle,
+      sourceUrl: req.body.sourceUrl,
     });
     res.status(201).json(result);
   } catch (error) {

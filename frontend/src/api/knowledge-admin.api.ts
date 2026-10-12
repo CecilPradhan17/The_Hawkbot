@@ -182,6 +182,8 @@ export function correctAdminKnowledge(
     content: string
     reviewCategory: ReviewCategory
     note: string
+    sourceTitle: string
+    sourceUrl?: string
   },
 ): Promise<KnowledgeCorrectionResult> {
   return api.post(`/knowledge/admin/${knowledgeId}/correct`, correction)

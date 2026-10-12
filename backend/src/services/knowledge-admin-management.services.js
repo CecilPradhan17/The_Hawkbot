@@ -101,13 +101,15 @@ export const createKnowledgeForAdmin = async (
 };
 
 export const correctKnowledgeForAdmin = async (
-  { knowledgeId, adminUserId, content, reviewCategory, note },
+  { knowledgeId, adminUserId, content, reviewCategory, note, sourceTitle, sourceUrl },
   dependencies = {},
 ) => {
   const id = Number(knowledgeId);
   const adminId = Number(adminUserId);
   const correctedContent = String(content || "").trim().replace(/\s+/g, " ");
   const correctionNote = String(note || "").trim();
+  const correctionSourceTitle = String(sourceTitle || "").trim().replace(/\s+/g, " ");
+  const correctionSourceUrl = normalizeOptionalHttpsUrl(sourceUrl);
 
   if (!Number.isInteger(id) || id <= 0) throw requestError("Invalid knowledge ID");
   if (!Number.isInteger(adminId) || adminId <= 0) throw requestError("Invalid administrator ID");
@@ -118,6 +120,9 @@ export const correctKnowledgeForAdmin = async (
   if (correctionNote.length < 3 || correctionNote.length > 1000) {
     throw requestError("Correction note must be between 3 and 1000 characters");
   }
+  if (correctionSourceTitle.length < 3 || correctionSourceTitle.length > 200) {
+    throw requestError("Source label must be between 3 and 200 characters");
+  }
 
   const database = dependencies.database || pool;
   const embeddingGenerator = dependencies.embeddingGenerator || generateDocumentEmbedding;
@@ -126,7 +131,9 @@ export const correctKnowledgeForAdmin = async (
   const stored = await storage({
     db: database,
     sourcePostId: null,
-    rawContent: null,
+    sourceUrl: correctionSourceUrl,
+    sourceTitle: correctionSourceTitle,
+    rawContent: correctedContent,
     chunks: [{ content: correctedContent, reviewCategory }],
     generateEmbedding: embeddingGenerator,
     afterStore: async ({ client, stored: inserted, verifiedAt }) => {

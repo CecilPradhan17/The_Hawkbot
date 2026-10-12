@@ -154,6 +154,8 @@ test("creates an embedded replacement and preserves an audit trail", async () =>
     content: "  The Library opens at 7:30 AM.  ",
     reviewCategory: "term",
     note: "Updated from the current library notice.",
+    sourceTitle: "  ULM Library website  ",
+    sourceUrl: "https://www.ulm.edu/library",
   }, { database: "database", embeddingGenerator, storage });
 
   assert.deepEqual(result, {
@@ -162,7 +164,9 @@ test("creates an embedded replacement and preserves an audit trail", async () =>
   });
   assert.equal(storageCalls[0].db, "database");
   assert.equal(storageCalls[0].sourcePostId, null);
-  assert.equal(storageCalls[0].rawContent, null);
+  assert.equal(storageCalls[0].sourceTitle, "ULM Library website");
+  assert.equal(storageCalls[0].sourceUrl, "https://www.ulm.edu/library");
+  assert.equal(storageCalls[0].rawContent, "The Library opens at 7:30 AM.");
   assert.equal(storageCalls[0].generateEmbedding, embeddingGenerator);
   assert.deepEqual(storageCalls[0].chunks, [{
     content: "The Library opens at 7:30 AM.",
@@ -188,6 +192,8 @@ test("allows an administrator to replace knowledge already needing an update", a
     content: "The corrected fact.",
     reviewCategory: "yearly",
     note: "Corrected after community feedback.",
+    sourceTitle: "ULM official notice",
+    sourceUrl: "",
   }, { storage, embeddingGenerator: async () => [0.1] }));
 });
 
@@ -199,6 +205,8 @@ test("refuses to replace historical knowledge", async () => {
     content: "The corrected fact.",
     reviewCategory: "yearly",
     note: "Attempted historical edit.",
+    sourceTitle: "ULM official notice",
+    sourceUrl: "",
   }, { storage, embeddingGenerator: async () => [0.1] }), (error) => (
     error.status === 409 && error.message === "Only active or needs-update knowledge can be corrected"
   ));
@@ -220,6 +228,31 @@ test("validates corrections before generating embeddings or opening storage", as
   assert.equal(embedded, false);
   assert.equal(stored, false);
 });
+
+for (const [name, override, message] of [
+  ["source label", { sourceTitle: "?" }, "Source label must be between 3 and 200 characters"],
+  ["source URL", { sourceUrl: "http://example.com" }, "Source URL must be a valid HTTPS URL"],
+]) {
+  test(`validates correction ${name} before embedding or storage`, async () => {
+    let embedded = false;
+    let stored = false;
+    await assert.rejects(correctKnowledgeForAdmin({
+      knowledgeId: 7,
+      adminUserId: 3,
+      content: "The corrected fact.",
+      reviewCategory: "yearly",
+      note: "Updated from an official notice.",
+      sourceTitle: "ULM official notice",
+      sourceUrl: "",
+      ...override,
+    }, {
+      embeddingGenerator: async () => { embedded = true; return [0.1]; },
+      storage: async () => { stored = true; },
+    }), new RegExp(message));
+    assert.equal(embedded, false);
+    assert.equal(stored, false);
+  });
+}
 
 const archiveHarness = ({ status = "active", found = true } = {}) => {
   const calls = [];

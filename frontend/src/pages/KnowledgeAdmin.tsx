@@ -362,7 +362,14 @@ function KnowledgeCard({
   item: AdminKnowledgeItem
   onArchive: (knowledgeId: number, note: string) => Promise<void>
   onCategoryUpdate: (knowledgeId: number, category: ReviewCategory) => Promise<void>
-  onCorrect: (knowledgeId: number, content: string, category: ReviewCategory, note: string) => Promise<void>
+  onCorrect: (
+    knowledgeId: number,
+    content: string,
+    category: ReviewCategory,
+    note: string,
+    sourceTitle: string,
+    sourceUrl: string,
+  ) => Promise<void>
   onQueueReview: (knowledgeId: number) => Promise<{ queued: boolean; alreadyOpen: boolean }>
 }) {
   const [selectedCategory, setSelectedCategory] = useState<ReviewCategory | ''>(item.reviewCategory ?? '')
@@ -374,6 +381,8 @@ function KnowledgeCard({
   const [correctedContent, setCorrectedContent] = useState(item.content)
   const [correctionCategory, setCorrectionCategory] = useState<ReviewCategory | ''>(item.reviewCategory ?? '')
   const [correctionNote, setCorrectionNote] = useState('')
+  const [correctionSourceTitle, setCorrectionSourceTitle] = useState(item.sourceTitle ?? '')
+  const [correctionSourceUrl, setCorrectionSourceUrl] = useState(item.sourceUrl ?? '')
   const [correcting, setCorrecting] = useState(false)
   const [correctionMessage, setCorrectionMessage] = useState('')
   const [showArchive, setShowArchive] = useState(false)
@@ -381,6 +390,7 @@ function KnowledgeCard({
   const [archiveConfirmed, setArchiveConfirmed] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [archiveMessage, setArchiveMessage] = useState('')
+  const correctionSourceUrlValid = !correctionSourceUrl.trim() || correctionSourceUrl.trim().startsWith('https://')
 
   useEffect(() => {
     setSelectedCategory(item.reviewCategory ?? '')
@@ -425,6 +435,8 @@ function KnowledgeCard({
     setCorrectedContent(item.content)
     setCorrectionCategory(item.reviewCategory ?? '')
     setCorrectionNote('')
+    setCorrectionSourceTitle(item.sourceTitle ?? '')
+    setCorrectionSourceUrl(item.sourceUrl ?? '')
     setCorrectionMessage('')
   }
 
@@ -434,7 +446,14 @@ function KnowledgeCard({
     setCorrecting(true)
     setCorrectionMessage('')
     try {
-      await onCorrect(item.id, correctedContent.trim(), correctionCategory, correctionNote.trim())
+      await onCorrect(
+        item.id,
+        correctedContent.trim(),
+        correctionCategory,
+        correctionNote.trim(),
+        correctionSourceTitle.trim(),
+        correctionSourceUrl.trim(),
+      )
     } catch (correctionError) {
       setCorrectionMessage(correctionError instanceof Error ? correctionError.message : 'Could not correct this fact.')
     } finally {
@@ -589,6 +608,40 @@ function KnowledgeCard({
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal leading-6 outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
                 />
               </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Source label
+                  <input
+                    required
+                    minLength={3}
+                    maxLength={200}
+                    value={correctionSourceTitle}
+                    disabled={correcting}
+                    placeholder="Example: ULM Registrar website"
+                    onChange={event => {
+                      setCorrectionSourceTitle(event.target.value)
+                      setCorrectionMessage('')
+                    }}
+                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Source URL <span className="font-normal text-slate-500">(optional, HTTPS only)</span>
+                  <input
+                    type="url"
+                    pattern="https://.*"
+                    maxLength={2000}
+                    value={correctionSourceUrl}
+                    disabled={correcting}
+                    placeholder="https://www.ulm.edu/..."
+                    onChange={event => {
+                      setCorrectionSourceUrl(event.target.value)
+                      setCorrectionMessage('')
+                    }}
+                    className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal outline-none transition focus:border-[#8A244B] focus:ring-2 focus:ring-[#8A244B]/20 disabled:opacity-60"
+                  />
+                </label>
+              </div>
               {correctionMessage && (
                 <p role="alert" className="text-sm font-medium text-red-700">{correctionMessage}</p>
               )}
@@ -603,7 +656,7 @@ function KnowledgeCard({
                 </button>
                 <button
                   type="submit"
-                  disabled={correcting || !correctionCategory || correctedContent.trim().length < 5 || correctionNote.trim().length < 3}
+                  disabled={correcting || !correctionCategory || correctedContent.trim().length < 5 || correctionNote.trim().length < 3 || correctionSourceTitle.trim().length < 3 || !correctionSourceUrlValid}
                   className="min-h-11 rounded-lg bg-[#8A244B] px-4 py-2 font-bold text-white transition hover:bg-[#711d3e] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {correcting ? 'Saving correction…' : 'Save corrected fact'}
@@ -884,9 +937,17 @@ export default function KnowledgeAdmin() {
     content: string,
     reviewCategory: ReviewCategory,
     note: string,
+    sourceTitle: string,
+    sourceUrl: string,
   ) => {
     setActionMessage('')
-    const result = await correctAdminKnowledge(knowledgeId, { content, reviewCategory, note })
+    const result = await correctAdminKnowledge(knowledgeId, {
+      content,
+      reviewCategory,
+      note,
+      sourceTitle,
+      sourceUrl,
+    })
     setActionMessage(`Fact #${knowledgeId} was corrected. Replacement fact #${result.replacement.id} is now active.`)
     await loadKnowledge()
   }
