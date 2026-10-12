@@ -46,6 +46,14 @@ export interface KnowledgeArchiveResult {
   archivedAt: string
 }
 
+export interface KnowledgeCreationResult {
+  created: {
+    id: number
+    content: string
+    reviewCategory: ReviewCategory
+  }
+}
+
 interface RawAdminKnowledgeItem {
   id: number
   content: string
@@ -138,6 +146,15 @@ export function queueAdminKnowledgeReview(knowledgeId: number): Promise<{
   reviewDueAt?: string
 }> {
   return api.post(`/knowledge/admin/${knowledgeId}/review`, {})
+}
+
+export function createAdminKnowledge(knowledge: {
+  content: string
+  reviewCategory: ReviewCategory
+  sourceTitle: string
+  sourceUrl?: string
+}): Promise<KnowledgeCreationResult> {
+  return api.post('/knowledge/admin', knowledge)
 }
 
 export function correctAdminKnowledge(
