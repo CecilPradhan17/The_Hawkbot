@@ -65,6 +65,32 @@ function saveChatMessages(userId: number | null, messages: Message[]) {
 }
 
 function BotMessageContent({ content, sources = [] }: { content: string; sources?: ChatSource[] }) {
+  const diningMenuSource = sources.find(source => {
+    try {
+      const url = new URL(source.url)
+      return url.hostname === 'ulm.mydininghub.com' && url.pathname.startsWith('/en/location/schulze')
+    } catch {
+      return false
+    }
+  })
+
+  if (diningMenuSource) {
+    return (
+      <div>
+        <p>{content}</p>
+        <a
+          href={diningMenuSource.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex items-center rounded-lg bg-[#1B5E8A] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#164d72]"
+        >
+          Open the current menu
+          <span aria-hidden="true" className="ml-1.5">↗</span>
+        </a>
+      </div>
+    )
+  }
+
   if (sources.length) {
     return (
       <>

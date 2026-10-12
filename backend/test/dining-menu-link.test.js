@@ -21,6 +21,7 @@ test("routes Schulze menu questions to the official dining page", async () => {
   ]) {
     const result = await tryHandleDiningMenuLink(question, { dictionary });
     assert.equal(result?.sourceType, "dining_link");
+    assert.equal(result?.response, "You can view the current Schulze Dining Hall menu here:");
     assert.equal(result?.matched, true);
     assert.equal(result?.sources[0].url, SCHULZE_MENU_URL);
   }
