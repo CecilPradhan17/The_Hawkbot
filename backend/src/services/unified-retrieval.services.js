@@ -4,13 +4,13 @@ import { retrieveKnowledgeCandidates } from "./rag-retrieval.services.js";
 export const OFFICIAL_RESOURCE_LIMIT = 3;
 export const FACILITY_LIMIT = 3;
 
-const rowsOrEmpty = async promise => {
+const optionalRowsOrEmpty = async (label, promise) => {
   try {
     return await promise;
   } catch (error) {
     // These catalogs are optional while the manual Neon migration is pending.
     if (["42P01", "42703"].includes(error?.code)) return [];
-    console.error("Unified evidence retrieval branch failed:", error.message);
+    console.error(`Optional ${label} retrieval failed:`, error.message);
     return [];
   }
 };
@@ -86,11 +86,19 @@ export async function retrieveFacilityCandidates(queryEmbedding, queryText, depe
 
 export async function retrieveUnifiedEvidence(queryEmbedding, queryText, dependencies = {}) {
   const database = dependencies.database || pool;
+  const startedAt = Date.now();
   const [knowledge, officialResources, facilities] = await Promise.all([
-    rowsOrEmpty(retrieveKnowledgeCandidates(queryEmbedding, queryText, { database })),
-    rowsOrEmpty(retrieveOfficialResourceCandidates(queryEmbedding, queryText, { database })),
-    rowsOrEmpty(retrieveFacilityCandidates(queryEmbedding, queryText, { database })),
+    // Approved knowledge is the primary Hawkbot value. Never turn its SQL
+    // failures into an ordinary retrieval miss.
+    retrieveKnowledgeCandidates(queryEmbedding, queryText, { database }),
+    optionalRowsOrEmpty("official resource", retrieveOfficialResourceCandidates(queryEmbedding, queryText, { database })),
+    optionalRowsOrEmpty("facility", retrieveFacilityCandidates(queryEmbedding, queryText, { database })),
   ]);
+  console.info("Unified evidence retrieval completed", {
+    durationMs: Date.now() - startedAt,
+    knowledgeCandidates: knowledge.length,
+    officialResourceCandidates: officialResources.length,
+    facilityCandidates: facilities.length,
+  });
   return { knowledge, officialResources, facilities };
 }
-

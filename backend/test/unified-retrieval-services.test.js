@@ -121,7 +121,7 @@ test("missing optional embedding columns degrade to empty branches without losin
   assert.deepEqual(result.facilities, []);
 });
 
-test("missing optional tables return empty evidence rather than throwing", async () => {
+test("a missing primary knowledge table is surfaced instead of disguised as a miss", async () => {
   const database = {
     query: async () => {
       const error = new Error("relation does not exist");
@@ -130,9 +130,8 @@ test("missing optional tables return empty evidence rather than throwing", async
     },
   };
 
-  assert.deepEqual(await retrieveUnifiedEvidence([0.3], "anything", { database }), {
-    knowledge: [],
-    officialResources: [],
-    facilities: [],
-  });
+  await assert.rejects(
+    () => retrieveUnifiedEvidence([0.3], "anything", { database }),
+    error => error.code === "42P01",
+  );
 });

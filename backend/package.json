@@ -9,6 +9,7 @@
     "test": "node --test",
     "eval:retrieval": "node src/evaluate-rag-retrieval.js",
     "backfill:evidence": "node src/backfill-evidence-embeddings.js",
+    "check:evidence": "node src/check-evidence-integrity.js",
     "review:knowledge": "node src/run-knowledge-review.js"
   },
   "repository": {
