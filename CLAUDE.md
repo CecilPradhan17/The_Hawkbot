@@ -1,93 +1,263 @@
 # Hawkbot
 
-A chatbot + community Q&A forum for University of Louisiana Monroe (ULM) students. Students post questions on a feed, other students answer, answers that clear a vote threshold get pulled into a verified knowledge base, and the chatbot answers future questions using RAG over that knowledge base only — it never generates unverified campus info.
+Hawkbot is a ULM campus assistant plus HawkWall, a community Q&A feed. The core
+product rule is grounding: Hawkbot may synthesize answers from retrieved,
+approved evidence and structured tools, but it must not invent campus facts from
+the model's pretrained knowledge.
 
-## Stack
+This file is the durable project handoff for future coding sessions. For the
+reasoning behind major choices, also read `DECISIONS.md`.
 
-- **Backend**: Node (ESM) + Express 5, `backend/src`. Postgres (pgvector) via `pg`, JWT auth (`jsonwebtoken` + `bcrypt`), OpenAI API for embeddings + LLM polishing.
-- **Frontend**: React 19 + TypeScript + Vite, `frontend/src`. Tailwind v4, React Router, Framer Motion.
-- **Deploy**: frontend on Vercel, backend on Render, DB on Neon (Postgres/pgvector).
+## Stack and deployment
 
-## Architecture
+- Backend: Node ESM + Express 5 in `backend/src`
+- Database: Neon PostgreSQL with pgvector, accessed through `pg`
+- AI: OpenAI embeddings plus a grounded answer/curation model
+- Frontend: React 19 + TypeScript + Vite + Tailwind v4 in `frontend/src`
+- Hosting: frontend on Vercel, backend on Render
+- Authentication: JWT with bcrypt-backed users
+- PWA: `vite-plugin-pwa`/Workbox; static assets and the app shell are cached,
+  but `/api/*` is always network-only
 
-**Request flow**: `server.js` boots `app.js` → CORS (allowlist: `localhost:5173` + `FRONTEND_URL`) → `express.json()` → routes mounted at `/api` (`routes/index.js`) → controller → service → `db.js` pool.
+Production is real. There are no active users currently, but historical user
+data may exist. Treat `DATABASE_URL`, migrations, seed/backfill scripts, pushes,
+and deployments as production-affecting. Ask before schema changes, production
+writes, pushes, or deployments. Never print or commit `.env` contents.
 
-Layering is `routes/ -> controllers/ -> services/`, one feature per file pair (e.g. `posts.routes.js` / `posts.controllers.js` / `posts.services.js`). Follow this pattern for new endpoints rather than putting logic in controllers.
+## Code organization
 
-**RAG chatbot flow** (`services/chatbot.services.js`):
-1. Embed the user's question with `generateQueryEmbedding` (query-type embedding, asymmetric search).
-2. Pull top 3 matches from `approved_knowledge` by cosine similarity (pgvector `<=>`).
-3. If best match < `SIMILARITY_THRESHOLD` (0.50) → return an honest fallback, no LLM call.
-4. Otherwise pass the matched rows to `polishResponse` (`llm.services.js`) to synthesize the final answer.
+`backend/src/server.js` boots `app.js`; routes are mounted beneath `/api` from
+`routes/index.js`. Keep the existing `routes -> controllers -> services -> db`
+layering. Business logic belongs in services rather than controllers.
 
-**Approval pipeline** (`services/approval.services.js`), triggered from `vote.services.js` once an answer crosses `VOTE_APPROVAL_THRESHOLD`:
-question + answer → `cleanContent` (LLM) → `generateEmbedding` → insert into `approved_knowledge`. This is fire-and-forget — errors are logged, not surfaced to the voter.
+Frontend API wrappers live in `frontend/src/api`. Authentication is owned by
+`context/AuthContext.tsx`; authenticated routes use `routes/ProtectedRoute.tsx`.
+Pages live in `frontend/src/pages`.
 
-**Migrations**: plain numbered SQL files in `backend/migrations/`, applied manually/sequentially (no migration runner). When changing schema, add the next-numbered file rather than editing an old one.
+The workspace is sometimes shared by multiple agents. Always run `git status`
+before editing or committing. Do not overwrite, stage, or commit unrelated dirty
+files merely because they are present.
 
-**Frontend**: `src/api/*.ts` wraps backend calls through `request.ts` (has cold-start retry/timeout logic for Render's sleep behavior — see `ServerWakeModal`/`ServerWakeContext`). `context/AuthContext.tsx` holds auth state; `routes/ProtectedRoute.tsx` gates authed pages. Pages live in `src/pages/`.
+## Current Hawkbot answer workflow
 
-## Commands
+The production orchestration is in `backend/src/services/chatbot.services.js`.
 
-- Backend dev: `cd backend && npm run dev` (nodemon, port 4005)
-- Frontend dev: `cd frontend && npm run dev` (Vite, port 5173)
-- Frontend build/typecheck: `cd frontend && npm run build` (runs `tsc -b` then `vite build`)
+1. Sanitize the current message and bounded conversational state.
+2. Try cheap deterministic handlers for small talk, the Schulze dining-menu
+   link, and recognized structured-hours questions. A clear single-purpose
+   match returns immediately. Mixed questions continue to grounded synthesis so
+   multiple evidence types can appear in one answer.
+3. Build the retrieval query. Explicit clarification chains include the original
+   question, Hawkbot's clarification, and the user's answer. Ordinary prior chat
+   is included only for genuinely referential follow-ups such as “what about
+   tomorrow?” or “is it open?” Short, self-contained questions must not inherit
+   unrelated history; see `chat-context.services.js` and commit `b3d1ca5`.
+4. Expand recognized campus-place aliases, then create one query embedding.
+5. `unified-retrieval.services.js` starts three bounded retrieval branches in
+   parallel: approved knowledge/HawkWall evidence, curated official resources,
+   and facility candidates for the structured-hours tool.
+6. Approved knowledge uses hybrid retrieval in
+   `rag-retrieval.services.js`: exact cosine ranking and PostgreSQL full-text
+   ranking are fused with reciprocal-rank fusion. Up to 20 rows feed a final
+   pool of 10. A knowledge candidate is confident when vector similarity is at
+   least `0.50` or full-text search matched it. Hyphens/dashes are normalized
+   before `websearch_to_tsquery` so names such as Fant-Ewing are not interpreted
+   as exclusion expressions.
+7. Official resources and facilities are separately retrieved with vector and
+   full-text search, capped at three each. The complete catalogs are not sent to
+   the model on every request.
+8. The LLM receives only the bounded candidate evidence. It may select multiple
+   approved facts and official resources, request an hours lookup for one
+   retrieved facility, or request the fixed dining link. It must return the IDs
+   it actually used.
+9. The backend validates every selected ID against the retrieved pool before
+   returning an answer. Selected official links and HawkWall discussions are
+   returned as structured sources. If no evidence survives retrieval/selection,
+   Hawkbot returns the honest HawkWall fallback.
+
+Approved knowledge retrieval is the primary branch: its SQL errors propagate and
+must not be disguised as an ordinary “no answer” result. Official-resource and
+facility branches may degrade independently when optional schema is unavailable.
+Retrieval logs branch counts and duration, but avoid logging private question text.
+
+## Conversation state and clarification
+
+`frontend/src/pages/Chatbot.tsx` persists rendered chat state in
+`sessionStorage`, scoped by user ID. It survives route changes and refreshes in
+the same browser tab/PWA window, but closing that tab/window clears it. It does
+not sync across devices.
+
+The frontend sends at most eight recent turns. The backend treats earlier model
+prose as conversational context, never factual evidence. Hawkbot may ask up to
+two clarification questions for one unresolved request. Each clarification
+round reconstructs retrieval from the original query, prior clarification
+questions/answers, and the current reply. After the limit, the model must give
+the best grounded answer or fall back.
+
+## Evidence sources
+
+### Community-approved knowledge
+
+When a HawkWall answer crosses `VOTE_APPROVAL_THRESHOLD`,
+`approval.services.js` curates the question plus answer into self-contained
+atomic facts, embeds every fact, and stores them transactionally in
+`approved_knowledge`. The question supplies subject/context so a terse answer
+such as “yes” is not stored without meaning. Source post lineage is retained so
+selected evidence can open its isolated read-only discussion page.
+
+### Official resources
+
+`official_resources` and `official_resource_aliases` contain reviewed ULM URLs,
+descriptions, aliases, priority, and verification metadata. They are curated
+destinations, not scraped page contents. The LLM may recommend only retrieved
+resource IDs and must not claim it read a linked page.
+
+Schulze menu questions are intentionally link-only. Hawkbot does not call the
+undocumented MyDiningHub endpoint, scrape it, cache it, or describe current menu
+items. The fixed official page is owned by
+`dining-menu-link.services.js`. Dining-hours questions remain separate.
+
+### Structured facility hours
+
+Facility schedules are normalized data, not RAG text. Recognized hours questions
+are resolved deterministically with precedence:
+
+`exact-date exception -> named special period -> regular weekly hours`
+
+The timezone is `America/Chicago`. Upload/extraction is reviewed before atomic
+publication; current schedules replace prior schedules. See `HOURS_SYSTEM.md`.
+The LLM sees only retrieved facility candidates and may request a validated
+lookup when deterministic routing did not fully handle the question.
+
+## Knowledge lifecycle and administration
+
+Knowledge statuses include `active`, `needs_update`, `replaced`, and `archived`.
+Review categories are `stable`, `yearly`, `term`, and `frequent`. Verification,
+outdated-report, and correction-question workflows preserve history rather than
+editing evidence in place.
+
+The protected `/api/knowledge-admin` API and `KnowledgeAdmin.tsx` support:
+
+- listing, filtering, searching, and paginating knowledge;
+- viewing source labels, URLs, source posts, review metadata, and replacement
+  lineage;
+- changing review categories and queuing community review;
+- archiving active or needs-update knowledge with an audit note;
+- correcting knowledge by creating an embedded replacement, marking the old
+  fact replaced, preserving source metadata, resolving open workflows, and
+  recording an administrator action;
+- manually creating sourced, embedded facts with administrator audit records;
+- optionally asking AI to split source material into atomic suggestions. This
+  is preview-only: an administrator must review and submit the final text.
+
+Create/correct paths reject duplicate active or needs-update facts before paying
+for embeddings. Historical rows are read-only. Never change a replaced/archived
+row in place or destroy audit lineage.
+
+`HOURS_ADMIN_EMAIL` currently controls both hours administration and knowledge
+administration through the existing owner middleware.
+
+## Embeddings and integrity
+
+All evidence uses `text-embedding-3-large` (3072 dimensions). New approved
+knowledge, official resources, and facilities generate/update embeddings in
+their normal write paths. Active approved knowledge is not allowed to have a
+null embedding after migration 029.
+
+Operational commands:
+
+- `cd backend && npm run backfill:evidence` embeds missing active knowledge,
+  official resources, and facilities, then verifies none remain missing.
+- `cd backend && npm run check:evidence` performs a read-only integrity check.
+- `cd backend && npm run eval:retrieval` runs the retrieval golden set against
+  the configured Neon/OpenAI environment.
+
+Run production backfills only with explicit approval. A successful local/unit
+test does not prove Neon connectivity; school Wi-Fi has repeatedly timed out on
+port 5432. Report live verification separately from code-level verification.
+
+## Migrations and seed data
+
+Migrations are numbered SQL files in `backend/migrations` and are applied
+manually/sequentially in Neon's SQL editor. Never edit an already-applied
+migration; add the next number. The known production sequence has been applied
+through `029_require_active_knowledge_embeddings.sql`.
+
+When a migration adds active evidence with null embeddings, run the evidence
+backfill before validating the migration-029 constraint. Normal application
+write paths must create the embedding before activating evidence.
+
+`backend/knowledge.json` is reviewed seed material with official provenance.
+`025_migrate_legacy_knowledge.sql` blanket-replaced unsourced legacy rows and
+inserted a manually reviewed subset. That conversion was incomplete: valid
+legacy topics such as the Honors Lounge may have been dropped. Do not repair
+this with isolated one-off facts. The remaining task is a full reconciliation:
+
+1. inventory every legacy fact from the pre-025 history;
+2. group duplicates and assign structured-hours/menu ownership where relevant;
+3. verify each remaining topic against a current official source;
+4. add a sourced replacement or record an explicit outdated/unverifiable
+   disposition;
+5. produce a coverage report and regression check proving no legacy fact was
+   silently lost.
+
+## Frontend behavior worth preserving
+
+- HawkWall uses indexed keyset pagination on `(created_at, id)` and infinite
+  scrolls 10 posts at a time.
+- User-scoped HawkWall state is retained across route navigation. Within 120
+  seconds it is reused; after that the newest page is refetched in the
+  background and pagination restarts from the refreshed first page.
+- A compact Hawkbot prompt sits above the feed and transfers its question to
+  the dedicated chat page without issuing a duplicate request.
+- Desktop and mobile use the left navigation system; logout clears auth and
+  returns to the public landing page.
+- The main posting action is “Post.” Its modal supports question and regular
+  post modes rather than exposing competing create buttons.
+- HawkWall citations open `/sources/hawkwall/:postId`, an isolated approved
+  discussion view, rather than dumping the user into the full feed.
+- PWA API responses are network-only. Never cache authenticated feed/chat/vote
+  responses in the service worker.
+
+## Commands and validation
+
+- Backend dev: `cd backend && npm run dev` (port 4005)
+- Backend tests: `cd backend && npm test`
+- Frontend dev: `cd frontend && npm run dev` (port 5173)
+- Frontend build/typecheck: `cd frontend && npm run build`
 - Frontend lint: `cd frontend && npm run lint`
-- Backend has no test suite and no lint script currently configured.
 
-## Environment variables (backend/.env, gitignored)
+Use tests proportional to the change. For retrieval fixes, add a regression at
+the stage that failed (context construction, SQL candidate retrieval, LLM
+grounding, or controller response) rather than adding a special-case answer.
 
-`DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `VOTE_APPROVAL_THRESHOLD`, `OPENAI_API_KEY`, `HOURS_ADMIN_EMAIL`, `FRONTEND_URL`, `NODE_ENV`. Never print `.env` contents or commit secrets.
+## Current handoff snapshot — 2026-10-12
 
-`HOURS_ADMIN_EMAIL` is the single account allowed to use the campus-hours administration API and `/hours/admin` UI. Campus-hours setup and publishing instructions live in `HOURS_SYSTEM.md`.
+- `main` includes unified evidence retrieval, bounded clarification context,
+  evidence embedding integrity/backfill, sourced legacy migration, and the full
+  admin create/correct/archive/improve UI/API through commit `c38885f`.
+- The concise-query retrieval repair is in `b3d1ca5`. The real configured LLM
+  successfully selected the on-campus-jobs evidence/resource and the
+  Fant-Ewing fact when those candidates were supplied. Direct live Neon
+  retrieval could not be retested from the current network because port 5432
+  timed out.
+- At the time of this update, another agent has uncommitted refinements in
+  `backend/src/services/knowledge-admin-management.services.js` and
+  `backend/test/knowledge-admin-management.test.js` that reject missing or
+  historical correction targets before embedding/storage. Inspect `git status`
+  and coordinate before touching or committing those files.
+- The highest-priority unresolved data task is the systematic legacy-knowledge
+  reconciliation described above. The highest-priority runtime check is to
+  retest representative clean and history-bearing queries after Render deploy:
+  “where can I get on campus jobs?”, “what is Fant-Ewing Coliseum?”, and “where
+  is the Honors Lounge?”.
 
-## Deployment reality check
+## Collaboration style
 
-Frontend (Vercel), backend (Render), and DB (Neon) all exist as real deployed environments, not just local dev. There are no active users right now, but the app has had real users before and their data may still be in the Neon DB — treat migrations, seed scripts, and destructive queries against `DATABASE_URL` as if they could hit real data. Confirm before running anything against production, before schema changes, and before deploying/pushing.
+For architecture or nontrivial product changes, discuss the design, trade-offs,
+and connection to the existing system before implementation. Small scoped fixes
+may be implemented directly. Preserve unrelated work, flag technical debt
+without expanding scope, and never push/deploy unless explicitly requested.
 
-## Current priorities
-
-Four workstreams, in this deliberate order — don't reshuffle without discussion:
-
-1. **PWA conversion** — make the frontend installable via `vite-plugin-pwa`. Scope is installable + fast cold load, *not* full offline-first: the app is fundamentally auth-gated and live (feed, chat, votes), so there's no meaningful offline mode to build for those. See "PWA conversion scope" below for the detailed decisions.
-
-### PWA conversion scope
-
-**Approach:** `vite-plugin-pwa` using the `generateSW` strategy — Workbox generates the service worker; no hand-rolled SW logic for this scope.
-
-**Manifest:** web app manifest with app name, and icons at 192px, 512px, and a maskable variant.
-
-**Runtime caching:**
-- Static hashed JS/CSS assets → cache-first.
-- HTML app shell → stale-while-revalidate.
-- `/api/*` routes → explicitly excluded from caching. They serve live authenticated data (feed, votes, chat) and must never be served stale.
-
-**Update handling:** `registerType: 'autoUpdate'`, with `skipWaiting` and `clientsClaim` enabled. Add a small React hook using `needsRefresh` / `updateServiceWorker` (from `virtual:pwa-register/react`) to prompt users to refresh when a new version is available — browsers check for service worker updates conservatively, so without this, fixes wouldn't apply promptly.
-
-**Install prompt:** custom install UI — capture `beforeinstallprompt` for Android/Chrome, plus a manual "Add to Home Screen" instructional UI for iOS Safari, since iOS doesn't fire a native install banner.
-
-**Out of scope for this pass:**
-- Offline fallback page / offline data caching — a plain network error state in existing components is considered sufficient for now.
-- Push notifications — flagged as a larger, separate future feature due to iOS limitations.
-
-2. **Evaluation harness** — built *before* touching the RAG pipeline, so changes have a real before/after baseline instead of vibes. RAGAS is Python; the backend is Node, so this is a standalone script (not part of the Express app) that pulls a golden question set + `approved_knowledge` from Postgres via `DATABASE_URL` and computes faithfulness, answer relevancy, context precision, and context recall. Also add lightweight in-app instrumentation: thumbs up/down on chatbot answers, and logging similarity score + latency per query (already computed in `chatbot.services.js`, just needs to be persisted).
-
-3. **RAG quality upgrades** — hybrid search (dense vector + BM25, merged via Reciprocal Rank Fusion) plus a reranking pass on top candidates before they reach the LLM. These are the two highest-ROI changes for a corpus this size. Explicitly out of scope for now: GraphRAG, agentic/multi-hop retrieval — the knowledge base is short FAQ-style Q&A pairs, not the kind of corpus that needs it.
-
-4. **Cost optimization** — primarily semantic caching of chatbot responses (embed the incoming query, check against a cache of recent queries by similarity, skip the LLM call on a near-match). This fits Hawkbot's traffic pattern well since many students independently ask near-duplicate questions. Provider-side prompt caching is a secondary, smaller win.
-
-## How we work together
-
-Cecil built this solo ~5 months ago as a newer engineer, so expect some rough edges/unconventional patterns alongside genuinely solid parts (the RAG/approval pipeline is intentional and well-reasoned — don't assume everything is accidental).
-
-Two work modes:
-- **Architect/brainstorm mode** — for new architectural features or anything nontrivial: explain what you're about to build, why, how it works, and how it connects to the rest of the codebase *before* writing code. Treat it as a design discussion, not a green light to implement.
-- **Build mode** — for trivial changes (UI tweaks, small fixes, styling, copy): go ahead and edit freely. Still nothing risky — no migrations, no prod-affecting commands, no git push/deploy without asking.
-
-Code quality: if you spot odd patterns, tech debt, or potential issues while working on something else, flag them — don't fix unprompted. Fix only what's in scope for the current task.
-
-## Decision log
-
-Cecil wants a running record of major architectural decisions and trade-offs on this project — "receipts" for resume bullets, interview prep, and portfolio writeups later. Kept in `DECISIONS.md` at the repo root.
-
-When a significant architectural decision gets made — a new system, a non-obvious trade-off, picking one real alternative over another — add an entry there proactively, don't wait to be asked. Skip routine fixes, styling, and anything with no real alternative on the table. Each entry: date + title, Context, Decision, Alternatives considered, Trade-offs, and the resume/interview angle (what it demonstrates, impact if measurable).
+Record significant architectural choices in `DECISIONS.md` with date, context,
+decision, alternatives, trade-offs, and a resume/interview angle.
