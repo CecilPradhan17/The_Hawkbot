@@ -47,6 +47,14 @@ const findDuplicateKnowledgeId = async ({ database, content, excludeId = null })
   return result.rows[0]?.id ?? null;
 };
 
+const findKnowledgeStatus = async ({ database, knowledgeId }) => {
+  const result = await database.query(
+    "SELECT status FROM approved_knowledge WHERE id = $1",
+    [knowledgeId],
+  );
+  return result.rows[0]?.status ?? null;
+};
+
 export const improveKnowledgeForAdmin = async ({ content }, dependencies = {}) => {
   const sourceContent = String(content || "").trim();
   if (sourceContent.length < 5 || sourceContent.length > 10000) {
@@ -145,6 +153,12 @@ export const correctKnowledgeForAdmin = async (
   const database = dependencies.database || pool;
   const embeddingGenerator = dependencies.embeddingGenerator || generateDocumentEmbedding;
   const storage = dependencies.storage || storeApprovedKnowledge;
+  const statusFinder = dependencies.statusFinder || findKnowledgeStatus;
+  const currentStatus = await statusFinder({ database, knowledgeId: id });
+  if (!currentStatus) throw requestError("Knowledge fact not found", 404);
+  if (!new Set(["active", "needs_update"]).has(currentStatus)) {
+    throw requestError("Only active or needs-update knowledge can be corrected", 409);
+  }
   const duplicateFinder = dependencies.duplicateFinder || findDuplicateKnowledgeId;
   const duplicateId = await duplicateFinder({ database, content: correctedContent, excludeId: id });
   if (duplicateId) {
