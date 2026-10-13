@@ -177,14 +177,15 @@ round trip), so a naive "make it a PWA" pass could easily over-invest in offline
 support that doesn't fit how the app actually works.
 
 **Decision:** Used `vite-plugin-pwa` with the `generateSW` (Workbox-generated)
-strategy, scoped deliberately narrow: installable, fast cold load, no offline
-mode. Three caching strategies chosen per resource type rather than one
-blanket rule — hashed JS/CSS/icons via the default precache (functionally
-cache-first, revision-invalidated on each deploy); the HTML app shell via an
-explicit `StaleWhileRevalidate` runtime rule so it revalidates on every visit
-instead of only on a new service-worker install; and `/api/*` via an explicit
-`NetworkOnly` rule (matched by pathname so it holds across the cross-origin
-Render backend) since feed/vote/chat data must never be served stale. Update
+strategy, scoped deliberately narrow: installable, fast cold load, and only a
+shell fallback offline. Three caching strategies are chosen per resource type
+rather than one blanket rule — hashed JS/CSS/icons via the default precache
+(functionally cache-first and revision-invalidated on each deploy); HTML
+navigations via a versioned `NetworkFirst` runtime rule with one cached fallback;
+and `/api/*` via an explicit `NetworkOnly` rule (matched by pathname so it holds
+across the cross-origin Render backend) since feed/vote/chat data must never be
+served stale. Vercel explicitly revalidates `index.html`, `sw.js`, and the web
+manifest while hashed assets remain immutable. Update
 handling uses `registerType: 'autoUpdate'` plus a `virtual:pwa-register/react`
 hook that surfaces a manual refresh prompt, since silently-installed updates
 don't apply until the user revisits anyway. Install prompting is split by
@@ -195,16 +196,18 @@ Add to Home Screen" instructions for iOS Safari, which never fires that event.
 posts data, background sync for votes) — rejected as solving a problem this
 app doesn't have; the value proposition is a live community forum, not an
 offline reader. Relying on `vite-plugin-pwa`'s default `navigateFallback`
-(precache-backed shell, refreshed only on new SW installs) instead of a custom
-SWR rule — simpler, but means users could sit on a stale shell for a long time
-between deploys; caught during implementation that this default also silently
-registers *ahead of* custom runtime rules, which would have made the intended
-SWR rule dead code.
+(precache-backed shell, refreshed only on new SW installs) was also rejected.
+An initial custom stale-while-revalidate HTML rule was shipped, but production
+showed an old shell could reference hashed JS/CSS removed by a newer Vercel
+deployment. Vercel then rewrote those missing asset requests to HTML, producing
+strict MIME errors and a white screen until refresh. Network-first navigation
+removes that stale-shell deployment race.
 
-**Trade-offs:** No offline fallback screen — a dead network shows the app's
-existing error states, not a dedicated "you're offline" UI. iOS install relies
-on user-agent sniffing rather than a platform API, so it's inherently
-best-effort (breaks if Apple changes the UA string pattern).
+**Trade-offs:** Navigation may wait up to five seconds for the network before
+using the cached shell, prioritizing deploy consistency over instant stale HTML.
+There is no dedicated offline experience, and live authenticated data still
+requires the network. iOS install relies on user-agent sniffing rather than a
+platform API, so it remains best-effort.
 
 **Resume/interview angle:** Shipped a PWA conversion with per-resource-type
 caching strategy selection (not a single default), and caught a real

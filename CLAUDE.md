@@ -16,8 +16,9 @@ reasoning behind major choices, also read `DECISIONS.md`.
 - Frontend: React 19 + TypeScript + Vite + Tailwind v4 in `frontend/src`
 - Hosting: frontend on Vercel, backend on Render
 - Authentication: JWT with bcrypt-backed users
-- PWA: `vite-plugin-pwa`/Workbox; static assets and the app shell are cached,
-  but `/api/*` is always network-only
+- PWA: `vite-plugin-pwa`/Workbox; hashed static assets are precached, HTML
+  navigations are network-first with one cached offline fallback, and `/api/*`
+  is always network-only
 
 Production is real. There are no active users currently, but historical user
 data may exist. Treat `DATABASE_URL`, migrations, seed/backfill scripts, pushes,
@@ -69,7 +70,10 @@ The production orchestration is in `backend/src/services/chatbot.services.js`.
 8. The LLM receives only the bounded candidate evidence. It may select multiple
    approved facts and official resources, request an hours lookup for one
    retrieved facility, or request the fixed dining link. It must return the IDs
-   it actually used.
+   it actually used. A broad question about what a campus office or center
+   “has,” “does,” “provides,” or “offers” may use directly relevant evidence as
+   a clearly labeled non-exhaustive example (for example, “One service…”); it
+   must not present partial evidence as a complete list or invent other services.
 9. The backend validates every selected ID against the retrieved pool before
    returning an answer. Selected official links and HawkWall discussions are
    returned as structured sources. If no evidence survives retrieval/selection,
@@ -105,6 +109,11 @@ atomic facts, embeds every fact, and stores them transactionally in
 such as “yes” is not stored without meaning. Source post lineage is retained so
 selected evidence can open its isolated read-only discussion page.
 
+The code-level approval threshold defaults to five votes when
+`VOTE_APPROVAL_THRESHOLD` is absent. A valid positive environment value still
+overrides that default. Do not reintroduce the prior behavior where missing
+configuration caused every vote request to fail before reaching PostgreSQL.
+
 ### Official resources
 
 `official_resources` and `official_resource_aliases` contain reviewed ULM URLs,
@@ -115,7 +124,12 @@ resource IDs and must not claim it read a linked page.
 Schulze menu questions are intentionally link-only. Hawkbot does not call the
 undocumented MyDiningHub endpoint, scrape it, cache it, or describe current menu
 items. The fixed official page is owned by
-`dining-menu-link.services.js`. Dining-hours questions remain separate.
+`dining-menu-link.services.js`; the frontend renders it as a prominent inline
+“Open the current menu” link rather than a generic Sources footer. Explicit
+canonical “Schulze” menu/serving questions do not depend on the facility-alias
+table. Configured aliases such as “caf” still resolve through the database, and
+unusual or misspelled wording may fall through to the constrained AI menu tool.
+Dining-hours questions remain separate.
 
 ### Structured facility hours
 
@@ -218,6 +232,12 @@ this with isolated one-off facts. The remaining task is a full reconciliation:
   discussion view, rather than dumping the user into the full feed.
 - PWA API responses are network-only. Never cache authenticated feed/chat/vote
   responses in the service worker.
+- PWA navigations are `NetworkFirst` using the versioned `html-app-shell-v2`
+  cache. Do not restore stale-while-revalidate for HTML: an old cached shell can
+  reference JS/CSS hashes removed by a later Vercel deployment, producing a
+  white screen and non-JavaScript/non-CSS MIME errors. `index.html`, `sw.js`,
+  and the web manifest are explicitly revalidated; hashed `/assets/*` remain
+  immutable.
 
 ## Commands and validation
 
@@ -231,26 +251,28 @@ Use tests proportional to the change. For retrieval fixes, add a regression at
 the stage that failed (context construction, SQL candidate retrieval, LLM
 grounding, or controller response) rather than adding a special-case answer.
 
-## Current handoff snapshot — 2026-10-12
+## Current handoff snapshot — 2026-10-13
 
 - `main` includes unified evidence retrieval, bounded clarification context,
-  evidence embedding integrity/backfill, sourced legacy migration, and the full
-  admin create/correct/archive/improve UI/API through commit `c38885f`.
+  evidence embedding integrity/backfill, sourced legacy migration, the full
+  admin create/correct/archive/improve UI/API, validation-before-embedding for
+  corrections, the network-first PWA shell fix, expanded official-resource
+  routing, inline dining-menu links, and the menu/service grounding fixes.
 - The concise-query retrieval repair is in `b3d1ca5`. The real configured LLM
   successfully selected the on-campus-jobs evidence/resource and the
   Fant-Ewing fact when those candidates were supplied. Direct live Neon
   retrieval could not be retested from the current network because port 5432
   timed out.
-- At the time of this update, another agent has uncommitted refinements in
-  `backend/src/services/knowledge-admin-management.services.js` and
-  `backend/test/knowledge-admin-management.test.js` that reject missing or
-  historical correction targets before embedding/storage. Inspect `git status`
-  and coordinate before touching or committing those files.
+- The working tree was clean at the start of this documentation update. Still
+  inspect `git status` before acting because multiple agents commonly share the
+  checkout.
 - The highest-priority unresolved data task is the systematic legacy-knowledge
   reconciliation described above. The highest-priority runtime check is to
   retest representative clean and history-bearing queries after Render deploy:
-  “where can I get on campus jobs?”, “what is Fant-Ewing Coliseum?”, and “where
-  is the Honors Lounge?”.
+  “where can I get on campus jobs?”, “what is Fant-Ewing Coliseum?”, “where is
+  the Honors Lounge?”, “what is Schulze serving today?”, and “what do they have
+  at the SSC?”. The last query should give a qualified supported example rather
+  than treating one known service as a complete inventory.
 
 ## Collaboration style
 
