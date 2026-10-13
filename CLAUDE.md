@@ -266,6 +266,12 @@ grounding, or controller response) rather than adding a special-case answer.
 - The working tree was clean at the start of this documentation update. Still
   inspect `git status` before acting because multiple agents commonly share the
   checkout.
+- The admin knowledge-management work is complete for the current scope. The
+  final backend regression run passed 243/243 tests; the related frontend
+  production build and focused lint checks also passed. No additional migration
+  is pending for this workflow. Admin creation and correction both reject exact
+  active/needs-update duplicates before embedding, and corrections preflight the
+  target status before embedding while rechecking it under lock during storage.
 - The highest-priority unresolved data task is the systematic legacy-knowledge
   reconciliation described above. The highest-priority runtime check is to
   retest representative clean and history-bearing queries after Render deploy:
@@ -280,6 +286,13 @@ For architecture or nontrivial product changes, discuss the design, trade-offs,
 and connection to the existing system before implementation. Small scoped fixes
 may be implemented directly. Preserve unrelated work, flag technical debt
 without expanding scope, and never push/deploy unless explicitly requested.
+
+The owner prefers work in small reviewable chunks: finish one chunk, explain
+each change briefly, report the relevant tests, and wait for approval before
+committing. In this project, the owner's message `cp` explicitly means “commit
+and push the reviewed chunk,” then begin the next agreed chunk. Stage only the
+files belonging to the current chunk because other agents may have concurrent
+changes in the shared checkout.
 
 Record significant architectural choices in `DECISIONS.md` with date, context,
 decision, alternatives, trade-offs, and a resume/interview angle.
