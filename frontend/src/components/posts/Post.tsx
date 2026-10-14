@@ -92,13 +92,21 @@ export default function Post({
               Give Answer
             </button>
           </>
-        ) : (
+        ) : post.status === 'pending' ? (
           <VoteButtons
             postId={post.id}
             voteCount={post.vote_count}
             userVote={post.user_vote}
             onVote={onVote}
           />
+        ) : (
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            post.status === 'approved'
+              ? 'bg-green-100 text-green-700'
+              : 'bg-red-100 text-red-700'
+          }`}>
+            Voting closed · {post.status}
+          </span>
         )}
       </div>
 
@@ -126,7 +134,7 @@ export default function Post({
                   </button>
                 </div>
                 <p className="text-slate-700 text-sm">{reply.content}</p>
-                <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
+                {reply.status === 'pending' ? <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
                   <VoteButtons
                     postId={reply.id}
                     voteCount={reply.vote_count}
@@ -134,7 +142,7 @@ export default function Post({
                     onVote={onVote}
                     small
                   />
-                </div>
+                </div> : <p className="mt-2 text-xs font-semibold text-slate-500">Voting closed · {reply.status}</p>}
               </div>
             ))
           )}

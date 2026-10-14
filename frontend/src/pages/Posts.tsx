@@ -310,21 +310,26 @@ export default function Posts() {
         return
       }
 
-      // Reconcile vote_count with server (user_vote already correct from optimistic update)
+      const reconcile = (post: PostResponse): PostResponse => ({
+        ...post,
+        vote_count: response.voteCount,
+        user_vote: response.userVote,
+        status: response.status,
+      })
       setPosts(prev => prev.map(post =>
-        post.id === postId ? { ...post, vote_count: response.voteCount } : post
+        post.id === postId ? reconcile(post) : post
       ))
       setRepliesMap(prev => {
         const updated = { ...prev }
         for (const questionId in updated) {
           updated[questionId] = updated[questionId].map(reply =>
-            reply.id === postId ? { ...reply, vote_count: response.voteCount } : reply
+            reply.id === postId ? reconcile(reply) : reply
           )
         }
         return updated
       })
       if (selectedPost?.id === postId) {
-        setSelectedPost(prev => prev ? { ...prev, vote_count: response.voteCount } : null)
+        setSelectedPost(prev => prev ? reconcile(prev) : null)
       }
     } catch {
       // Rollback: apply same vote again to reverse the optimistic update

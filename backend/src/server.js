@@ -19,9 +19,17 @@
  */
 
 import app from "./app.js";
+import { finalizeDueVotes } from "./services/vote.services.js";
 
 const PORT = 4005;
 
 app.listen(PORT, () => {
     console.log("The server is listening on PORT: ", PORT);
 });
+
+const finalizeVotes = () => {
+  finalizeDueVotes().catch(error => console.error("Vote finalization failed:", error));
+};
+finalizeVotes();
+const voteFinalizer = setInterval(finalizeVotes, 60_000);
+voteFinalizer.unref();
