@@ -103,10 +103,14 @@ live in `chatbot-tools.services.js`.
    a clearly labeled non-exhaustive example (for example, “One service…”); it
    must not present partial evidence as a complete list or invent other services.
    Location answers must identify a supported building, room, address, or useful
-   relative location; merely saying that a place is on campus is not sufficient.
+   relative location; merely saying that a place is on campus or is located at
+   itself is not sufficient. A grounded landmark attached to an entity explicitly
+   inside the facility may support a qualified relative-location inference.
    When evidence supports only part of a request, give that useful part and state
    the unsupported remainder. Dates, deadlines, prices, eligibility, policy
    exceptions, safety, and current operating status require explicit premises.
+   HawkWall citation titles and excerpts are decoded from numeric/common HTML
+   entities, whitespace-normalized, and trimmed before being returned to the UI.
 9. One privacy-bounded structured log event is emitted per completed request with
    its route, deterministic matcher, ordered tools, loop depth, RAG similarities,
    per-stage latency, total latency, and available token usage. Question text is

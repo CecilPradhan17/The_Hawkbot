@@ -89,6 +89,7 @@ test("the router can call a registered tool and return a grounded answer", async
   assert.deepEqual(events[0].similarityScores, [0.82]);
   assert.equal(events[0].tokenUsage[0].stage, "router");
   assert.equal(events[0].tokenUsage[1].stage, "final_answer");
+  assert.match(client.calls[0].messages[0].content, /Never answer that a place is located at itself/);
 });
 
 test("a second tool request reaches the hard cap and forces the fallback", async () => {

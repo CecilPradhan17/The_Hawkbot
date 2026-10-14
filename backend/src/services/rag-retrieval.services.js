@@ -5,6 +5,28 @@ const serializeTimestamp = value => {
   return value ? String(value) : null;
 };
 
+const decodeNumericEntity = (match, code, radix) => {
+  const codePoint = Number.parseInt(code, radix);
+  return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF
+    && !(codePoint >= 0xD800 && codePoint <= 0xDFFF)
+    ? String.fromCodePoint(codePoint)
+    : match;
+};
+
+const decodeHtmlEntities = value => String(value || "")
+  .replace(/&#x([0-9a-f]+);/gi, (match, code) => decodeNumericEntity(match, code, 16))
+  .replace(/&#([0-9]+);/g, (match, code) => decodeNumericEntity(match, code, 10))
+  .replace(/&(nbsp|amp|lt|gt|quot|apos);/gi, entity => ({
+    "&nbsp;": " ",
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": "\"",
+    "&apos;": "'",
+  })[entity.toLowerCase()])
+  .replace(/\s+/g, " ")
+  .trim();
+
 export const RAG_CANDIDATE_LIMIT = 10;
 export const RAG_SOURCE_POOL_LIMIT = 20;
 export const RAG_SIMILARITY_THRESHOLD = 0.50;
@@ -41,8 +63,8 @@ export const buildHawkWallSources = candidates => {
     const threadPostId = Number.isInteger(parentId) && parentId > 0 ? parentId : postId;
     sources.set(postId, {
       type: "hawkwall",
-      title: candidate.thread_title || "HawkWall discussion",
-      excerpt: candidate.source_post_content || candidate.cleaned_content,
+      title: decodeHtmlEntities(candidate.thread_title || "HawkWall discussion"),
+      excerpt: decodeHtmlEntities(candidate.source_post_content || candidate.cleaned_content),
       postId,
       threadPostId,
       url: `/sources/hawkwall/${postId}`,

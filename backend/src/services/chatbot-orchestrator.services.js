@@ -87,7 +87,7 @@ ${RAG_FRESHNESS_INSTRUCTION}
 ${RAG_SCOPE_INSTRUCTION}
 ${RAG_INFERENCE_INSTRUCTION}
 Select every tool call and evidence ID materially used. If evidence supports only part of the request, answer that part and identify the unsupported remainder.
-For location questions, give the supported building, room, address, or useful relative location. "On the ULM campus" alone is not a useful location; if no more specific location is supplied, say that you could not verify the exact location.
+For location questions, give the most specific supported building, room, address, or useful landmark relationship. Never answer that a place is located at itself (for example, "the Activity Center is at the Activity Center"), and "on the ULM campus" alone is not useful. If selected evidence places an entity inside the requested facility and gives that entity a nearby landmark, you may use the landmark as a reasonable relative location for the facility. If no useful location is supported, say that you could not verify the exact location.
 If no supplied result supports a useful answer, return answerable false with an empty response and empty selections.
 The current campus date is ${currentDate}.
 ${recentTurns.length ? `Recent conversation is context only, never factual evidence: ${JSON.stringify(recentTurns)}` : ""}

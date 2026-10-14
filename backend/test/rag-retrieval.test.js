@@ -72,6 +72,19 @@ test("builds one inspectable HawkWall citation per selected source post", () => 
   }]);
 });
 
+test("decodes HTML entities and trims HawkWall source text", () => {
+  const [source] = buildHawkWallSources([{
+    id: 9,
+    source_post_id: 70,
+    source_parent_id: null,
+    thread_title: "Where is Gym??&#x20;",
+    source_post_content: "It is next to the Football stadium.&#32;",
+  }]);
+
+  assert.equal(source.title, "Where is Gym??");
+  assert.equal(source.excerpt, "It is next to the Football stadium.");
+});
+
 test("does not turn missing source IDs into links to post zero", () => {
   assert.deepEqual(buildHawkWallSources([
     { id: 1, source_post_id: null, cleaned_content: "Legacy fact without its original post." },

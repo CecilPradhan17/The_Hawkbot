@@ -80,6 +80,10 @@ Trusted official-resource aliases now qualify their resource independently of th
 full query's conjunctive full-text score. Common acronyms are also derived from each
 reviewed resource name, preventing extra words such as “services” from defeating a
 clear `SSC` match without maintaining one-off acronym rows.
+HawkWall citation display text is normalized at the backend boundary so stored HTML
+entities cannot leak into plain-text React rendering. Location synthesis explicitly
+rejects circular facility-at-itself wording and prefers a grounded room, address, or
+landmark relationship when one is available.
 
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic
