@@ -56,8 +56,13 @@ const facilityHoursDefinition = {
           type: ["string", "null"],
           description: "A named period such as Fall Break, or null.",
         },
+        answerMode: {
+          type: "string",
+          enum: ["direct", "compose"],
+          description: "Use direct only when hours completely answer the request; use compose when another part also needs an answer.",
+        },
       },
-      required: ["facilityName", "intent", "day", "specialEvent"],
+      required: ["facilityName", "intent", "day", "specialEvent", "answerMode"],
       additionalProperties: false,
     },
   },
@@ -150,7 +155,7 @@ const createRagSearchTool = dependencies => ({
 const createFacilityHoursTool = dependencies => ({
   name: "facility_hours",
   definition: facilityHoursDefinition,
-  async execute({ facilityName, intent, day, specialEvent }) {
+  async execute({ facilityName, intent, day, specialEvent, answerMode }) {
     const database = dependencies.database || pool;
     const dictionary = dependencies.facilityDictionary
       || (() => getFacilityDictionary(database));
@@ -169,8 +174,10 @@ const createFacilityHoursTool = dependencies => ({
         found: true,
         facilityName: facility.name,
         authoritativeHoursResult: answer.response,
+        answerMode,
       },
       evidence: { hours: answer },
+      directResponse: answer,
       buildSources: () => answer.sources || [],
     };
   },
@@ -193,4 +200,3 @@ export const createChatbotToolRegistry = (dependencies = {}) => {
   if (webSearchEnabled) tools.push(createWebSearchTool());
   return tools;
 };
-

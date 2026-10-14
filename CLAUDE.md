@@ -69,9 +69,13 @@ live in `chatbot-tools.services.js`.
    full-text search, capped at three each. The complete catalogs are not sent to
    the model on every request.
 7. Tool results are returned inside explicit untrusted-data delimiters. The model
-   may answer or request one additional tool. Code enforces a hard maximum of two
-   tool iterations; exhausting the cap, a tool error, or no useful evidence ends
-   in the honest HawkWall fallback.
+   may answer or request one additional tool. A router-selected hours lookup marks
+   itself `direct` only when it completely answers the request; code then returns
+   the authoritative formatted hours response without another LLM call. Mixed
+   requests use `compose`, preserving the hours result as evidence for synthesis.
+   Code enforces a hard maximum of two tool iterations. After a useful second tool,
+   one tools-disabled call may synthesize the final answer; invalid output, a tool
+   error, or no useful evidence ends in the honest HawkWall fallback.
 8. The final answer must return the tool-call and evidence IDs it actually used.
    The backend validates those IDs against executed, useful tool results before
    returning any prose. Grounding permits conclusions explicitly stated by or

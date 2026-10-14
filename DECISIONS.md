@@ -53,6 +53,13 @@ fall back on a question that another iteration could answer. A temporary legacy 
 remains for existing dependency-injected tests and should be removed after their
 fixtures move to the registry interface.
 
+**Follow-up — 2026-10-14:** The hours tool now declares whether its result completely
+answers the request (`direct`) or must be combined with other evidence (`compose`).
+Direct mode returns the deterministic formatter's response without a synthesis call,
+and code rejects direct mode for clearly multi-part wording. Compose mode may use both
+tool slots, followed by one tools-disabled synthesis call; the two-tool cap therefore
+limits retrieval without preventing a final combined answer.
+
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic
 termination, evidence-ID validation, and graceful degradation.

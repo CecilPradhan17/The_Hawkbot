@@ -153,3 +153,101 @@ test("a tool error degrades to the fallback instead of throwing", async () => {
     console.error = originalError;
   }
 });
+
+test("a router-selected standalone hours result returns the authoritative answer directly", async () => {
+  const authoritative = {
+    response: "The Activity Center closes at 9:00 PM.",
+    matched: true,
+    sourceType: "hours",
+  };
+  const client = mockClient([
+    response({ toolCall: {
+      id: "call-hours",
+      name: "facility_hours",
+      arguments: {
+        facilityName: "Activity Center",
+        intent: "closing_time",
+        day: "2026-10-14",
+        specialEvent: null,
+        answerMode: "direct",
+      },
+    } }),
+  ]);
+  const tool = {
+    name: "facility_hours",
+    definition: { type: "function", function: { name: "facility_hours", parameters: { type: "object" } } },
+    execute: async () => ({
+      useful: true,
+      modelOutput: { found: true, authoritativeHoursResult: authoritative.response, answerMode: "direct" },
+      evidence: { hours: authoritative },
+      directResponse: authoritative,
+    }),
+  };
+  const result = await orchestrateChatQuery("What time does the Activity Center close?", {
+    client, log: silentLog, deterministicHandlers: noDeterministicMatch, toolRegistry: [tool],
+  });
+  assert.deepEqual(result, authoritative);
+  assert.equal(client.calls.length, 1);
+});
+
+test("a mixed hours request cannot return direct and composes with another tool result", async () => {
+  const client = mockClient([
+    response({ toolCall: {
+      id: "call-hours",
+      name: "facility_hours",
+      arguments: {
+        facilityName: "Activity Center",
+        intent: "closing_time",
+        day: "2026-10-14",
+        specialEvent: null,
+        answerMode: "direct",
+      },
+    } }),
+    response({ toolCall: {
+      id: "call-rag",
+      name: "rag_search",
+      arguments: { query: "Activity Center crowded tonight" },
+    } }),
+    response({ content: {
+      answerable: true,
+      response: "The Activity Center closes at 9:00 PM, and students report it is busiest after 6:00 PM.",
+      usedToolCallIds: ["call-hours", "call-rag"],
+      relevantCandidateIds: [44],
+      officialResourceIds: [],
+      structuredRelationshipIds: [],
+    } }),
+  ]);
+  const tools = [{
+    name: "facility_hours",
+    definition: { type: "function", function: { name: "facility_hours", parameters: { type: "object" } } },
+    execute: async args => ({
+      useful: true,
+      modelOutput: { found: true, authoritativeHoursResult: "The Activity Center closes at 9:00 PM.", answerMode: args.answerMode },
+      evidence: { hours: { response: "The Activity Center closes at 9:00 PM." } },
+      directResponse: { response: "The Activity Center closes at 9:00 PM.", matched: true, sourceType: "hours" },
+    }),
+  }, {
+    name: "rag_search",
+    definition: { type: "function", function: { name: "rag_search", parameters: { type: "object" } } },
+    execute: async () => ({
+      useful: true,
+      modelOutput: { found: true, knowledge: [{ id: 44, content: "The Activity Center is busiest after 6 PM." }] },
+      evidence: { knowledge: [{ id: 44, cleaned_content: "The Activity Center is busiest after 6 PM." }] },
+      similarityScores: [0.91],
+      buildSources: () => [],
+    }),
+  }];
+  const result = await orchestrateChatQuery(
+    "When does the Activity Center close, and is it crowded tonight?",
+    { client, log: silentLog, deterministicHandlers: noDeterministicMatch, toolRegistry: tools },
+  );
+  assert.match(result.response, /closes at 9:00 PM/);
+  assert.match(result.response, /busiest after 6:00 PM/);
+  assert.deepEqual(result.knowledgeIds, [44]);
+  assert.equal(client.calls.length, 3);
+  assert.match(
+    client.calls[1].messages.find(message => message.tool_call_id === "call-hours").content,
+    /directModeRejected/,
+  );
+  assert.equal("tools" in client.calls[2], false);
+});
