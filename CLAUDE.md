@@ -41,36 +41,40 @@ files merely because they are present.
 
 ## Current Hawkbot answer workflow
 
-The production orchestration is in `backend/src/services/chatbot.services.js`.
+`backend/src/services/chatbot.services.js` is the production entry point and
+delegates to `chatbot-orchestrator.services.js`. Tool definitions and execution
+live in `chatbot-tools.services.js`.
 
 1. Sanitize the current message and bounded conversational state.
-2. Try cheap deterministic handlers for small talk, the Schulze dining-menu
-   link, and recognized structured-hours questions. A clear single-purpose
-   match returns immediately. Mixed questions continue to grounded synthesis so
-   multiple evidence types can appear in one answer.
-3. Build the retrieval query. Explicit clarification chains include the original
-   question, Hawkbot's clarification, and the user's answer. Ordinary prior chat
-   is included only for genuinely referential follow-ups such as “what about
-   tomorrow?” or “is it open?” Short, self-contained questions must not inherit
-   unrelated history; see `chat-context.services.js` and commit `b3d1ca5`.
-4. Expand recognized campus-place aliases, then create one query embedding.
-5. `unified-retrieval.services.js` starts three bounded retrieval branches in
-   parallel: approved knowledge/HawkWall evidence, curated official resources,
-   and facility candidates for the structured-hours tool.
-6. Approved knowledge uses hybrid retrieval in
+2. Try strict deterministic handlers for small talk, recognized structured-hours
+   questions, and the Schulze dining-menu link. A clear single-purpose match
+   returns immediately without an LLM call. Mixed questions continue to the
+   router so a partial canned answer does not discard the rest of the request.
+3. On a miss, the configurable `ROUTER_MODEL` (default `gpt-4o-mini`) must choose
+   one registered tool using OpenAI tool calling. The production registry offers
+   `rag_search` and `facility_hours`. `web_search` is a nonfunctional scaffold
+   and is omitted unless `WEB_SEARCH_ENABLED=true`.
+4. `rag_search` preserves the existing alias expansion, query embedding, and
+   unified retrieval. `unified-retrieval.services.js` starts three bounded
+   branches in parallel: approved knowledge/HawkWall evidence, curated official
+   resources, and facility candidates.
+5. Approved knowledge uses hybrid retrieval in
    `rag-retrieval.services.js`: exact cosine ranking and PostgreSQL full-text
    ranking are fused with reciprocal-rank fusion. Up to 20 rows feed a final
    pool of 10. A knowledge candidate is confident when vector similarity is at
    least `0.50` or full-text search matched it. Hyphens/dashes are normalized
    before `websearch_to_tsquery` so names such as Fant-Ewing are not interpreted
    as exclusion expressions.
-7. Official resources and facilities are separately retrieved with vector and
+6. Official resources and facilities are separately retrieved with vector and
    full-text search, capped at three each. The complete catalogs are not sent to
    the model on every request.
-8. The LLM receives only the bounded candidate evidence. It may select multiple
-   approved facts and official resources, request an hours lookup for one
-   retrieved facility, or request the fixed dining link. It must return the IDs
-   it actually used. Grounding permits conclusions explicitly stated by or
+7. Tool results are returned inside explicit untrusted-data delimiters. The model
+   may answer or request one additional tool. Code enforces a hard maximum of two
+   tool iterations; exhausting the cap, a tool error, or no useful evidence ends
+   in the honest HawkWall fallback.
+8. The final answer must return the tool-call and evidence IDs it actually used.
+   The backend validates those IDs against executed, useful tool results before
+   returning any prose. Grounding permits conclusions explicitly stated by or
    reasonably entailed from selected evidence, including combining compatible
    facts and backend-supplied trusted relationships. Every material campus-specific
    premise must still be supplied; the model may not fill gaps from pretrained
@@ -82,15 +86,17 @@ The production orchestration is in `backend/src/services/chatbot.services.js`.
    When evidence supports only part of a request, give that useful part and state
    the unsupported remainder. Dates, deadlines, prices, eligibility, policy
    exceptions, safety, and current operating status require explicit premises.
-9. The backend validates every selected ID against the retrieved pool before
-   returning an answer. Selected official links and HawkWall discussions are
-   returned as structured sources. If no evidence survives retrieval/selection,
-   Hawkbot returns the honest HawkWall fallback.
+9. One privacy-bounded structured log event is emitted per completed request with
+   its route, deterministic matcher, ordered tools, loop depth, RAG similarities,
+   per-stage latency, total latency, and available token usage. Question text is
+   not logged.
 
-Approved knowledge retrieval is the primary branch: its SQL errors propagate and
-must not be disguised as an ordinary “no answer” result. Official-resource and
-facility branches may degrade independently when optional schema is unavailable.
-Retrieval logs branch counts and duration, but avoid logging private question text.
+Approved knowledge retrieval remains the primary branch: its SQL errors propagate
+out of `unified-retrieval.services.js` rather than being converted into an empty
+candidate set. The orchestrator treats that as an explicit failed tool execution,
+logs the failure metadata, and returns the safe fallback instead of a 500. Optional
+official-resource and facility branches may still degrade independently when their
+schema is unavailable. Avoid logging private question text.
 
 ## Conversation state and clarification
 
@@ -259,7 +265,7 @@ Use tests proportional to the change. For retrieval fixes, add a regression at
 the stage that failed (context construction, SQL candidate retrieval, LLM
 grounding, or controller response) rather than adding a special-case answer.
 
-## Current handoff snapshot — 2026-10-13
+## Current handoff snapshot — 2026-10-14
 
 - `main` includes unified evidence retrieval, bounded clarification context,
   evidence embedding integrity/backfill, sourced legacy migration, the full
@@ -287,6 +293,11 @@ grounding, or controller response) rather than adding a special-case answer.
   the Honors Lounge?”, “what is Schulze serving today?”, and “what do they have
   at the SSC?”. The last query should give a qualified supported example rather
   than treating one known service as a complete inventory.
+- The production chat path now uses the registered-tool cascade described above.
+  The older dependency-injected flow remains temporarily inside
+  `chatbot.services.js` only to preserve established focused fixtures; migrate
+  those fixtures to the registry interface before deleting that compatibility
+  branch.
 
 ## Collaboration style
 

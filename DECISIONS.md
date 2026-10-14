@@ -22,6 +22,41 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-10-14 — Hawkbot uses a capped registered-tool cascade
+
+**Context:** Hawkbot's grounded synthesis call could select hours and menu tools,
+but retrieval and orchestration were coupled in one service and were difficult to
+extend or observe. The product needs cheap deterministic handling for exact cases,
+model-driven routing for varied student language, and a hard code boundary that
+prevents an open-ended agent loop or an unsupported final answer.
+
+**Decision:** Keep strict deterministic small-talk, hours, and dining checks first.
+On a miss, a configurable inexpensive model selects from a registry whose initial
+tools are existing unified RAG and structured facility hours. Tool outputs are
+delimited and treated as untrusted data. The model may answer after a useful result
+or request one additional tool, while code enforces a two-iteration cap and validates
+every selected tool-call and evidence ID. Empty results, invalid selections, tool
+errors, router errors, and cap exhaustion return the established honest fallback.
+Web search exists only as a disabled registry scaffold pending an allowlisted design.
+One structured, content-free observability event records routing, tools, similarities,
+latencies, and available token usage.
+
+**Alternatives considered:** Keep expanding one monolithic synthesis prompt, build
+separate hardcoded branches for every new capability, or allow an autonomous agent
+to continue until it decides it is finished. The monolith obscures routing and tool
+cost; hardcoded branches do not handle varied language; an uncapped agent weakens
+latency, cost, and grounding guarantees.
+
+**Trade-offs:** A non-deterministic request now usually needs a routing call followed
+by a final-answer call, increasing latency and token cost. The two-iteration cap may
+fall back on a question that another iteration could answer. A temporary legacy path
+remains for existing dependency-injected tests and should be removed after their
+fixtures move to the registry interface.
+
+**Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
+observable tool-calling cascade with defense against prompt injection, deterministic
+termination, evidence-ID validation, and graceful degradation.
+
 ## 2026-10-13 — Grounding permits bounded inference over selected evidence
 
 **Context:** Requiring a retrieved sentence to directly repeat the requested fact made

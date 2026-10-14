@@ -24,6 +24,7 @@ import {
   canClarify,
   sanitizeChatContext,
 } from "./chat-context.services.js";
+import { orchestrateChatQuery } from "./chatbot-orchestrator.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -79,6 +80,12 @@ const mergeSources = (...groups) => {
 
 export const handleChatQuery = async (userMessage, dependencies = {}, rawContext = {}) => {
   const context = sanitizeChatContext(rawContext);
+  // Production uses the tool-orchestrated cascade. The dependency-injected
+  // branch below remains temporarily for the established focused unit tests
+  // and can be removed once those fixtures target the registry interface.
+  if (Object.keys(dependencies).length === 0) {
+    return orchestrateChatQuery(userMessage, { context });
+  }
   const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;
   const diningMenuHandler = dependencies.diningMenuHandler || tryHandleDiningMenuLink;
   const embedding = dependencies.embedding || generateQueryEmbedding;
