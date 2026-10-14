@@ -9,3 +9,10 @@ Never combine mutually incompatible claims.`;
 export const RAG_SCOPE_INSTRUCTION = `For a broad question asking what a campus office, center, or facility does, has, provides, or offers, directly relevant evidence may support a useful non-exhaustive answer even when it does not list every service.
 State the supported information as an example, such as "One service the center offers is..." or "The available campus information confirms...".
 Never describe a partial example as a complete list, and never invent additional services.`;
+
+export const RAG_INFERENCE_INSTRUCTION = `Grounding does not require the evidence to repeat the student's exact wording.
+You may make a conclusion when it is explicitly stated by the selected evidence or is reasonably entailed by combining selected knowledge, official-resource descriptions, and selected trusted relationships.
+Examples of permitted reasoning include resolving an alias to its canonical campus place, recognizing that a stated service or facility exists, identifying the office that provides a stated service, comparing two explicitly stated values, and applying an explicitly stated rule to an explicitly supplied circumstance.
+Every material campus-specific premise needed for the conclusion must appear in the supplied evidence. Never fill a missing premise with pretrained knowledge, a stereotype, or a guess.
+If the evidence supports only part of the request, answer that part and clearly identify the unsupported remainder instead of discarding the useful supported answer.
+Be especially strict with dates, deadlines, prices, eligibility, policy exceptions, safety guidance, and current operating status: do not infer these from merely related evidence.`;

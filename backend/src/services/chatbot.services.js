@@ -10,7 +10,10 @@ import {
   isConfidentCandidate,
   retrieveKnowledgeCandidates,
 } from "./rag-retrieval.services.js";
-import { expandCampusPlaceAliases } from "./campus-place-alias.services.js";
+import {
+  expandCampusPlaceAliases,
+  resolveCampusPlaceRelationships,
+} from "./campus-place-alias.services.js";
 import { getFacilityDictionary } from "./hours-repository.services.js";
 import { diningMenuLinkResponse, tryHandleDiningMenuLink } from "./dining-menu-link.services.js";
 import { getOfficialResourceCatalog } from "./official-resource.services.js";
@@ -97,6 +100,10 @@ export const handleChatQuery = async (userMessage, dependencies = {}, rawContext
     || (dependencies.retriever
       ? async query => query
       : query => expandCampusPlaceAliases(query, { dictionary: facilityDictionary }));
+  const relationshipResolver = dependencies.relationshipResolver
+    || (dependencies.retriever || dependencies.aliasExpander
+      ? async () => []
+      : query => resolveCampusPlaceRelationships(query, { dictionary: facilityDictionary }));
 
   const smalltalkResult = await smalltalkHandler(userMessage);
   if (smalltalkResult && !isMixedRequest(userMessage)) return withAction(smalltalkResult);
@@ -110,6 +117,12 @@ export const handleChatQuery = async (userMessage, dependencies = {}, rawContext
   if (hoursResult && !isMixedRequest(userMessage)) return withAction(hoursResult);
 
   let retrievalQuery = buildContextualQuery(userMessage, context);
+  let trustedRelationships = [];
+  try {
+    trustedRelationships = await relationshipResolver(retrievalQuery);
+  } catch (error) {
+    console.error("Campus relationship resolution failed:", error.message);
+  }
   try {
     retrievalQuery = await aliasExpander(retrievalQuery);
   } catch (error) {
@@ -148,7 +161,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}, rawContext
   const similarity = vectorScores.length ? Math.max(...vectorScores).toFixed(4) : null;
   const confidentRows = candidates.filter(isConfidentCandidate);
   if (confidentRows.length === 0 && facilities.length === 0 && officialResources.length === 0
-    && !hoursResult && !diningMenuResult) {
+    && trustedRelationships.length === 0 && !hoursResult && !diningMenuResult) {
     return withAction({ response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" }, "fallback");
   }
 
@@ -166,6 +179,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}, rawContext
     allowClarification: canClarify(context),
     structuredEvidence: hoursResult,
     diningEvidence: diningMenuResult,
+    trustedRelationships,
   });
   if (polished?.action === "clarify" && polished.response?.trim()) {
     const answeredContext = context.clarification
@@ -223,9 +237,15 @@ export const handleChatQuery = async (userMessage, dependencies = {}, rawContext
     : [];
   const resourceById = new Map(officialResources.map(resource => [Number(resource.resourceId), resource]));
   const validResourceSelection = selectedResourceIds.every(id => resourceById.has(id));
-  const hasGrounding = selectedIds.length > 0 || selectedResourceIds.length > 0 || hoursResult || diningMenuResult;
+  const selectedRelationshipIds = Array.isArray(polished?.structuredRelationshipIds)
+    ? [...new Set(polished.structuredRelationshipIds)]
+    : [];
+  const allowedRelationshipIds = new Set(trustedRelationships.map(item => item.relationshipId));
+  const validRelationshipSelection = selectedRelationshipIds.every(id => allowedRelationshipIds.has(id));
+  const hasGrounding = selectedIds.length > 0 || selectedResourceIds.length > 0
+    || selectedRelationshipIds.length > 0 || hoursResult || diningMenuResult;
   if (!polished?.answerable || !polished.response?.trim() || !hasGrounding
-    || !validKnowledgeSelection || !validResourceSelection) {
+    || !validKnowledgeSelection || !validResourceSelection || !validRelationshipSelection) {
     return withAction({ response: FALLBACK_MESSAGE, matched: false, sourceType: "fallback" }, "fallback");
   }
   const selectedKnowledge = confidentRows.filter(row => selectedIds.includes(Number(row.id)));

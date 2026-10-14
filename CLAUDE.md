@@ -70,10 +70,18 @@ The production orchestration is in `backend/src/services/chatbot.services.js`.
 8. The LLM receives only the bounded candidate evidence. It may select multiple
    approved facts and official resources, request an hours lookup for one
    retrieved facility, or request the fixed dining link. It must return the IDs
-   it actually used. A broad question about what a campus office or center
+   it actually used. Grounding permits conclusions explicitly stated by or
+   reasonably entailed from selected evidence, including combining compatible
+   facts and backend-supplied trusted relationships. Every material campus-specific
+   premise must still be supplied; the model may not fill gaps from pretrained
+   knowledge. Unique facility aliases are selectable, backend-validated relationship
+   evidence rather than retrieval hints only. A broad question about what a campus office or center
    “has,” “does,” “provides,” or “offers” may use directly relevant evidence as
    a clearly labeled non-exhaustive example (for example, “One service…”); it
    must not present partial evidence as a complete list or invent other services.
+   When evidence supports only part of a request, give that useful part and state
+   the unsupported remainder. Dates, deadlines, prices, eligibility, policy
+   exceptions, safety, and current operating status require explicit premises.
 9. The backend validates every selected ID against the retrieved pool before
    returning an answer. Selected official links and HawkWall discussions are
    returned as structured sources. If no evidence survives retrieval/selection,

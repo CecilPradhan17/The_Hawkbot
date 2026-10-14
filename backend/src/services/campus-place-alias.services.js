@@ -23,6 +23,38 @@ export const resolveUniqueCampusFacility = async (query, dependencies = {}) => {
   return matches.size === 1 ? [...matches.values()][0] : null;
 };
 
+export const resolveCampusPlaceRelationships = async (query, dependencies = {}) => {
+  const dictionary = dependencies.dictionary
+    || (() => getFacilityDictionary(dependencies.database));
+  const normalizedQuery = normalizeAlias(query);
+  if (!normalizedQuery) return [];
+
+  const aliases = new Map();
+  for (const entry of await dictionary()) {
+    const alias = normalizeAlias(entry.normalized_alias);
+    if (!alias) continue;
+    const facilities = aliases.get(alias) || new Map();
+    facilities.set(Number(entry.id), entry.name);
+    aliases.set(alias, facilities);
+  }
+
+  return [...aliases.entries()]
+    .filter(([alias, facilities]) => containsPhrase(normalizedQuery, alias) && facilities.size === 1)
+    .sort(([left], [right]) => right.length - left.length)
+    .slice(0, MAX_CANONICAL_ADDITIONS)
+    .map(([alias, facilities]) => {
+      const [facilityId, facilityName] = [...facilities.entries()][0];
+      return {
+        relationshipId: `facility-alias:${facilityId}:${alias}`,
+        type: "campus_place_alias",
+        alias,
+        facilityId,
+        facilityName,
+        statement: `The campus term "${alias}" refers to ${facilityName}.`,
+      };
+    });
+};
+
 export const expandCampusPlaceAliases = async (query, dependencies = {}) => {
   const dictionary = dependencies.dictionary
     || (() => getFacilityDictionary(dependencies.database));

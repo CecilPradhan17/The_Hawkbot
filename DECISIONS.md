@@ -22,6 +22,41 @@ Newest entries at the top. Template for new entries:
 
 ---
 
+## 2026-10-13 — Grounding permits bounded inference over selected evidence
+
+**Context:** Requiring a retrieved sentence to directly repeat the requested fact made
+Hawkbot reject useful answers that followed from approved evidence. For example, the
+system could know both that “gym” uniquely refers to the Activity Center and that the
+Activity Center provides fitness facilities, yet still treat “Where is the gym?” as
+unanswerable. A general-purpose model can make that connection, but allowing unrestricted
+pretrained knowledge would weaken Hawkbot's campus-grounding guarantee.
+
+**Decision:** Define grounding as explicit support or reasonable entailment from selected
+evidence. The answer model may combine compatible approved facts, official-resource
+descriptions, structured results, and backend-supplied trusted relationships. Every
+material campus-specific premise must still be present in that evidence. Unique facility
+aliases are now passed as ID-labeled relationships that the model must select, and both
+the model adapter and orchestration layer validate selected relationship IDs against the
+backend-provided pool. Partial support produces a qualified useful answer rather than an
+all-or-nothing fallback. Dates, deadlines, prices, eligibility, policy exceptions, safety,
+and current operating status retain a stricter no-inference rule unless every premise is
+explicitly supplied.
+
+**Alternatives considered:** Loosen the prompt to let the model use general knowledge, or
+continue requiring direct sentence-level answers. Unrestricted model knowledge improves
+coverage but can invent changing campus facts; direct-only grounding is safe but discards
+valid conclusions and makes answer quality depend too heavily on exact wording.
+
+**Trade-offs:** Entailment remains probabilistic, so regression coverage and validated
+evidence selection are important. The relationship mechanism initially exposes facility
+aliases; additional governed relationship types can be added as structured campus data
+becomes available. In exchange, Hawkbot can answer a much broader range of paraphrases,
+multi-fact questions, comparisons, and partial requests without abandoning provenance.
+
+**Resume/interview angle:** Evolved a retrieval system from extractive sentence matching
+to validated evidence-based reasoning, increasing answer coverage while preserving a
+hard boundary against unsupported domain claims.
+
 ## 2026-10-12 — AI-assisted admin knowledge requires human approval
 
 **Context:** The owner needs to add official knowledge directly without routing it

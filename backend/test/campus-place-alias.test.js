@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { expandCampusPlaceAliases, resolveUniqueCampusFacility } from "../src/services/campus-place-alias.services.js";
+import {
+  expandCampusPlaceAliases,
+  resolveCampusPlaceRelationships,
+  resolveUniqueCampusFacility,
+} from "../src/services/campus-place-alias.services.js";
 
 const dictionary = async () => [
   { id: 1, name: "Activity Center", normalized_alias: "activity center" },
@@ -58,5 +62,27 @@ test("resolves one facility through any stored alias", async () => {
   assert.deepEqual(
     await resolveUniqueCampusFacility("whats at the caf", { dictionary }),
     { id: 2, name: "Schulze Dining Hall" },
+  );
+});
+
+test("turns an unambiguous alias into selectable trusted evidence", async () => {
+  assert.deepEqual(await resolveCampusPlaceRelationships("where is the gym", { dictionary }), [{
+    relationshipId: "facility-alias:1:gym",
+    type: "campus_place_alias",
+    alias: "gym",
+    facilityId: 1,
+    facilityName: "Activity Center",
+    statement: "The campus term \"gym\" refers to Activity Center.",
+  }]);
+});
+
+test("does not create trusted evidence for an ambiguous alias", async () => {
+  const ambiguousDictionary = async () => [
+    { id: 1, name: "Activity Center", normalized_alias: "gym" },
+    { id: 3, name: "Legacy Gym", normalized_alias: "gym" },
+  ];
+  assert.deepEqual(
+    await resolveCampusPlaceRelationships("where is the gym", { dictionary: ambiguousDictionary }),
+    [],
   );
 });

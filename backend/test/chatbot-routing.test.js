@@ -549,3 +549,56 @@ test("a mixed hours question continues to one synthesis call with structured and
   assert.deepEqual(result.knowledgeIds, [44]);
   assert.equal(result.sources[0].url, "/sources/hawkwall/91");
 });
+
+test("trusted relationships can ground a useful inferred answer", async () => {
+  const relationship = {
+    relationshipId: "facility-alias:1:gym",
+    statement: "The campus term \"gym\" refers to Activity Center.",
+  };
+  const result = await handleChatQuery("Where is the gym?", {
+    hoursHandler: async () => null,
+    aliasExpander: async query => query,
+    relationshipResolver: async () => [relationship],
+    embedding: async () => [0.1],
+    unifiedRetriever: async () => ({ knowledge: [], officialResources: [], facilities: [] }),
+    polisher: async (_query, _knowledge, options) => {
+      assert.deepEqual(options.trustedRelationships, [relationship]);
+      return {
+        action: "answer",
+        answerable: true,
+        response: "ULM's gym is the Activity Center. I don't have a verified street address.",
+        relevantCandidateIds: [],
+        officialResourceIds: [],
+        structuredRelationshipIds: [relationship.relationshipId],
+      };
+    },
+  });
+
+  assert.equal(result.matched, true);
+  assert.equal(result.action, "answer");
+  assert.match(result.response, /gym is the Activity Center/);
+});
+
+test("rejects an invented structured relationship selection", async () => {
+  const result = await handleChatQuery("Can freshmen use this service?", {
+    hoursHandler: async () => null,
+    aliasExpander: async query => query,
+    relationshipResolver: async () => [{
+      relationshipId: "office-service:1:tutoring",
+      statement: "The SSC provides tutoring.",
+    }],
+    embedding: async () => [0.1],
+    unifiedRetriever: async () => ({ knowledge: [], officialResources: [], facilities: [] }),
+    polisher: async () => ({
+      action: "answer",
+      answerable: true,
+      response: "Freshmen can use tutoring.",
+      relevantCandidateIds: [],
+      officialResourceIds: [],
+      structuredRelationshipIds: ["eligibility:freshmen:tutoring"],
+    }),
+  });
+
+  assert.equal(result.matched, false);
+  assert.equal(result.sourceType, "fallback");
+});
