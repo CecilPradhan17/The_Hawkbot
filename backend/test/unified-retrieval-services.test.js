@@ -30,6 +30,9 @@ test("official-resource retrieval is hybrid, bounded, and returns the orchestrat
   assert.deepEqual(captured.values, [JSON.stringify([0.1, 0.2]), "on campus jobs", 3]);
   assert.match(captured.text, /official_resources/);
   assert.match(captured.text, /official_resource_aliases/);
+  assert.match(captured.text, /unnest\(alias_list\)/);
+  assert.match(captured.text, /regexp_replace\(r\.name, '\^ULM/);
+  assert.match(captured.text, /WHERE alias_match OR acronym_match OR similarity >= 0\.35 OR text_score > 0/);
   assert.match(captured.text, /embedding <=> \$1::vector/);
   assert.match(captured.text, /websearch_to_tsquery\('english', \$2\)/);
   assert.match(captured.text, /to_tsvector\('english', name \|\| ' ' \|\| description \|\| ' ' \|\| aliases\)/);

@@ -76,6 +76,10 @@ and records success independently, so one empty or failed lookup does not erase 
 evidence from another; the ordinary no-answer fallback applies when no called tool
 returns useful evidence. Exceptional invalid model output and infrastructure failures
 still fail closed.
+Trusted official-resource aliases now qualify their resource independently of the
+full query's conjunctive full-text score. Common acronyms are also derived from each
+reviewed resource name, preventing extra words such as “services” from defeating a
+clear `SSC` match without maintaining one-off acronym rows.
 
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic

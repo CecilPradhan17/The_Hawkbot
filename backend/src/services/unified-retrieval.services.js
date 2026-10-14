@@ -22,7 +22,16 @@ export async function retrieveOfficialResourceCandidates(queryEmbedding, queryTe
     `WITH resource_text AS (
        SELECT r.id, r.slug, r.name, r.description, r.url, r.response_text,
               r.requires_login, r.last_verified_at, r.priority, r.embedding,
-              COALESCE(string_agg(a.normalized_alias, ' '), '') AS aliases
+              COALESCE(string_agg(a.normalized_alias, ' '), '') AS aliases,
+              COALESCE(array_agg(a.normalized_alias) FILTER (WHERE a.normalized_alias IS NOT NULL), '{}') AS alias_list,
+              (
+                SELECT string_agg(left(name_word, 1), '')
+                FROM regexp_split_to_table(
+                  lower(regexp_replace(r.name, '^ULM\\s+', '', 'i')),
+                  '\\s+'
+                ) AS name_word
+                WHERE name_word NOT IN ('and', 'of', 'the')
+              ) AS name_acronym
        FROM official_resources r
        LEFT JOIN official_resource_aliases a ON a.resource_id = r.id
        WHERE r.active = TRUE
@@ -33,12 +42,19 @@ export async function retrieveOfficialResourceCandidates(queryEmbedding, queryTe
               ts_rank_cd(
                 to_tsvector('english', name || ' ' || description || ' ' || aliases),
                 websearch_to_tsquery('english', $2)
-              ) AS text_score
+              ) AS text_score,
+              EXISTS (
+                SELECT 1
+                FROM unnest(alias_list) AS exact_alias
+                WHERE strpos(' ' || lower($2) || ' ', ' ' || exact_alias || ' ') > 0
+              ) AS alias_match,
+              strpos(' ' || lower($2) || ' ', ' ' || name_acronym || ' ') > 0 AS acronym_match
        FROM resource_text
      )
      SELECT * FROM ranked
-     WHERE similarity >= 0.35 OR text_score > 0
-     ORDER BY (CASE WHEN text_score > 0 THEN 1 ELSE 0 END) DESC,
+     WHERE alias_match OR acronym_match OR similarity >= 0.35 OR text_score > 0
+     ORDER BY alias_match DESC, acronym_match DESC,
+              (CASE WHEN text_score > 0 THEN 1 ELSE 0 END) DESC,
               text_score DESC, similarity DESC NULLS LAST, priority DESC
      LIMIT $3`,
     [JSON.stringify(queryEmbedding), normalizeLexicalQuery(queryText), limit],

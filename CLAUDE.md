@@ -70,7 +70,10 @@ live in `chatbot-tools.services.js`.
    as exclusion expressions.
 6. Official resources and facilities are separately retrieved with vector and
    full-text search, capped at three each. The complete catalogs are not sent to
-   the model on every request.
+   the model on every request. A whole-phrase match on a database-owned official
+   resource alias independently qualifies that resource. Common acronyms are derived
+   from reviewed resource names (for example, Student Success Center becomes `SSC`),
+   so extra wording does not defeat a clear abbreviation.
 7. Tool results are returned inside explicit untrusted-data delimiters. One failed
    tool becomes an explicit empty result without cancelling other calls. The model
    synthesizes from every successful result, or may request one remaining tool when
