@@ -56,9 +56,9 @@ fixtures move to the registry interface.
 **Follow-up — 2026-10-14:** The hours tool now declares whether its result completely
 answers the request (`direct`) or must be combined with other evidence (`compose`).
 Direct mode returns the deterministic formatter's response without a synthesis call,
-and code rejects direct mode for clearly multi-part wording. Compose mode may use both
-tool slots, followed by one tools-disabled synthesis call; the two-tool cap therefore
-limits retrieval without preventing a final combined answer.
+and code rejects direct mode for clearly multi-part wording. Compose mode may use the
+remaining tool-calling round, followed by one tools-disabled synthesis call; the
+two-round cap therefore limits recursion without limiting a round to one tool.
 
 **Follow-up — 2026-10-14:** The fixed Schulze menu-link response now uses the same
 `direct`/`compose` contract. A standalone menu request can return it unchanged, while
@@ -68,6 +68,14 @@ explain an explicitly unavailable portion; at least one selected tool must still
 useful, and all factual evidence IDs remain backend-validated.
 The UI owns link rendering: composed prose refers to the menu button, and the backend
 removes a duplicate Markdown or raw menu URL if the model emits one anyway.
+Compose mode also forces another tool-calling round when an initial single call cannot
+cover the request. This turns the mode from a prompt suggestion into an enforced
+multi-part retrieval contract while preserving the two-round loop cap.
+The router may now select both required tools in its initial plan. Each call executes
+and records success independently, so one empty or failed lookup does not erase useful
+evidence from another; the ordinary no-answer fallback applies when no called tool
+returns useful evidence. Exceptional invalid model output and infrastructure failures
+still fail closed.
 
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic

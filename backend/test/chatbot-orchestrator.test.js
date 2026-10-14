@@ -6,16 +6,16 @@ import {
 } from "../src/services/chatbot-orchestrator.services.js";
 import { createChatbotToolRegistry } from "../src/services/chatbot-tools.services.js";
 
-const response = ({ toolCall, content, usage = { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 } }) => ({
+const response = ({ toolCall, toolCalls, content, usage = { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 } }) => ({
   choices: [{
-    message: toolCall ? {
+    message: toolCall || toolCalls ? {
       role: "assistant",
       content: null,
-      tool_calls: [{
-        id: toolCall.id,
+      tool_calls: (toolCalls || [toolCall]).map(call => ({
+        id: call.id,
         type: "function",
-        function: { name: toolCall.name, arguments: JSON.stringify(toolCall.arguments || {}) },
-      }],
+        function: { name: call.name, arguments: JSON.stringify(call.arguments || {}) },
+      })),
     } : { role: "assistant", content: JSON.stringify(content) },
   }],
   usage,
@@ -245,6 +245,8 @@ test("a mixed hours request cannot return direct and composes with another tool 
   assert.match(result.response, /busiest after 6:00 PM/);
   assert.deepEqual(result.knowledgeIds, [44]);
   assert.equal(client.calls.length, 3);
+  assert.equal(client.calls[1].tool_choice, "required");
+  assert.deepEqual(client.calls[1].tools.map(item => item.function.name), ["facility_hours", "rag_search"]);
   assert.match(
     client.calls[1].messages.find(message => message.tool_call_id === "call-hours").content,
     /directModeRejected/,
@@ -329,6 +331,8 @@ test("mixed Schulze hours and menu questions compose both authoritative tool res
   assert.equal(result.sourceType, "dining_link");
   assert.match(result.sources[0].url, /ulm\.mydininghub\.com\/en\/location\/schulze/);
   assert.equal(client.calls.length, 3);
+  assert.equal(client.calls[1].tool_choice, "required");
+  assert.deepEqual(client.calls[1].tools.map(item => item.function.name), ["facility_hours", "dining_menu"]);
 });
 
 test("an unavailable hours result does not discard useful service evidence", async () => {
@@ -388,5 +392,107 @@ test("an unavailable hours result does not discard useful service evidence", asy
     assert.match(result.response, /couldn't verify today's hours/);
     assert.deepEqual(result.knowledgeIds, [example.id]);
     assert.equal(result.matched, true);
+    assert.equal(client.calls[1].tool_choice, "required");
+    assert.deepEqual(client.calls[1].tools.map(item => item.function.name), ["facility_hours", "rag_search"]);
   }
+});
+
+test("the router can plan two tools together and one failure does not discard the other result", async () => {
+  const client = mockClient([
+    response({ toolCalls: [{
+      id: "call-hours",
+      name: "facility_hours",
+      arguments: {
+        facilityName: "Library",
+        intent: "open_now",
+        day: "2026-10-14",
+        specialEvent: null,
+        answerMode: "compose",
+      },
+    }, {
+      id: "call-rag",
+      name: "rag_search",
+      arguments: { query: "ULM Library services" },
+    }] }),
+    response({ content: {
+      answerable: true,
+      response: "I couldn't verify today's hours. The Library provides books, research databases, study rooms, and computer labs.",
+      usedToolCallIds: ["call-hours", "call-rag"],
+      relevantCandidateIds: [73],
+      officialResourceIds: [],
+      structuredRelationshipIds: [],
+    } }),
+  ]);
+  const tools = [{
+    name: "facility_hours",
+    definition: { type: "function", function: { name: "facility_hours", parameters: { type: "object" } } },
+    execute: async () => ({ useful: false, modelOutput: { found: false } }),
+  }, {
+    name: "rag_search",
+    definition: { type: "function", function: { name: "rag_search", parameters: { type: "object" } } },
+    execute: async () => ({
+      useful: true,
+      modelOutput: { found: true, knowledge: [{ id: 73, content: "The Library provides books, research databases, study rooms, and computer labs." }] },
+      evidence: { knowledge: [{ id: 73, cleaned_content: "The Library provides books, research databases, study rooms, and computer labs." }] },
+      similarityScores: [0.9],
+      buildSources: () => [],
+    }),
+  }];
+
+  const result = await orchestrateChatQuery("Is the library open today, and what services does it offer?", {
+    client,
+    log: silentLog,
+    deterministicHandlers: noDeterministicMatch,
+    toolRegistry: tools,
+  });
+
+  assert.equal(client.calls.length, 2);
+  assert.equal(client.calls[0].parallel_tool_calls, true);
+  assert.match(result.response, /couldn't verify today's hours/);
+  assert.match(result.response, /research databases/);
+  assert.deepEqual(result.knowledgeIds, [73]);
+});
+
+test("the round limit does not limit how many needed tools can run in one round", async () => {
+  const plannedCalls = [1, 2, 3].map(id => ({
+    id: `call-${id}`,
+    name: `tool_${id}`,
+    arguments: {},
+  }));
+  const client = mockClient([
+    response({ toolCalls: plannedCalls }),
+    response({ content: {
+      answerable: true,
+      response: "Combined answer from three grounded tools.",
+      usedToolCallIds: plannedCalls.map(call => call.id),
+      relevantCandidateIds: [1, 2, 3],
+      officialResourceIds: [],
+      structuredRelationshipIds: [],
+    } }),
+  ]);
+  const executionCounts = [0, 0, 0];
+  const tools = [1, 2, 3].map(id => ({
+    name: `tool_${id}`,
+    definition: { type: "function", function: { name: `tool_${id}`, parameters: { type: "object" } } },
+    execute: async () => {
+      executionCounts[id - 1] += 1;
+      return {
+        useful: true,
+        modelOutput: { found: true, knowledge: [{ id, content: `Fact ${id}` }] },
+        evidence: { knowledge: [{ id, cleaned_content: `Fact ${id}` }] },
+        buildSources: () => [],
+      };
+    },
+  }));
+
+  const result = await orchestrateChatQuery("Combine three campus facts", {
+    client,
+    log: silentLog,
+    deterministicHandlers: noDeterministicMatch,
+    toolRegistry: tools,
+  });
+
+  assert.deepEqual(executionCounts, [1, 1, 1]);
+  assert.deepEqual(result.knowledgeIds, [1, 2, 3]);
+  assert.equal(client.calls.length, 2);
 });

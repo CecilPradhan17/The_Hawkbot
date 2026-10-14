@@ -51,7 +51,8 @@ live in `chatbot-tools.services.js`.
    returns immediately without an LLM call. Mixed questions continue to the
    router so a partial canned answer does not discard the rest of the request.
 3. On a miss, the configurable `ROUTER_MODEL` (default `gpt-4o-mini`) must choose
-   one registered tool using OpenAI tool calling. The production registry offers
+   every needed registered tool. A multi-part request can select all needed tools
+   in the first OpenAI tool-calling response. The registry offers
    `rag_search`, `facility_hours`, and `dining_menu`. The dining tool returns only
    the backend-owned official Schulze menu destination; it does not fetch or
    summarize live menu data. `web_search` is a nonfunctional scaffold and is
@@ -70,16 +71,21 @@ live in `chatbot-tools.services.js`.
 6. Official resources and facilities are separately retrieved with vector and
    full-text search, capped at three each. The complete catalogs are not sent to
    the model on every request.
-7. Tool results are returned inside explicit untrusted-data delimiters. The model
-   may answer or request one additional tool. Router-selected hours and dining-menu
+7. Tool results are returned inside explicit untrusted-data delimiters. One failed
+   tool becomes an explicit empty result without cancelling other calls. The model
+   synthesizes from every successful result, or may request one remaining tool when
+   the initial plan used only one. Router-selected hours and dining-menu
    lookups mark themselves `direct` only when they completely answer the request;
    code then returns the authoritative backend response without another LLM call.
    Mixed requests use `compose`, preserving the result as evidence for synthesis.
+   A compose result forces the remaining tool slot to use a different registered
+   tool, so the router cannot silently drop the request's second part.
    Composed dining answers refer to the frontend's menu button; the backend strips
    any duplicate Markdown or raw menu URL from model prose before returning it.
-   Code enforces a hard maximum of two tool iterations. After a useful second tool,
-   one tools-disabled call may synthesize the final answer; invalid output, a tool
-   error, or no useful evidence ends in the honest HawkWall fallback.
+   Code enforces a hard maximum of two tool-calling rounds, not two individual calls.
+   Each round may contain as many calls as the question needs. After a useful second
+   round, one tools-disabled call may synthesize the final answer; invalid output, a tool
+   orchestration error, or no useful evidence ends in the honest HawkWall fallback.
 8. The final answer must return the tool-call and evidence IDs it actually used.
    The backend validates those IDs against executed tool results and requires at
    least one selected useful result before returning any prose. A selected empty
@@ -93,6 +99,8 @@ live in `chatbot-tools.services.js`.
    “has,” “does,” “provides,” or “offers” may use directly relevant evidence as
    a clearly labeled non-exhaustive example (for example, “One service…”); it
    must not present partial evidence as a complete list or invent other services.
+   Location answers must identify a supported building, room, address, or useful
+   relative location; merely saying that a place is on campus is not sufficient.
    When evidence supports only part of a request, give that useful part and state
    the unsupported remainder. Dates, deadlines, prices, eligibility, policy
    exceptions, safety, and current operating status require explicit premises.
