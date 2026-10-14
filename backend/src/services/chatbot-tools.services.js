@@ -94,7 +94,7 @@ const webSearchDefinition = {
   type: "function",
   function: {
     name: "web_search",
-    description: "Search approved ULM web domains and return excerpts with source URLs.",
+    description: "Search approved ULM web domains for current or changing campus information, including news, announcements, events, calendars, deadlines, personnel/contact details, policy or fee changes, schedules, service status, and current official pages. May be called alongside any other relevant tool; do not use it when a structured tool fully owns the requested fact.",
     strict: true,
     parameters: {
       type: "object",

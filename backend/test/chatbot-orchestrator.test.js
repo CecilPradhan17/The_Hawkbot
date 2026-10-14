@@ -90,6 +90,9 @@ test("the router can call a registered tool and return a grounded answer", async
   assert.equal(events[0].tokenUsage[0].stage, "router");
   assert.equal(events[0].tokenUsage[1].stage, "final_answer");
   assert.match(client.calls[0].messages[0].content, /Never answer that a place is located at itself/);
+  assert.match(client.calls[0].messages[0].content, /Tool selection is multi-select, not mutually exclusive/);
+  assert.match(client.calls[0].messages[0].content, /signals, not automatic triggers/);
+  assert.match(client.calls[0].messages[0].content, /web_search alongside either structured tool/);
 });
 
 test("a second tool request reaches the hard cap and forces the fallback", async () => {
@@ -131,6 +134,16 @@ test("disabled web search is never offered to the router", async () => {
     client, log: silentLog, deterministicHandlers: noDeterministicMatch, toolRegistry: [tool],
   });
   assert.deepEqual(client.calls[0].tools.map(item => item.function.name), ["rag_search"]);
+});
+
+test("enabled web search is offered alongside every other tool", () => {
+  assert.deepEqual(
+    createChatbotToolRegistry({ webSearchEnabled: true }).map(tool => tool.name),
+    ["rag_search", "facility_hours", "dining_menu", "web_search"],
+  );
+  const webTool = createChatbotToolRegistry({ webSearchEnabled: true })
+    .find(tool => tool.name === "web_search");
+  assert.match(webTool.definition.function.description, /May be called alongside any other relevant tool/);
 });
 
 test("a tool error degrades to the fallback instead of throwing", async () => {

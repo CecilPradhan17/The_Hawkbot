@@ -57,6 +57,14 @@ live in `chatbot-tools.services.js`.
    the backend-owned official Schulze menu destination; it does not fetch or
    summarize live menu data. `web_search` is a nonfunctional scaffold and is
    omitted unless `WEB_SEARCH_ENABLED=true`.
+   Tool selection is independent and multi-select rather than a routing fork. The
+   planner may choose any relevant combination in one round and must not call every
+   tool by default. When enabled, `web_search` is intended for volatile or explicitly
+   current ULM news, announcements, events, calendars, deadlines, directories,
+   policies, fees, availability, schedules, service status, and official pages.
+   Freshness wording is a signal rather than an automatic trigger, and structured
+   hours/menu tools retain ownership of their facts. `rag_search` may accompany web
+   or structured tools whenever approved or community evidence adds useful context.
 4. `rag_search` preserves the existing alias expansion, query embedding, and
    unified retrieval. `unified-retrieval.services.js` starts three bounded
    branches in parallel: approved knowledge/HawkWall evidence, curated official

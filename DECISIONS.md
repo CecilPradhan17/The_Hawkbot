@@ -84,6 +84,12 @@ HawkWall citation display text is normalized at the backend boundary so stored H
 entities cannot leak into plain-text React rendering. Location synthesis explicitly
 rejects circular facility-at-itself wording and prefers a grounded room, address, or
 landmark relationship when one is available.
+Tool planning is explicitly multi-select: RAG, structured hours, dining, and future
+web search are peers that may run in any needed combination within one round. The
+planner uses volatility and user intent—not keywords alone—to decide whether web
+evidence is useful, while avoiding indiscriminate calls. Web selection neither blocks
+nor requires a preliminary RAG call; both may be selected together when official and
+community evidence can contribute.
 
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic
