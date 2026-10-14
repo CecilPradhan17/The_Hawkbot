@@ -13,6 +13,7 @@ import {
 } from "./campus-place-alias.services.js";
 import { getFacilityDictionary } from "./hours-repository.services.js";
 import { resolveHoursToolLookup } from "./hours-chat.services.js";
+import { diningMenuLinkResponse } from "./dining-menu-link.services.js";
 
 const ragSearchDefinition = {
   type: "function",
@@ -63,6 +64,27 @@ const facilityHoursDefinition = {
         },
       },
       required: ["facilityName", "intent", "day", "specialEvent", "answerMode"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const diningMenuDefinition = {
+  type: "function",
+  function: {
+    name: "dining_menu",
+    description: "Return Hawkbot's fixed official Schulze Dining Hall menu destination without fetching or summarizing live menu data.",
+    strict: true,
+    parameters: {
+      type: "object",
+      properties: {
+        answerMode: {
+          type: "string",
+          enum: ["direct", "compose"],
+          description: "Use direct only when the menu destination completely answers the request; use compose when another part also needs an answer.",
+        },
+      },
+      required: ["answerMode"],
       additionalProperties: false,
     },
   },
@@ -183,6 +205,26 @@ const createFacilityHoursTool = dependencies => ({
   },
 });
 
+const createDiningMenuTool = () => ({
+  name: "dining_menu",
+  definition: diningMenuDefinition,
+  async execute({ answerMode }) {
+    const answer = diningMenuLinkResponse();
+    return {
+      useful: true,
+      modelOutput: {
+        found: true,
+        authoritativeMenuResult: answer.response,
+        officialMenuUrl: answer.sources[0].url,
+        answerMode,
+      },
+      evidence: { diningMenu: answer },
+      directResponse: answer,
+      buildSources: () => answer.sources,
+    };
+  },
+});
+
 const createWebSearchTool = () => ({
   name: "web_search",
   definition: webSearchDefinition,
@@ -194,7 +236,11 @@ const createWebSearchTool = () => ({
 });
 
 export const createChatbotToolRegistry = (dependencies = {}) => {
-  const tools = [createRagSearchTool(dependencies), createFacilityHoursTool(dependencies)];
+  const tools = [
+    createRagSearchTool(dependencies),
+    createFacilityHoursTool(dependencies),
+    createDiningMenuTool(),
+  ];
   const webSearchEnabled = dependencies.webSearchEnabled
     ?? String(process.env.WEB_SEARCH_ENABLED || "false").toLowerCase() === "true";
   if (webSearchEnabled) tools.push(createWebSearchTool());

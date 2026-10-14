@@ -112,7 +112,7 @@ test("a second tool request reaches the hard cap and forces the fallback", async
 test("disabled web search is never offered to the router", async () => {
   assert.deepEqual(
     createChatbotToolRegistry({ webSearchEnabled: false }).map(tool => tool.name),
-    ["rag_search", "facility_hours"],
+    ["rag_search", "facility_hours", "dining_menu"],
   );
   const client = mockClient([
     response({ toolCall: { id: "call-rag", name: "rag_search", arguments: { query: "unknown" } } }),
@@ -250,4 +250,141 @@ test("a mixed hours request cannot return direct and composes with another tool 
     /directModeRejected/,
   );
   assert.equal("tools" in client.calls[2], false);
+});
+
+test("a router-selected standalone dining menu result returns the fixed response directly", async () => {
+  const client = mockClient([
+    response({ toolCall: {
+      id: "call-menu",
+      name: "dining_menu",
+      arguments: { answerMode: "direct" },
+    } }),
+  ]);
+  const menuTool = createChatbotToolRegistry({ webSearchEnabled: false })
+    .find(tool => tool.name === "dining_menu");
+
+  const result = await orchestrateChatQuery("What is Schulze serving?", {
+    client,
+    log: silentLog,
+    deterministicHandlers: noDeterministicMatch,
+    toolRegistry: [menuTool],
+  });
+
+  assert.equal(result.sourceType, "dining_link");
+  assert.match(result.sources[0].url, /ulm\.mydininghub\.com\/en\/location\/schulze/);
+  assert.equal(client.calls.length, 1);
+});
+
+test("mixed Schulze hours and menu questions compose both authoritative tool results", async () => {
+  const client = mockClient([
+    response({ toolCall: {
+      id: "call-hours",
+      name: "facility_hours",
+      arguments: {
+        facilityName: "Schulze Dining Hall",
+        intent: "open_now",
+        day: "2026-10-14",
+        specialEvent: null,
+        answerMode: "compose",
+      },
+    } }),
+    response({ toolCall: {
+      id: "call-menu",
+      name: "dining_menu",
+      arguments: { answerMode: "compose" },
+    } }),
+    response({ content: {
+      answerable: true,
+      response: "Schulze is open until 8:00 PM tonight. Use the official menu link to see what is currently being served.",
+      usedToolCallIds: ["call-hours", "call-menu"],
+      relevantCandidateIds: [],
+      officialResourceIds: [],
+      structuredRelationshipIds: [],
+    } }),
+  ]);
+  const hoursTool = {
+    name: "facility_hours",
+    definition: { type: "function", function: { name: "facility_hours", parameters: { type: "object" } } },
+    execute: async () => ({
+      useful: true,
+      modelOutput: { found: true, authoritativeHoursResult: "Schulze is open until 8:00 PM tonight.", answerMode: "compose" },
+      evidence: { hours: { response: "Schulze is open until 8:00 PM tonight." } },
+      directResponse: { response: "Schulze is open until 8:00 PM tonight.", matched: true, sourceType: "hours" },
+      buildSources: () => [],
+    }),
+  };
+  const menuTool = createChatbotToolRegistry({ webSearchEnabled: false })
+    .find(tool => tool.name === "dining_menu");
+
+  const result = await orchestrateChatQuery("Is Schulze open tonight, and what are they serving?", {
+    client,
+    log: silentLog,
+    deterministicHandlers: noDeterministicMatch,
+    toolRegistry: [hoursTool, menuTool],
+  });
+
+  assert.match(result.response, /open until 8:00 PM/);
+  assert.equal(result.sourceType, "dining_link");
+  assert.match(result.sources[0].url, /ulm\.mydininghub\.com\/en\/location\/schulze/);
+  assert.equal(client.calls.length, 3);
+});
+
+test("an unavailable hours result does not discard useful service evidence", async () => {
+  for (const example of [
+    { question: "Is the library open today, and what services does it offer?", subject: "Library", id: 71 },
+    { question: "When does the SSC close, and what can it help me with?", subject: "SSC", id: 72 },
+  ]) {
+    const client = mockClient([
+      response({ toolCall: {
+        id: "call-hours",
+        name: "facility_hours",
+        arguments: {
+          facilityName: example.subject,
+          intent: "closing_time",
+          day: "2026-10-14",
+          specialEvent: null,
+          answerMode: "compose",
+        },
+      } }),
+      response({ toolCall: {
+        id: "call-rag",
+        name: "rag_search",
+        arguments: { query: `${example.subject} services` },
+      } }),
+      response({ content: {
+        answerable: true,
+        response: `I couldn't verify today's hours. ${example.subject} provides documented student services.`,
+        usedToolCallIds: ["call-hours", "call-rag"],
+        relevantCandidateIds: [example.id],
+        officialResourceIds: [],
+        structuredRelationshipIds: [],
+      } }),
+    ]);
+    const tools = [{
+      name: "facility_hours",
+      definition: { type: "function", function: { name: "facility_hours", parameters: { type: "object" } } },
+      execute: async () => ({ useful: false, modelOutput: { found: false } }),
+    }, {
+      name: "rag_search",
+      definition: { type: "function", function: { name: "rag_search", parameters: { type: "object" } } },
+      execute: async () => ({
+        useful: true,
+        modelOutput: { found: true, knowledge: [{ id: example.id, content: `${example.subject} provides documented student services.` }] },
+        evidence: { knowledge: [{ id: example.id, cleaned_content: `${example.subject} provides documented student services.` }] },
+        similarityScores: [0.88],
+        buildSources: () => [],
+      }),
+    }];
+
+    const result = await orchestrateChatQuery(example.question, {
+      client,
+      log: silentLog,
+      deterministicHandlers: noDeterministicMatch,
+      toolRegistry: tools,
+    });
+
+    assert.match(result.response, /couldn't verify today's hours/);
+    assert.deepEqual(result.knowledgeIds, [example.id]);
+    assert.equal(result.matched, true);
+  }
 });

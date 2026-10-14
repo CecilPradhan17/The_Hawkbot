@@ -52,8 +52,10 @@ live in `chatbot-tools.services.js`.
    router so a partial canned answer does not discard the rest of the request.
 3. On a miss, the configurable `ROUTER_MODEL` (default `gpt-4o-mini`) must choose
    one registered tool using OpenAI tool calling. The production registry offers
-   `rag_search` and `facility_hours`. `web_search` is a nonfunctional scaffold
-   and is omitted unless `WEB_SEARCH_ENABLED=true`.
+   `rag_search`, `facility_hours`, and `dining_menu`. The dining tool returns only
+   the backend-owned official Schulze menu destination; it does not fetch or
+   summarize live menu data. `web_search` is a nonfunctional scaffold and is
+   omitted unless `WEB_SEARCH_ENABLED=true`.
 4. `rag_search` preserves the existing alias expansion, query embedding, and
    unified retrieval. `unified-retrieval.services.js` starts three bounded
    branches in parallel: approved knowledge/HawkWall evidence, curated official
@@ -69,16 +71,18 @@ live in `chatbot-tools.services.js`.
    full-text search, capped at three each. The complete catalogs are not sent to
    the model on every request.
 7. Tool results are returned inside explicit untrusted-data delimiters. The model
-   may answer or request one additional tool. A router-selected hours lookup marks
-   itself `direct` only when it completely answers the request; code then returns
-   the authoritative formatted hours response without another LLM call. Mixed
-   requests use `compose`, preserving the hours result as evidence for synthesis.
+   may answer or request one additional tool. Router-selected hours and dining-menu
+   lookups mark themselves `direct` only when they completely answer the request;
+   code then returns the authoritative backend response without another LLM call.
+   Mixed requests use `compose`, preserving the result as evidence for synthesis.
    Code enforces a hard maximum of two tool iterations. After a useful second tool,
    one tools-disabled call may synthesize the final answer; invalid output, a tool
    error, or no useful evidence ends in the honest HawkWall fallback.
 8. The final answer must return the tool-call and evidence IDs it actually used.
-   The backend validates those IDs against executed, useful tool results before
-   returning any prose. Grounding permits conclusions explicitly stated by or
+   The backend validates those IDs against executed tool results and requires at
+   least one selected useful result before returning any prose. A selected empty
+   result may support an explicit inability-to-verify statement, but never a campus
+   fact. Grounding permits conclusions explicitly stated by or
    reasonably entailed from selected evidence, including combining compatible
    facts and backend-supplied trusted relationships. Every material campus-specific
    premise must still be supplied; the model may not fill gaps from pretrained

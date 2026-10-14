@@ -60,6 +60,13 @@ and code rejects direct mode for clearly multi-part wording. Compose mode may us
 tool slots, followed by one tools-disabled synthesis call; the two-tool cap therefore
 limits retrieval without preventing a final combined answer.
 
+**Follow-up — 2026-10-14:** The fixed Schulze menu-link response now uses the same
+`direct`/`compose` contract. A standalone menu request can return it unchanged, while
+a mixed request can combine the backend-owned official link with structured hours or
+other grounded evidence. Final validation accepts selected unsuccessful calls only to
+explain an explicitly unavailable portion; at least one selected tool must still be
+useful, and all factual evidence IDs remain backend-validated.
+
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic
 termination, evidence-ID validation, and graceful degradation.
