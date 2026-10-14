@@ -66,6 +66,8 @@ a mixed request can combine the backend-owned official link with structured hour
 other grounded evidence. Final validation accepts selected unsuccessful calls only to
 explain an explicitly unavailable portion; at least one selected tool must still be
 useful, and all factual evidence IDs remain backend-validated.
+The UI owns link rendering: composed prose refers to the menu button, and the backend
+removes a duplicate Markdown or raw menu URL if the model emits one anyway.
 
 **Resume/interview angle:** Refactored a grounded RAG assistant into an extensible,
 observable tool-calling cascade with defense against prompt injection, deterministic

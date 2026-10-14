@@ -75,6 +75,8 @@ live in `chatbot-tools.services.js`.
    lookups mark themselves `direct` only when they completely answer the request;
    code then returns the authoritative backend response without another LLM call.
    Mixed requests use `compose`, preserving the result as evidence for synthesis.
+   Composed dining answers refer to the frontend's menu button; the backend strips
+   any duplicate Markdown or raw menu URL from model prose before returning it.
    Code enforces a hard maximum of two tool iterations. After a useful second tool,
    one tools-disabled call may synthesize the final answer; invalid output, a tool
    error, or no useful evidence ends in the honest HawkWall fallback.

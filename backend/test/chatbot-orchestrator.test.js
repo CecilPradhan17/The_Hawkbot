@@ -295,7 +295,7 @@ test("mixed Schulze hours and menu questions compose both authoritative tool res
     } }),
     response({ content: {
       answerable: true,
-      response: "Schulze is open until 8:00 PM tonight. Use the official menu link to see what is currently being served.",
+      response: "Schulze is open until 8:00 PM tonight. You can view the current menu [here](https://ulm.mydininghub.com/en/location/schulze).",
       usedToolCallIds: ["call-hours", "call-menu"],
       relevantCandidateIds: [],
       officialResourceIds: [],
@@ -324,6 +324,8 @@ test("mixed Schulze hours and menu questions compose both authoritative tool res
   });
 
   assert.match(result.response, /open until 8:00 PM/);
+  assert.match(result.response, /button below/);
+  assert.doesNotMatch(result.response, /\[here\]|https:\/\//);
   assert.equal(result.sourceType, "dining_link");
   assert.match(result.sources[0].url, /ulm\.mydininghub\.com\/en\/location\/schulze/);
   assert.equal(client.calls.length, 3);
