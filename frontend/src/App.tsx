@@ -9,8 +9,6 @@ import Landing from '@/pages/Landing'
 import HoursAdmin from '@/pages/HoursAdmin'
 import KnowledgeAdmin from '@/pages/KnowledgeAdmin'
 import HawkWallSource from '@/pages/HawkWallSource'
-import { ServerWakeProvider, useServerWake } from '@/context/ServerWakeContext'
-import ServerWakeModal from '@/components/ServerWakeModal'
 import PwaUpdatePrompt from '@/components/PwaUpdatePrompt'
 import { Analytics } from '@vercel/analytics/react'
 import { HawkwallFeedProvider } from '@/context/HawkwallFeedContext'
@@ -57,7 +55,6 @@ function AdminOnlyRoute({ children }: { children: ReactNode }) {
 }
 
 function AppInner() {
-  const { isWaking } = useServerWake()
   const { userId } = useAuth()
 
   return (
@@ -78,7 +75,6 @@ function AppInner() {
         </Routes>
       </HawkwallFeedProvider>
 
-      <ServerWakeModal isWaking={isWaking} />
       <PwaUpdatePrompt />
     </>
   )
@@ -86,9 +82,9 @@ function AppInner() {
 
 export default function App() {
   return (
-    <ServerWakeProvider>
+    <>
       <AppInner />
       <Analytics />
-    </ServerWakeProvider>
+    </>
   )
 }

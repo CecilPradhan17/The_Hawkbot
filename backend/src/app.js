@@ -34,7 +34,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. Render health checks, mobile apps)
+      // Allow requests with no origin (e.g. mobile apps and other non-browser clients)
       if (!origin) return callback(null, true)
       if (allowedOrigins.includes(origin)) return callback(null, true)
       callback(new Error(`CORS blocked: ${origin}`))
@@ -44,7 +44,6 @@ app.use(
 );
 
 app.use(express.json());
-app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }))
 app.use("/api", routes);
 app.use(errorHandler);
 
