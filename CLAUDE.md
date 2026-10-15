@@ -71,6 +71,10 @@ live in `chatbot-tools.services.js`.
    `WEB_SEARCH_ENABLED=true`; `WEB_SEARCH_MODEL` and the comma-separated
    `WEB_SEARCH_ALLOWED_DOMAINS` are optional server-side overrides. Returned URLs are
    validated against the allowlist before becoming evidence or user-visible sources.
+   Only URLs cited in the search model's evidence report are displayed; merely
+   consulted results are excluded. Academic calendar/deadline queries use medium
+   search context and retry once with an explicit instruction to inspect and cite the
+   current official calendar PDF when the first search stops at a landing page.
 4. `rag_search` preserves the existing alias expansion, query embedding, and
    unified retrieval. `unified-retrieval.services.js` starts three bounded
    branches in parallel: approved knowledge/HawkWall evidence, curated official

@@ -160,6 +160,7 @@ test("web search uses the Responses API with approved domains and cited sources"
               type: "search",
               sources: [
                 { type: "url", url: "https://www.ulm.edu/registrar/registration.html" },
+                { type: "url", url: "https://www.ulm.edu/financialaid/" },
                 { type: "url", url: "https://example.com/not-approved" },
               ],
             },
@@ -203,6 +204,61 @@ test("web search uses the Responses API with approved domains and cited sources"
     title: "Registration information",
     url: "https://www.ulm.edu/registrar/registration.html",
   }]);
+});
+
+test("academic deadline search retries for and cites the official PDF", async () => {
+  const calls = [];
+  const responseWithCitation = ({ report, title, url, usage }) => ({
+    output_text: `FOUND: ${report}`,
+    output: [{
+      type: "message",
+      content: [{
+        type: "output_text",
+        text: `FOUND: ${report}`,
+        annotations: [{ type: "url_citation", title, url, start_index: 0, end_index: report.length }],
+      }],
+    }],
+    usage,
+  });
+  const responses = [
+    responseWithCitation({
+      report: "The Academic Affairs page links current academic calendars.",
+      title: "Academic Calendars",
+      url: "https://www.ulm.edu/academicaffairs/academiccalendar.html",
+      usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
+    }),
+    responseWithCitation({
+      report: "For Fall 2026 full-term courses, the final drop date is October 26, 2026.",
+      title: "2026-2027 Academic Calendar",
+      url: "https://www.ulm.edu/academicaffairs/documents/26-27-academic-calendar.pdf",
+      usage: { input_tokens: 140, output_tokens: 30, total_tokens: 170 },
+    }),
+  ];
+  const webSearchClient = {
+    responses: { create: async request => {
+      calls.push(request);
+      return responses.shift();
+    } },
+  };
+  const webTool = createChatbotToolRegistry({
+    webSearchEnabled: true,
+    webSearchClient,
+    webSearchDomains: ["ulm.edu"],
+  }).find(tool => tool.name === "web_search");
+
+  const result = await webTool.execute({ query: "When is the drop date for classes?" });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].tools[0].search_context_size, "medium");
+  assert.match(calls[1].input, /inspect the relevant current official ULM academic-calendar PDF/);
+  assert.equal(result.modelOutput.evidenceReport,
+    "For Fall 2026 full-term courses, the final drop date is October 26, 2026.");
+  assert.deepEqual(result.buildSources(), [{
+    type: "official_web",
+    title: "2026-2027 Academic Calendar",
+    url: "https://www.ulm.edu/academicaffairs/documents/26-27-academic-calendar.pdf",
+  }]);
+  assert.deepEqual(result.usage, { input_tokens: 240, output_tokens: 50, total_tokens: 290 });
 });
 
 test("a cited web result can ground an answer without database evidence IDs", async () => {

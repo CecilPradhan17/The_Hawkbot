@@ -563,3 +563,28 @@ fresh, cited official evidence without scraping pages or expanding its answer do
 **Resume/interview angle:** Added controlled live web grounding to a multi-tool campus
 assistant with model-based invocation, hard source boundaries, citation validation,
 partial-failure isolation, and composable evidence synthesis.
+
+## 2026-10-15 — Follow official calendar searches into cited PDFs
+
+**Context:** A general academic-calendar search can return the Academic Affairs landing
+page and adjacent office pages while an exact deadline lives in a linked PDF. Returning
+all consulted search results also makes unrelated pages look like supporting citations.
+
+**Decision:** Treat academic add/drop, withdrawal, registration, payment, and exam-date
+questions as document-oriented searches. Use medium search context, instruct the search
+model to inspect the current official calendar document and distinguish academic
+sessions, and retry once with a PDF-specific query when the initial cited sources do not
+include a PDF. Display only URL citations attached to the evidence report, never the
+complete set of pages the search engine consulted. If the question omits a term, use
+the campus date only to select the unambiguous current term and label that assumption;
+never silently reuse an expired HawkWall semester date.
+
+**Alternatives considered:** Permanently ingesting calendar PDFs into RAG would make
+retrieval predictable but risks serving an outdated revision and duplicates a live
+official source. A dedicated calendar schema would be strongest for deterministic date
+logic but requires an administrative publication pipeline comparable to facility hours.
+
+**Trade-offs:** A document-oriented question may incur a second search call and extra
+latency. The retry is isolated, so its failure retains the first cited result. In
+exchange, exact deadline answers can cite the authoritative document itself and the UI
+does not present tangential search results as evidence.
