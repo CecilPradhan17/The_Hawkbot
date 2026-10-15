@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { Fragment, useState, useRef, useEffect, type ReactNode } from 'react'
 import {
   reportOutdatedKnowledge,
   sendChatMessage,
@@ -125,6 +125,65 @@ function saveChatSession(
   }
 }
 
+function renderInlineBotMarkdown(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*\n]+\*\*)/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>
+    }
+    return <Fragment key={index}>{part}</Fragment>
+  })
+}
+
+function FormattedBotText({ content }: { content: string }) {
+  const lines = content.split('\n')
+  const blocks: ReactNode[] = []
+
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index]
+    if (!line.trim()) {
+      index += 1
+      continue
+    }
+
+    const unorderedMatch = line.match(/^\s*[-*]\s+(.+)$/)
+    const orderedMatch = line.match(/^\s*\d+[.)]\s+(.+)$/)
+    if (unorderedMatch || orderedMatch) {
+      const ordered = Boolean(orderedMatch)
+      const items: string[] = []
+      while (index < lines.length) {
+        const match = ordered
+          ? lines[index].match(/^\s*\d+[.)]\s+(.+)$/)
+          : lines[index].match(/^\s*[-*]\s+(.+)$/)
+        if (!match) break
+        items.push(match[1])
+        index += 1
+      }
+      const List = ordered ? 'ol' : 'ul'
+      blocks.push(
+        <List
+          key={`list-${index}`}
+          className={`ml-5 space-y-1 ${ordered ? 'list-decimal' : 'list-disc'}`}
+        >
+          {items.map((item, itemIndex) => (
+            <li key={itemIndex}>{renderInlineBotMarkdown(item)}</li>
+          ))}
+        </List>,
+      )
+      continue
+    }
+
+    const headingMatch = line.match(/^\s*#{1,6}\s+(.+)$/)
+    blocks.push(
+      <p key={`line-${index}`} className={headingMatch ? 'font-semibold' : undefined}>
+        {renderInlineBotMarkdown(headingMatch?.[1] ?? line)}
+      </p>,
+    )
+    index += 1
+  }
+
+  return <div className="space-y-2">{blocks}</div>
+}
+
 function BotMessageContent({ content, sources = [] }: { content: string; sources?: ChatSource[] }) {
   const diningMenuSource = sources.find(source => {
     try {
@@ -138,7 +197,7 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
   if (diningMenuSource) {
     return (
       <div>
-        <p>{content}</p>
+        <FormattedBotText content={content} />
         <a
           href={diningMenuSource.url}
           target="_blank"
@@ -155,7 +214,7 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
   if (sources.length) {
     return (
       <>
-        {content}
+        <FormattedBotText content={content} />
         <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-2 text-xs text-slate-500">
           <span>Sources:</span>
           {sources.map(source => source.type === 'hawkwall' ? (
@@ -198,14 +257,14 @@ function BotMessageContent({ content, sources = [] }: { content: string; sources
   }
   const marker = '\n\nSource:'
   const sourceIndex = content.lastIndexOf(marker)
-  if (sourceIndex === -1) return <>{content}</>
+  if (sourceIndex === -1) return <FormattedBotText content={content} />
 
   const source = content.slice(sourceIndex + marker.length).trim()
   const sourceIsUrl = /^https:\/\/[^\s]+$/.test(source)
 
   return (
     <>
-      {content.slice(0, sourceIndex)}
+      <FormattedBotText content={content.slice(0, sourceIndex)} />
       <p className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-500">
         Source:{' '}
         {sourceIsUrl ? (
