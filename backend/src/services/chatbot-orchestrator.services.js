@@ -126,6 +126,7 @@ const validateFinalAnswer = (parsed, executedResults) => {
   const allowedRelationshipIds = new Set();
   let selectedHours = false;
   let selectedDiningMenu = false;
+  let selectedWebSearch = false;
   for (const callId of usedToolCallIds) {
     const executed = resultByCallId.get(callId);
     for (const candidate of executed.result.evidence?.knowledge || []) allowedKnowledgeIds.add(Number(candidate.id));
@@ -137,6 +138,7 @@ const validateFinalAnswer = (parsed, executedResults) => {
     }
     if (executed.result.evidence?.hours) selectedHours = true;
     if (executed.result.evidence?.diningMenu) selectedDiningMenu = true;
+    if (executed.result.evidence?.web) selectedWebSearch = true;
   }
 
   const knowledgeIds = unique((parsed.relevantCandidateIds || []).map(Number));
@@ -145,7 +147,7 @@ const validateFinalAnswer = (parsed, executedResults) => {
   if (!knowledgeIds.every(id => Number.isInteger(id) && allowedKnowledgeIds.has(id))) return null;
   if (!resourceIds.every(id => Number.isInteger(id) && allowedResourceIds.has(id))) return null;
   if (!relationshipIds.every(id => allowedRelationshipIds.has(id))) return null;
-  if (!selectedHours && !selectedDiningMenu
+  if (!selectedHours && !selectedDiningMenu && !selectedWebSearch
     && knowledgeIds.length === 0 && resourceIds.length === 0 && relationshipIds.length === 0) return null;
 
   return {
@@ -180,6 +182,10 @@ const buildResult = (validated, executedResults) => {
   const similarity = similarityScores.length ? Math.max(...similarityScores).toFixed(4) : null;
   const usedHours = selectedCalls.some(item => item.result.evidence?.hours);
   const usedDiningMenu = selectedCalls.some(item => item.result.evidence?.diningMenu);
+  const usedWebSearch = selectedCalls.some(item => item.result.evidence?.web);
+  const usedRag = validated.knowledgeIds.length > 0
+    || validated.resourceIds.length > 0
+    || validated.relationshipIds.length > 0;
   return {
     response: usedDiningMenu
       ? removeDuplicateDiningLinks(validated.response, sources)
@@ -187,8 +193,10 @@ const buildResult = (validated, executedResults) => {
     matched: true,
     ...(similarity ? { similarity } : {}),
     sourceType: usedDiningMenu ? "dining_link"
-      : usedHours && validated.knowledgeIds.length === 0 && validated.resourceIds.length === 0
+      : usedHours && !usedRag && !usedWebSearch
       ? "hours"
+      : usedWebSearch && (usedHours || usedRag) ? "unified"
+      : usedWebSearch ? "web"
       : validated.resourceIds.length > 0 ? "unified" : "rag",
     action: "answer",
     clarification: null,
@@ -257,6 +265,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
   }
   stageLatencyMs.deterministic = Number(elapsedMs(deterministicStartedAt).toFixed(2));
 
+  const client = options.client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const registry = options.toolRegistry || createChatbotToolRegistry({
     database,
     facilityDictionary,
@@ -264,9 +273,11 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
     retrieveEvidence: options.retrieveEvidence,
     hoursResolver: options.hoursResolver,
     webSearchEnabled: options.webSearchEnabled,
+    webSearchClient: options.webSearchClient || client,
+    webSearchDomains: options.webSearchDomains,
+    webSearchModel: options.webSearchModel,
   });
   const toolByName = new Map(registry.map(tool => [tool.name, tool]));
-  const client = options.client || new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const context = options.context || { recentTurns: [] };
   const messages = [
     {
@@ -339,6 +350,9 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
           useful: Boolean(toolResult.useful),
           ...(toolResult.modelOutput?.status === "tool_error" ? { error: true } : {}),
         });
+        if (toolResult.usage) {
+          tokenUsage.push({ stage: tool.name, ...usageSummary(toolResult.usage) });
+        }
         const supportsAnswerMode = tool.name === "facility_hours" || tool.name === "dining_menu";
         if (supportsAnswerMode && args.answerMode === "direct" && isMixedRequest(userMessage)) {
           toolResult.modelOutput.answerMode = "compose";

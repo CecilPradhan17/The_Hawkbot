@@ -533,3 +533,33 @@ have one owner, and the retired rows remain recoverable for audit purposes.
 **Resume/interview angle:** Migrated an unsourced RAG seed corpus into a provenance-aware,
 auditable knowledge catalog, separating stable institutional facts from structured live
 data and preventing fabricated or invalid citations.
+
+## 2026-10-15 — Live official-domain web search as composable evidence
+
+**Context:** Hawkbot needs current ULM announcements, deadlines, personnel details,
+athletics information, and other volatile facts that are not appropriate for its
+reviewed RAG corpus. Web retrieval must compose with hours, dining, and HawkWall
+evidence rather than becoming a separate answer path.
+
+**Decision:** Implement `web_search` with OpenAI's hosted Responses API search. The
+existing router decides when it is useful and may select it alongside any other tool.
+The executor performs a live search only when called, limits retrieval to a
+backend-owned ULM domain allowlist, returns a bounded evidence report, validates every
+source URL again locally, and exposes only API-returned citations to the final grounded
+answer. The outer tool-call ID is the selectable grounding reference because web
+evidence has no database row IDs.
+
+**Alternatives considered:** Anthropic hosted search has the same base per-search fee
+but adds another provider and response format. Raw Brave, Exa, or Tavily results can be
+cheaper but require Hawkbot to own more extraction and citation logic. A periodically
+crawled ULM index reduces repeated search costs but is not necessary at expected volume
+and is less current than an on-demand search.
+
+**Trade-offs:** A selected search adds a hosted tool fee, model tokens, and network
+latency. Search availability can degrade independently, so failures remain empty tool
+results and do not discard useful output from other tools. In exchange, Hawkbot gets
+fresh, cited official evidence without scraping pages or expanding its answer domain.
+
+**Resume/interview angle:** Added controlled live web grounding to a multi-tool campus
+assistant with model-based invocation, hard source boundaries, citation validation,
+partial-failure isolation, and composable evidence synthesis.

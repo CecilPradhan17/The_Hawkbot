@@ -52,11 +52,11 @@ live in `chatbot-tools.services.js`.
    router so a partial canned answer does not discard the rest of the request.
 3. On a miss, the configurable `ROUTER_MODEL` (default `gpt-4o-mini`) must choose
    every needed registered tool. A multi-part request can select all needed tools
-   in the first OpenAI tool-calling response. The registry offers
+   in the first OpenAI tool-calling response. The registry always offers
    `rag_search`, `facility_hours`, and `dining_menu`. The dining tool returns only
    the backend-owned official Schulze menu destination; it does not fetch or
-   summarize live menu data. `web_search` is a nonfunctional scaffold and is
-   omitted unless `WEB_SEARCH_ENABLED=true`.
+   summarize live menu data. Live `web_search` is additionally registered only
+   when `WEB_SEARCH_ENABLED=true`.
    Tool selection is independent and multi-select rather than a routing fork. The
    planner may choose any relevant combination in one round and must not call every
    tool by default. When enabled, `web_search` is intended for volatile or explicitly
@@ -65,6 +65,12 @@ live in `chatbot-tools.services.js`.
    Freshness wording is a signal rather than an automatic trigger, and structured
    hours/menu tools retain ownership of their facts. `rag_search` may accompany web
    or structured tools whenever approved or community evidence adds useful context.
+   The web executor uses OpenAI Responses API live search with a backend-owned domain
+   allowlist (`ulm.edu` and `ulmwarhawks.com` by default), a bounded evidence report,
+   a 15-second timeout, and API-returned citations. It is enabled with
+   `WEB_SEARCH_ENABLED=true`; `WEB_SEARCH_MODEL` and the comma-separated
+   `WEB_SEARCH_ALLOWED_DOMAINS` are optional server-side overrides. Returned URLs are
+   validated against the allowlist before becoming evidence or user-visible sources.
 4. `rag_search` preserves the existing alias expansion, query embedding, and
    unified retrieval. `unified-retrieval.services.js` starts three bounded
    branches in parallel: approved knowledge/HawkWall evidence, curated official

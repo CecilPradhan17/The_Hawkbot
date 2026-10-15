@@ -146,6 +146,97 @@ test("enabled web search is offered alongside every other tool", () => {
   assert.match(webTool.definition.function.description, /May be called alongside any other relevant tool/);
 });
 
+test("web search uses the Responses API with approved domains and cited sources", async () => {
+  const calls = [];
+  const webSearchClient = {
+    responses: { create: async request => {
+      calls.push(request);
+      return {
+        output_text: "FOUND: ULM announced that registration opens Monday.",
+        output: [
+          {
+            type: "web_search_call",
+            action: {
+              type: "search",
+              sources: [
+                { type: "url", url: "https://www.ulm.edu/registrar/registration.html" },
+                { type: "url", url: "https://example.com/not-approved" },
+              ],
+            },
+          },
+          {
+            type: "message",
+            content: [{
+              type: "output_text",
+              text: "FOUND: ULM announced that registration opens Monday.",
+              annotations: [{
+                type: "url_citation",
+                title: "Registration information",
+                url: "https://www.ulm.edu/registrar/registration.html",
+                start_index: 0,
+                end_index: 46,
+              }],
+            }],
+          },
+        ],
+        usage: { input_tokens: 120, output_tokens: 20, total_tokens: 140 },
+      };
+    } },
+  };
+  const webTool = createChatbotToolRegistry({
+    webSearchEnabled: true,
+    webSearchClient,
+    webSearchDomains: ["ulm.edu"],
+    webSearchModel: "test-search-model",
+  }).find(tool => tool.name === "web_search");
+
+  const result = await webTool.execute({ query: "When does registration open?" });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].model, "test-search-model");
+  assert.equal(calls[0].tool_choice, "required");
+  assert.deepEqual(calls[0].tools[0].filters.allowed_domains, ["ulm.edu"]);
+  assert.equal(result.useful, true);
+  assert.equal(result.modelOutput.evidenceReport, "ULM announced that registration opens Monday.");
+  assert.deepEqual(result.buildSources(), [{
+    type: "official_web",
+    title: "Registration information",
+    url: "https://www.ulm.edu/registrar/registration.html",
+  }]);
+});
+
+test("a cited web result can ground an answer without database evidence IDs", async () => {
+  const client = mockClient([
+    response({ toolCall: { id: "call-web", name: "web_search", arguments: { query: "latest ULM announcement" } } }),
+    response({ content: {
+      answerable: true,
+      response: "ULM posted a current campus announcement.",
+      usedToolCallIds: ["call-web"],
+      relevantCandidateIds: [],
+      officialResourceIds: [],
+      structuredRelationshipIds: [],
+    } }),
+  ]);
+  const source = { type: "official_web", title: "ULM announcement", url: "https://www.ulm.edu/news/" };
+  const tool = {
+    name: "web_search",
+    definition: { type: "function", function: { name: "web_search", parameters: { type: "object" } } },
+    execute: async () => ({
+      useful: true,
+      modelOutput: { found: true, evidenceReport: "ULM posted a current campus announcement." },
+      evidence: { web: { report: "ULM posted a current campus announcement.", sources: [source] } },
+      buildSources: () => [source],
+    }),
+  };
+
+  const result = await orchestrateChatQuery("What is the latest ULM announcement?", {
+    client, log: silentLog, deterministicHandlers: noDeterministicMatch, toolRegistry: [tool],
+  });
+
+  assert.equal(result.sourceType, "web");
+  assert.deepEqual(result.sources, [source]);
+});
+
 test("a tool error degrades to the fallback instead of throwing", async () => {
   const originalError = console.error;
   console.error = () => {};
