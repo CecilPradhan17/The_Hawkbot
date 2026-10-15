@@ -56,7 +56,7 @@ live in `chatbot-tools.services.js`.
    `rag_search`, `facility_hours`, and `dining_menu`. The dining tool returns only
    the backend-owned official Schulze menu destination; it does not fetch or
    summarize live menu data. Live `web_search` is additionally registered only
-   when `WEB_SEARCH_ENABLED=true`.
+   unless `WEB_SEARCH_ENABLED=false` explicitly disables it.
    Tool selection is independent and multi-select rather than a routing fork. The
    planner may choose any relevant combination in one round and must not call every
    tool by default. When enabled, `web_search` is intended for volatile or explicitly
@@ -67,8 +67,10 @@ live in `chatbot-tools.services.js`.
    or structured tools whenever approved or community evidence adds useful context.
    The web executor uses OpenAI Responses API live search with a backend-owned domain
    allowlist (`ulm.edu` and `ulmwarhawks.com` by default), a bounded evidence report,
-   a 15-second timeout, and API-returned citations. It is enabled with
-   `WEB_SEARCH_ENABLED=true`; `WEB_SEARCH_MODEL` and the comma-separated
+   a 25-second per-search timeout, and API-returned citations. Its default search model is
+   `gpt-5.5` at low reasoning effort, which supports the required domain filters;
+   `WEB_SEARCH_MODEL`
+   and the comma-separated
    `WEB_SEARCH_ALLOWED_DOMAINS` are optional server-side overrides. Returned URLs are
    validated against the allowlist before becoming evidence or user-visible sources.
    Only URLs cited in the search model's evidence report are displayed; merely

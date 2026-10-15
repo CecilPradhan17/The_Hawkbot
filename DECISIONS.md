@@ -588,3 +588,25 @@ logic but requires an administrative publication pipeline comparable to facility
 latency. The retry is isolated, so its failure retains the first cited result. In
 exchange, exact deadline answers can cite the authoritative document itself and the UI
 does not present tangential search results as evidence.
+
+## 2026-10-15 — Enable the selected web provider with a filter-compatible model
+
+**Context:** The live web executor remained behind an opt-in flag after OpenAI was
+selected as Hawkbot's provider. When manually enabled, it inherited `gpt-4o-mini` from
+the router, but OpenAI's Responses API rejects domain filters for that model. Both
+conditions converted current-information questions into an empty tool result.
+
+**Decision:** Register `web_search` by default, with `WEB_SEARCH_ENABLED=false` as the
+explicit operational kill switch. Default web execution to `gpt-5.5` at low reasoning
+effort, independently of `ROUTER_MODEL`, because the live project API accepts the
+required hosted-search domain filters for that model. `WEB_SEARCH_MODEL` remains
+available for a reviewed replacement.
+
+**Alternatives considered:** Requiring a deployment flag is conservative but leaves a
+chosen product feature silently unavailable after ordinary deploys. Removing domain
+filters would let `gpt-4o-mini` run but would violate Hawkbot's official-source boundary.
+
+**Trade-offs:** Deployments begin incurring search charges whenever the planner selects
+the tool unless they explicitly opt out. Separating router and search models adds one
+configuration concept, but prevents a low-cost routing-model change from breaking or
+weakening web retrieval.

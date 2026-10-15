@@ -136,6 +136,13 @@ test("disabled web search is never offered to the router", async () => {
   assert.deepEqual(client.calls[0].tools.map(item => item.function.name), ["rag_search"]);
 });
 
+test("web search is registered by default after provider selection", () => {
+  assert.deepEqual(
+    createChatbotToolRegistry().map(tool => tool.name),
+    ["rag_search", "facility_hours", "dining_menu", "web_search"],
+  );
+});
+
 test("enabled web search is offered alongside every other tool", () => {
   assert.deepEqual(
     createChatbotToolRegistry({ webSearchEnabled: true }).map(tool => tool.name),
@@ -191,7 +198,7 @@ test("web search uses the Responses API with approved domains and cited sources"
     webSearchModel: "test-search-model",
   }).find(tool => tool.name === "web_search");
 
-  const result = await webTool.execute({ query: "When does registration open?" });
+  const result = await webTool.execute({ query: "What is the latest ULM announcement?" });
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].model, "test-search-model");
@@ -228,7 +235,7 @@ test("academic deadline search retries for and cites the official PDF", async ()
       usage: { input_tokens: 100, output_tokens: 20, total_tokens: 120 },
     }),
     responseWithCitation({
-      report: "For Fall 2026 full-term courses, the final drop date is October 26, 2026.",
+      report: "For Spring 2027 registration, use the [official calendar](https://www.ulm.edu/academicaffairs/documents/26-27-academic-calendar.pdf).",
       title: "2026-2027 Academic Calendar",
       url: "https://www.ulm.edu/academicaffairs/documents/26-27-academic-calendar.pdf",
       usage: { input_tokens: 140, output_tokens: 30, total_tokens: 170 },
@@ -246,13 +253,13 @@ test("academic deadline search retries for and cites the official PDF", async ()
     webSearchDomains: ["ulm.edu"],
   }).find(tool => tool.name === "web_search");
 
-  const result = await webTool.execute({ query: "When is the drop date for classes?" });
+  const result = await webTool.execute({ query: "When is registration for ULM Spring 2027 classes?" });
 
   assert.equal(calls.length, 2);
   assert.equal(calls[0].tools[0].search_context_size, "medium");
   assert.match(calls[1].input, /inspect the relevant current official ULM academic-calendar PDF/);
   assert.equal(result.modelOutput.evidenceReport,
-    "For Fall 2026 full-term courses, the final drop date is October 26, 2026.");
+    "For Spring 2027 registration, use the official calendar.");
   assert.deepEqual(result.buildSources(), [{
     type: "official_web",
     title: "2026-2027 Academic Calendar",
