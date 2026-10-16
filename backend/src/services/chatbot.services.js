@@ -25,6 +25,7 @@ import {
   sanitizeChatContext,
 } from "./chat-context.services.js";
 import { orchestrateChatQuery } from "./chatbot-orchestrator.services.js";
+import { recordChatbotTelemetry } from "./chatbot-telemetry.services.js";
 
 /**
  * Orchestrates deterministic structured answers before the existing RAG flow.
@@ -84,7 +85,7 @@ export const handleChatQuery = async (userMessage, dependencies = {}, rawContext
   // branch below remains temporarily for the established focused unit tests
   // and can be removed once those fixtures target the registry interface.
   if (Object.keys(dependencies).length === 0) {
-    return orchestrateChatQuery(userMessage, { context });
+    return orchestrateChatQuery(userMessage, { context, telemetryRecorder: recordChatbotTelemetry });
   }
   const smalltalkHandler = dependencies.smalltalkHandler || tryHandleSmalltalk;
   const diningMenuHandler = dependencies.diningMenuHandler || tryHandleDiningMenuLink;

@@ -133,8 +133,11 @@ live in `chatbot-tools.services.js`.
    entities, whitespace-normalized, and trimmed before being returned to the UI.
 9. One privacy-bounded structured log event is emitted per completed request with
    its route, deterministic matcher, ordered tools, loop depth, RAG similarities,
-   per-stage latency, total latency, and available token usage. Question text is
-   not logged.
+   per-stage latency, total latency, and available token usage. Production also
+   writes privacy-safe cost telemetry to `chatbot_request_logs`: a random request
+   ID, broad locally derived category, tool outcomes, models/tokens, hosted-search
+   call count, versioned estimated USD cost, and latency. Question text and user
+   identifiers are never persisted. Telemetry failure must never fail a chat reply.
 
 Approved knowledge retrieval remains the primary branch: its SQL errors propagate
 out of `unified-retrieval.services.js` rather than being converted into an empty

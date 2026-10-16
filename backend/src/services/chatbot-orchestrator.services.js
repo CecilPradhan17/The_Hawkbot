@@ -6,6 +6,7 @@ import { tryHandleHoursQuery } from "./hours-chat.services.js";
 import { getFacilityDictionary } from "./hours-repository.services.js";
 import { createChatbotToolRegistry } from "./chatbot-tools.services.js";
 import { CAMPUS_TIME_ZONE } from "./hours-validation.services.js";
+import { buildChatbotTelemetry } from "./chatbot-telemetry.services.js";
 import {
   RAG_FRESHNESS_INSTRUCTION,
   RAG_INFERENCE_INSTRUCTION,
@@ -212,6 +213,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
   const stageLatencyMs = { deterministic: 0, routerCalls: [], tools: [], finalAnswer: 0 };
   const tokenUsage = [];
   const toolsCalled = [];
+  const toolExecutions = [];
   let route = "router";
   let deterministicMatcher = null;
   let loopDepth = 0;
@@ -219,18 +221,34 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
   const executedResults = [];
   let capReached = false;
   let compositionPending = false;
+  let requestErrored = false;
   const log = options.log || (event => console.info(JSON.stringify(event)));
 
-  const emitLog = () => log({
-    event: "hawkbot_chat_request",
-    route,
-    deterministicMatcher,
-    toolsCalled,
-    loopDepth,
-    similarityScores: executedResults.flatMap(item => item.result.similarityScores || []),
-    latencyMs: { ...stageLatencyMs, total: Number(elapsedMs(totalStartedAt).toFixed(2)) },
-    tokenUsage,
-  });
+  const emitLog = () => {
+    const outcome = requestErrored ? "error"
+      : result.matched === false ? "fallback"
+      : toolExecutions.some(tool => !tool.useful) ? "partial"
+      : "answered";
+    const event = {
+      event: "hawkbot_chat_request",
+      route,
+      outcome,
+      deterministicMatcher,
+      toolsCalled,
+      toolExecutions,
+      loopDepth,
+      similarityScores: executedResults.flatMap(item => item.result.similarityScores || []),
+      latencyMs: { ...stageLatencyMs, total: Number(elapsedMs(totalStartedAt).toFixed(2)) },
+      tokenUsage,
+    };
+    log(event);
+    if (options.telemetryRecorder) {
+      const telemetry = buildChatbotTelemetry({ question: userMessage, event });
+      Promise.resolve(options.telemetryRecorder(telemetry)).catch(error => {
+        console.error("Chatbot telemetry persistence failed:", error.message);
+      });
+    }
+  };
 
   const database = options.database;
   let dictionaryPromise;
@@ -250,6 +268,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
       try {
         matched = await handler.run(userMessage);
       } catch (error) {
+        requestErrored = true;
         route = "deterministic";
         deterministicMatcher = handler.name;
         stageLatencyMs.deterministic = Number(elapsedMs(deterministicStartedAt).toFixed(2));
@@ -312,7 +331,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
       const toolCalls = message?.tool_calls || [];
       if (toolCalls.length === 0) {
         stageLatencyMs.finalAnswer = routerLatency;
-        tokenUsage.push({ stage: "final_answer", ...usageSummary(response.usage) });
+        tokenUsage.push({ stage: "final_answer", model: process.env.ROUTER_MODEL || "gpt-4o-mini", ...usageSummary(response.usage) });
         if (!message) break;
         let parsed;
         try {
@@ -326,7 +345,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
       }
 
       stageLatencyMs.routerCalls.push(routerLatency);
-      tokenUsage.push({ stage: loopDepth === 0 ? "router" : "router_followup", ...usageSummary(response.usage) });
+      tokenUsage.push({ stage: loopDepth === 0 ? "router" : "router_followup", model: process.env.ROUTER_MODEL || "gpt-4o-mini", ...usageSummary(response.usage) });
       loopDepth += 1;
       messages.push(message);
       let directResult = null;
@@ -352,8 +371,18 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
           useful: Boolean(toolResult.useful),
           ...(toolResult.modelOutput?.status === "tool_error" ? { error: true } : {}),
         });
+        toolExecutions.push({
+          name: tool.name,
+          useful: Boolean(toolResult.useful),
+          error: toolResult.modelOutput?.status === "tool_error",
+          webSearchCalls: Number(toolResult.billing?.webSearchCalls) || 0,
+        });
         if (toolResult.usage) {
-          tokenUsage.push({ stage: tool.name, ...usageSummary(toolResult.usage) });
+          tokenUsage.push({
+            stage: tool.name,
+            model: toolResult.billing?.model || null,
+            ...usageSummary(toolResult.usage),
+          });
         }
         const supportsAnswerMode = tool.name === "facility_hours" || tool.name === "dining_menu";
         if (supportsAnswerMode && args.answerMode === "direct" && isMixedRequest(userMessage)) {
@@ -397,7 +426,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
         response_format: finalAnswerSchema,
       });
       stageLatencyMs.finalAnswer = Number(elapsedMs(finalStartedAt).toFixed(2));
-      tokenUsage.push({ stage: "final_answer", ...usageSummary(response.usage) });
+      tokenUsage.push({ stage: "final_answer", model: process.env.ROUTER_MODEL || "gpt-4o-mini", ...usageSummary(response.usage) });
       const message = response.choices?.[0]?.message;
       let parsed;
       try {
@@ -409,6 +438,7 @@ export async function orchestrateChatQuery(userMessage, options = {}) {
       if (validated) result = buildResult(validated, executedResults);
     }
   } catch (error) {
+    requestErrored = true;
     console.error("Chatbot router failed:", error.message);
   }
 

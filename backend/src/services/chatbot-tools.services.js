@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { DateTime } from "luxon";
 import pool from "../db.js";
-import { generateQueryEmbedding } from "./embedding.services.js";
+import { generateQueryEmbeddingWithUsage } from "./embedding.services.js";
 import {
   buildKnowledgeSources,
   formatKnowledgeCandidates,
@@ -237,7 +237,6 @@ const createRagSearchTool = dependencies => ({
   definition: ragSearchDefinition,
   async execute({ query }) {
     const database = dependencies.database || pool;
-    const embedding = dependencies.embedding || generateQueryEmbedding;
     const retrieve = dependencies.retrieveEvidence
       || ((queryEmbedding, queryText) => retrieveUnifiedEvidence(queryEmbedding, queryText, { database }));
     const dictionary = dependencies.facilityDictionary
@@ -253,7 +252,10 @@ const createRagSearchTool = dependencies => ({
     }
 
     if (!expandedQuery) return { useful: false, modelOutput: { found: false }, similarityScores: [] };
-    const queryEmbedding = await embedding(expandedQuery);
+    const embeddingResult = dependencies.embedding
+      ? { embedding: await dependencies.embedding(expandedQuery), usage: null }
+      : await generateQueryEmbeddingWithUsage(expandedQuery);
+    const queryEmbedding = embeddingResult.embedding;
     const retrieved = await retrieve(queryEmbedding, expandedQuery);
     const knowledge = (retrieved.knowledge || []).filter(isConfidentCandidate);
     const officialResources = retrieved.officialResources || [];
@@ -278,6 +280,8 @@ const createRagSearchTool = dependencies => ({
         })),
       },
       evidence: { knowledge, officialResources, relationships },
+      usage: embeddingResult.usage,
+      billing: { model: "text-embedding-3-large" },
       buildSources(selection) {
         const selectedKnowledge = knowledge.filter(candidate =>
           selection.knowledgeIds.includes(Number(candidate.id)));
@@ -414,6 +418,7 @@ Do not include Markdown links or raw URLs in the report; source links are return
       evidence: useful ? { web: { report, sources } } : {},
       buildSources: () => sources,
       usage: mergeResponseUsage(responses),
+      billing: { model, webSearchCalls: responses.length },
     };
   },
 });

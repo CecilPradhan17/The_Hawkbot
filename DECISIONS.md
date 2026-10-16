@@ -610,3 +610,29 @@ filters would let `gpt-4o-mini` run but would violate Hawkbot's official-source 
 the tool unless they explicitly opt out. Separating router and search models adds one
 configuration concept, but prevents a low-cost routing-model change from breaking or
 weakening web retrieval.
+
+## 2026-10-16 — Privacy-safe per-request cost telemetry
+
+**Context:** Multi-stage routing and hosted web search make cost vary substantially by
+question. Render logs include token usage but are temporary, difficult to aggregate,
+and intentionally omit question text. Persisting raw questions with account IDs would
+create an avoidable history of potentially sensitive student concerns.
+
+**Decision:** Store one operational record per HawkBot request with a random UUID, a
+broad category derived locally in memory, route and outcome, tool success states,
+model/token usage, hosted-search call count, latency, and a versioned estimated USD
+cost. Never store the raw question, response, conversation history, or user identity.
+Persistence is best-effort so missing telemetry cannot block a student answer.
+
+**Alternatives considered:** Raw question logging would make debugging and evaluation
+easier but creates unnecessary privacy and compliance exposure. Render-only logs avoid
+a schema but cannot reliably answer historical cost questions. Linking records to user
+accounts would support per-user billing but is unnecessary for aggregate operations.
+
+**Trade-offs:** Broad categories cannot reconstruct an individual failure, and prices
+must be updated when OpenAI changes rates. In exchange, HawkBot can measure per-route
+and per-tool cost without building a sensitive student-query archive.
+
+**Resume/interview angle:** Added auditable unit economics to a multi-model RAG system
+while applying data minimization: operationally useful metrics are retained without
+persisting user prompts or identity.

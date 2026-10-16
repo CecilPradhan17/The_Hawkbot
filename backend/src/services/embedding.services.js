@@ -57,6 +57,15 @@ export const generateQueryEmbedding = async (text) => {
   return response.data[0].embedding;
 };
 
+export const generateQueryEmbeddingWithUsage = async (text) => {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-large",
+    input: text,
+    encoding_format: "float",
+  });
+  return { embedding: response.data[0].embedding, usage: response.usage };
+};
+
 /**
  * Legacy export — kept for backward compatibility with seed.js
  * and approval.service.js that still import generateEmbedding.
